@@ -1,5 +1,11 @@
 # Project-specific
 crowdin.config.yaml
+~test.py
+~mgh/
+~satis/
+unreal.py
+unreal.py.stub
+Game.po
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
