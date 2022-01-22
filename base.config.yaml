@@ -1,0 +1,140 @@
+---
+# Base Crowdin settings, Crowdin settings can be overwritten by crowdin.config.yaml.
+# If some of your settings match across projects, you can set them here.
+
+#
+### Crowdin settings section ###
+#
+# crowdin.config.yaml contains the exact same section.
+# Any key present in crowdin.yaml overwrites these values.
+# For security reasons, api-token can only be set in crowdin.config.yaml.
+# Never publish or share your api-token or crowdin.config.yaml!
+crowdin:
+  organization:   org_name
+  # Set to your organization name if the project is on enterprise account.
+  # Leave this empty, if the project is on crowdin.com.
+
+  # api-token:      APITOKENYOUGENERATEONCROWDIN
+  # You can't set it here, you can only set it in crowdin.config.yaml, which you should keep secret.
+  # NEVER SHARE YOUR API TOKEN ANYWHERE!
+
+  project-id:     123456
+  # Project ID on Crowdin.
+  # If you don't know the ID, leave this empty and set project-name below.
+  
+  project-name:   ProjectNameOnCrowdin
+  # Project name on Crowdin.
+  # Used to get the project ID from the list of projects if it's not set above.
+
+  
+parameters:
+  stop-on-errors: True
+  # Should we stop if one task doesn't work?
+
+  use-unreal: True
+  # Should we use features that require unreal.py?
+  # Requires Unreal Python plugin to be enabled
+
+  p4-checkout: False
+  # Should we check out files from p4?
+  # By default, it checks out Localization folder.
+  # You can also specify additional files for checkout.
+  # P4 editor settings are used (from Saved/Config/Windows/SourceControlSettings.ini)
+
+  p4-checkin: False # TODO: implement this
+  # Should we check in the files back to p4?
+
+  p4-cl-desc: | # TODO: check out the files into a separate CL
+    * Imported latest translations from Crowdin
+    * Updated language completion rates in the language selection menu
+    * Updated community translators in credits
+    * Updated the source file on Crowdin
+  # Default CL descripiton to use for check-outs and check-ins
+
+
+### TASK LISTS ###
+# Task lists are lists of scripts that are executed one after another.
+# You can add as many task lists as you like.
+# Launch them by running 'locsync.py scenario_name'
+# A list of tasks, each task is a few of key-value pairs like this:
+#   description: required, this will be printed as the task is performed, and in the summary
+#   script: required, relative path to the script file
+#   unreal: optional, True/False, flags if this script has to be launched via unreal-cmd.exe
+#   p4-checkout/p4-checkin: optional, True/False, flags if the script is checks out assets or checks them in
+# All scripts should also use this config and crowdin.config.yaml for any configuration.
+
+no-source-upload:
+
+#  - description: 'Checkout Localization folder and community credits files'
+    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+#    script: p4checkout.py
+#    p4-checkout: True
+
+  - description: 'Gather the text in UE for all targets and export all locales'
+    script: ue-gather-and-export.py
+
+  - description: 'Generate hash and test/source locale with comments and debug IDs'
+    script: test_lang.py
+
+#  - description: 'Pull language completion rates from Crowdin and save them to a CSV file'
+#    script: compl_rate.py
+
+#  - description: 'Pull top members from Crowdin, generate date for credits and save it to a CSV file'
+#    script: community_credits.py
+
+#  - description: 'Reimport language list and community credits datatables from CSVs'
+#    script: reimport-datatables.py
+#    unreal: True
+
+#  - description: 'Upload the updated source file to Crowdin'
+#    script: upload_source.py
+
+  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
+    script: build-and-download.py
+
+  - description: 'Import and compile all targets in UE'
+    script: ue-import-and-compile.py
+  
+# end of default
+
+upload-source:
+# Upload new source file from test/io locale to Crowdin
+  - description: 'Upload the updated source file to Crowdin'
+    script: upload_source.py
+
+# end of upload-source
+
+full-sync:
+#  - description: 'Checkout Localization folder and community credits files'
+#    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+#    script: p4checkout.py
+#    p4-checkout: True
+
+  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+    script: ue-gather-and-export.py
+
+  - description: 'Generate test from draft and source locale with comments and debug IDs'
+    script: test_lang.py
+
+#  - description: 'Pull language completion rates from Crowdin and save them to a CSV file'
+#    script: compl_rate.py
+
+#  - description: 'Pull top members from Crowdin, generate date for credits and save it to a CSV file'
+#    script: community_credits.py
+
+#  - description: 'Reimport language list and community credits datatables from CSVs'
+#    script: reimport-datatables.py
+#    unreal: True
+
+  - description: 'Upload the updated source file to Crowdin'
+    script: upload_source.py
+
+  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
+    script: build-and-download.py
+
+  - description: 'Import and compile all targets in UE'
+    script: ue-import-and-compile.py
+
+# end of full-sync
+
+...
