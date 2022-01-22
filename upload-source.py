@@ -1,4 +1,4 @@
-import crowdin
+from libraries import crowdin
 from time import sleep
 from pathlib import Path
 from loguru import logger
