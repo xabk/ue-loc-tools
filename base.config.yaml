@@ -52,6 +52,38 @@ parameters:
   # Default CL descripiton to use for check-outs and check-ins
 
 
+script-parameters:
+  test-lang.py:
+    loc_targets: ['Game']
+    debug_ID_locale: io  # Set to '' (empty) to disable debug ID locale generation
+    hash_locale: ia-001  # Set to '' (empty) to disable hash locale generation
+    hash_prefix: '# '
+    hash_suffix: ' ~'
+    clear_translations: No
+    id_length: 4
+    encoding: utf-8-sig
+    sort_po: Yes
+    var_regex: '{[^}\[<]+}|<[^/>]+/>' # Looking for {variables} and <empty tags ... />
+    comments_criteria:
+#     - - PO entry field to search (msgctxt, msgid, msgstr, comment)
+#       - RegEx
+#       - Comment to add if RegEx is found in the PO entry field
+      - - 'msgctxt' # Example: Hint for abbreviated items, matched by namespace (Satisfactory)
+        - 'AbbreviatedDisplayName,'
+        - "Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\niiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)"
+      - - 'msgid' # Hint for lines with Unreal inline plurals
+        - '}\|plural\('
+        - |-
+          "Please adapt to your language plural rules. We only support keywords: zero, one, two, few, many, other.\n"
+          "Use Alt + C on Crowdin to create a skeleton adapted to your language grammar.\n"
+          "Translate only white text in curly braces. Test using the form below the Preview box.\n"
+          "Check what keywords stand for here: http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html."
+      - 
+        - 'msgid' # Example: Hint for lines with 'Zoop' in source (Satisfactory)
+        - '\b[Zz]oop'
+        - "Please keep this one as is or transliterate/change spelling only. Don't come up with funny names: it brings more harm than good."
+
+
 ### TASK LISTS ###
 # Task lists are lists of scripts that are executed one after another.
 # You can add as many task lists as you like.
@@ -74,7 +106,9 @@ no-source-upload:
     script: ue-gather-and-export.py
 
   - description: 'Generate hash and test/source locale with comments and debug IDs'
-    script: test_lang.py
+    script: test-lang.py
+#   script-parameters:
+#     hash_locale: '' # Disable hash locale generation
 
 #  - description: 'Pull language completion rates from Crowdin and save them to a CSV file'
 #    script: compl_rate.py
@@ -114,7 +148,7 @@ full-sync:
     script: ue-gather-and-export.py
 
   - description: 'Generate test from draft and source locale with comments and debug IDs'
-    script: test_lang.py
+    script: test-lang.py
 
 #  - description: 'Pull language completion rates from Crowdin and save them to a CSV file'
 #    script: compl_rate.py
@@ -127,7 +161,7 @@ full-sync:
 #    unreal: True
 
   - description: 'Upload the updated source file to Crowdin'
-    script: upload_source.py
+    script: upload-source.py
 
   - description: 'Build the project on Crowdin and download all targets to Content/Localization'
     script: build-and-download.py
