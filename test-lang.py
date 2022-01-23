@@ -7,12 +7,11 @@ from dataclasses import dataclass, field, fields
 
 from libraries import (
     polib,  # Modified polib: _POFileParser.handle_oc only splits references by ', '
-    ueutilities,
+    uetools,
+    utilities,
 )
 
 from pprint import pprint as pp
-
-BASE_CFG = 'base.config.yaml'
 
 # -------------------------------------------------------------------------------------
 # Defaults - These can be edited, only used if not overridden in configs
@@ -23,7 +22,7 @@ BASE_CFG = 'base.config.yaml'
 # 2. Global params from base.config.yaml (if config file found and parameters found)
 # 3. Defaults below (if no parameters found in config or no config found)
 @dataclass
-class Parameters:
+class TestLangParameters(utilities.Parameters):
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to list to process all loc targets when implemented
     loc_targets: list = field(
@@ -38,7 +37,7 @@ class Parameters:
     hash_suffix: str = ' ~'  # Suffix for each string in hash locale
 
     clear_translations: bool = False  # Start over? E.g., if ID length changed
-    id_length: int = 4  # Num of digits in ID (#0001)
+    id_length: int = 4  # Num of digits in ID (#0001), start over if changed
 
     encoding: str = 'utf-8-sig'  # PO file encoding
     sort_po: bool = True  # Sort the file by source reference?
@@ -69,10 +68,18 @@ class Parameters:
     # Regex to match indices and make them zero-padded to fix the sorting
     ind_regex: str = r'([\[\(])([^\]\)]+)([\]\)])'  # Anything in () or []
 
-    # Regex to match IDs (based on the id_length, start over if you change that)
-    id_regex: str = r'#(\d{{{id_length}}})'
+    # Regex pattern to match IDs
+    id_regex_pattern: str = r'#(\d{{{id_length}}})'
 
+    # Actual regex based on id_length
+    id_regex: str = None
+
+    # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_path = '../'
+
+    def post_update(self):
+        super().post_update()
+        self.id_regex = self.id_regex_pattern.format(id_length=self.id_length)
 
 
 # ---------------------------------------------------------------------------------
@@ -101,55 +108,6 @@ def get_task_list_from_arguments():
     return parser.parse_args().tasklist
 
 
-def read_config(task_list=None):
-
-    cfg = Parameters()
-
-    if not Path(BASE_CFG).exists():
-        logger.info('No config found. Using default parameters.')
-        cfg.id_regex = cfg.id_regex.format(id_length=cfg.id_length)
-        logger.info(f'{cfg}')
-        return cfg
-
-    with open(BASE_CFG, mode='r', encoding='utf-8') as f:
-        yaml_config = yaml.safe_load(f)
-
-    script = Path(__file__).name
-
-    updated = False
-    if script in yaml_config['script-parameters']:
-        for key, value in yaml_config['script-parameters'][script].items():
-            if key in [field.name for field in fields(Parameters)]:
-                updated = True
-                cfg.__setattr__(key, value)
-        if updated:
-            logger.info('Updated parameters from global section of base.config.yaml.')
-
-    updated = False
-    if task_list and task_list in yaml_config:
-        task_id = [
-            i for i, val in enumerate(yaml_config[task_list]) if val['script'] == script
-        ]
-        if task_id and 'script-parameters' in yaml_config[task_list][task_id[0]]:
-            logger.info('Updated parameters from global section of base.config.yaml.')
-            for key, value in yaml_config[task_list][task_id[0]][
-                'script-parameters'
-            ].items():
-                if key in [field.name for field in fields(Parameters)]:
-                    updated = True
-                    cfg.__setattr__(key, value)
-            if updated:
-                logger.info(
-                    f'Updated parameters from {task_list} section of base.config.yaml.'
-                )
-
-    cfg.id_regex = cfg.id_regex.format(id_length=cfg.id_length)
-
-    logger.info(f'{cfg}')
-
-    return cfg
-
-
 def id_gen(number: int, id_length: int) -> str:
     '''
     Generate fixed-width #12345 IDs (number to use, and ID width).
@@ -176,7 +134,7 @@ def get_additional_comments(entry: polib.POEntry, criteria: list) -> list:
     return comments
 
 
-def find_max_ID(cfg: Parameters) -> int:
+def find_max_ID(cfg: TestLangParameters) -> int:
     '''
     Find max used debug ID in `targets` localization targets.
     Returns 0 if no debug IDs are used.
@@ -203,7 +161,9 @@ def find_max_ID(cfg: Parameters) -> int:
     return max_id
 
 
-def process_debug_ID_locale(po_file: str, starting_id: int, cfg: Parameters) -> int:
+def process_debug_ID_locale(
+    po_file: str, starting_id: int, cfg: TestLangParameters
+) -> int:
     '''
     Process the PO file to insert #12345 IDs as 'translations'
     and add them to context
@@ -334,7 +294,7 @@ def process_debug_ID_locale(po_file: str, starting_id: int, cfg: Parameters) -> 
     return current_id
 
 
-def process_hash_locale(po_file: str, cfg: Parameters):
+def process_hash_locale(po_file: str, cfg: TestLangParameters):
     '''
     Open the PO, wrap every string in hash prefix and suffix, save the PO
     '''
@@ -362,10 +322,11 @@ def main():
     logger.info('--- Debug IDs script start ---')
 
     task_list = get_task_list_from_arguments()
-    cfg = read_config(task_list)
 
-    # TODO: Replace with actual content path look up (use ueutilities lib)
-    cfg.content_path = '../'
+    cfg = TestLangParameters()
+
+    cfg.read_config(Path(__file__).name, logger, task_list=task_list)
+
     logger.info(f'Content path: {Path(cfg.content_path).absolute()}')
 
     starting_id = 1
