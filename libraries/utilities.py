@@ -21,9 +21,15 @@ DEF_ENGINE_DIR = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/'
 @dataclass
 class Parameters:
     def post_update(self):
-        pass
+        '''
+        Called after you initiate or update the paramaters from config files.
 
-    # ---------------------------------------------------------------------------------
+        Override this to recalculate any config values
+        that depend on other config values. E.g., if you want
+        to format a path based on a base path or
+        create regex based on a pattern and other value.
+        '''
+        pass
 
     def read_config(
         self,
@@ -34,10 +40,20 @@ class Parameters:
         task_list: str = None,
     ):
 
-        if not Path(base_config).exists():
+        # Update Crowdin API config if exists
+        if secret_config and Path(secret_config).exists():
+            with open(secret_config, mode='r', encoding='utf-8') as f:
+                yaml_config = yaml.safe_load(f)
+
+            for key, value in yaml_config['crowdin'].items():
+                if key in [field.name for field in fields(self)]:
+                    self.__setattr__(key, value)
+
+        # Use defaults and return if base config does not exist
+        if not base_config or not Path(base_config).exists():
             logger.info('No config found. Using default parameters.')
             if 'token' in self and not self.token:
-                logger.warning('Token parameter exists but not set!')
+                logger.warning('API token parameter exists but not set!')
             self.post_update()
             logger.info(f'{self}')
             return
@@ -45,6 +61,7 @@ class Parameters:
         with open(base_config, mode='r', encoding='utf-8') as f:
             yaml_config = yaml.safe_load(f)
 
+        # Update config from the defaults section of base config
         updated = False
         if script in yaml_config['script-parameters']:
             for key, value in yaml_config['script-parameters'][script].items():
@@ -56,6 +73,7 @@ class Parameters:
                     'Updated parameters from global section of base.config.yaml.'
                 )
 
+        # Update config with overrides from the 'task list' section of base config
         updated = False
         if task_list and task_list in yaml_config:
             task_id = [
@@ -78,6 +96,7 @@ class Parameters:
                         f'Updated parameters from {task_list} section of base.config.yaml.'
                     )
 
+        # Run post_update to compute derivative parameters, if any
         self.post_update()
 
         logger.info(f'{self}')
