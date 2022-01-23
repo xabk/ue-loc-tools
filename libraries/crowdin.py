@@ -12,7 +12,7 @@ class UECrowdinCli(CrowdinClient):
         token: str,
         logger=None,
         organization: str = None,
-        project_id: str = None,
+        project_id: int = None,
         silent: bool = False,
     ):
         super().__init__()
