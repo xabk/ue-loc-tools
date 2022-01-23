@@ -11,8 +11,6 @@ from libraries import (
     utilities,
 )
 
-from pprint import pprint as pp
-
 # -------------------------------------------------------------------------------------
 # Defaults - These can be edited, only used if not overridden in configs
 # (needed to make the script work standalone)
