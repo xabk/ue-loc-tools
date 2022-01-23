@@ -20,6 +20,9 @@ DEF_ENGINE_DIR = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/'
 
 @dataclass
 class Parameters:
+
+    # TODO: Add some default parameters? Paths?
+
     def post_update(self):
         '''
         Called after you initiate or update the paramaters from config files.
@@ -95,6 +98,9 @@ class Parameters:
                     logger.info(
                         f'Updated parameters from {task_list} section of base.config.yaml.'
                     )
+
+        if 'token' in self and not self.token:
+            logger.warning('API token parameter exists but not set!')
 
         # Run post_update to compute derivative parameters, if any
         self.post_update()
