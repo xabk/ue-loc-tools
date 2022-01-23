@@ -1,16 +1,20 @@
 ---
-# Base Crowdin settings, Crowdin settings can be overwritten by crowdin.config.yaml.
-# If some of your settings match across projects, you can set them here.
-
 #
-### Crowdin settings section ###
+# -------------------------------------------------------------
+# ----------------- CROWDIN SETTINGS SECTION ------------------
+# -------------------------------------------------------------
+#
+# Set defaults for Crowdin API integration for all of your projects.
+# E.g., if all projects are hosted on your enterprise accounts,
+# set `organization` here and you can omit it in crowdin.config.yaml.
 #
 # crowdin.config.yaml contains the exact same section.
 # Any key present in crowdin.yaml overwrites these values.
 # For security reasons, api-token can only be set in crowdin.config.yaml.
-# Never publish or share your api-token or crowdin.config.yaml!
+# Never publish or share your API token or crowdin.config.yaml!
+#
 crowdin:
-  organization:   org_name
+  organization: ''
   # Set to your organization name if the project is on enterprise account.
   # Leave this empty, if the project is on crowdin.com.
 
@@ -18,15 +22,14 @@ crowdin:
   # You can't set it here, you can only set it in crowdin.config.yaml, which you should keep secret.
   # NEVER SHARE YOUR API TOKEN ANYWHERE!
 
-  project-id:     123456
+  project-id: 123456
   # Project ID on Crowdin.
-  # If you don't know the ID, leave this empty and set project-name below.
-  
-  project-name:   ProjectNameOnCrowdin
-  # Project name on Crowdin.
-  # Used to get the project ID from the list of projects if it's not set above.
 
-  
+#
+# -------------------------------------------------------------
+# ----------------- LOCSYNC SETTINGS SECTION ------------------
+# -------------------------------------------------------------
+#
 parameters:
   stop-on-errors: True
   # Should we stop if one task doesn't work?
@@ -51,16 +54,20 @@ parameters:
     * Updated the source file on Crowdin
   # Default CL descripiton to use for check-outs and check-ins
 
-
+# -------------------------------------------------------------
+# ----- SCRIPT PARAMETERS: SET DEFAULTS FOR SCRIPTS HERE ------
+# -------------------------------------------------------------
 script-parameters:
+
   test-lang.py:
+
     loc_targets: ['Game']
     debug_ID_locale: io  # Set to '' (empty) to disable debug ID locale generation
     hash_locale: ia-001  # Set to '' (empty) to disable hash locale generation
     hash_prefix: '# '
     hash_suffix: ' ~'
     clear_translations: No
-    id_length: 4
+    id_length: 4 # Start over (clear_translations = True) if you change id length
     encoding: utf-8-sig
     sort_po: Yes
     var_regex: '{[^}\[<]+}|<[^/>]+/>' # Looking for {variables} and <empty tags ... />
@@ -83,8 +90,11 @@ script-parameters:
         - '\b[Zz]oop'
         - "Please keep this one as is or transliterate/change spelling only. Don't come up with funny names: it brings more harm than good."
 
-
-### TASK LISTS ###
+#
+# -------------------------------------------------------------
+# ------------------------ TASK LISTS -------------------------
+# -------------------------------------------------------------
+#
 # Task lists are lists of scripts that are executed one after another.
 # You can add as many task lists as you like.
 # Launch them by running 'locsync.py scenario_name'
@@ -93,6 +103,7 @@ script-parameters:
 #   script: required, relative path to the script file
 #   unreal: optional, True/False, flags if this script has to be launched via unreal-cmd.exe
 #   p4-checkout/p4-checkin: optional, True/False, flags if the script is checks out assets or checks them in
+#   script-parameters: can contain any script specific parameters that will override defaults
 # All scripts should also use this config and crowdin.config.yaml for any configuration.
 
 no-source-upload:
@@ -170,5 +181,14 @@ full-sync:
     script: ue-import-and-compile.py
 
 # end of full-sync
+
+recreate-test-language:
+  - description: 'Generate hash and test/source locale with comments and debug IDs'
+    script: test-lang.py
+    script-parameters:
+      hash_locale: '' # Disable hash locale generation
+      clear_translations: Yes
+
+# end of recreate-test-language
 
 ...
