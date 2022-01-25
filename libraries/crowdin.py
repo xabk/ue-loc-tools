@@ -189,6 +189,8 @@ class UECrowdinCli(CrowdinClient):
 
     def get_top_translators(self):
 
+        self.update_file_list_and_project_data()
+
         language_ids = self.data['project_data']['targetLanguageIds']
 
         reports = dict.fromkeys(sorted(language_ids))
