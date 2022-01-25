@@ -97,9 +97,29 @@ script-parameters:
     temp_dir: 'Localization/~Temp/LocFilesTemp'
 
     dest_dir: 'Localization/{target}/'
-    project_dir: '../'
+    content_dir: '../'
 
     locales_to_delete: ['en-US-POSIX']
+
+  community-credits.py:
+    # csv_name: 'FactoryGame/Interface/UI/DT_Credits_Community.csv'
+    csv_name: 'Localization/DT_Credits_Community.csv'
+    csv_encoding: 'utf-16-le'
+
+    translation_threshold: 2000
+    review_threshold: 2000
+
+    users_to_exclude: [ '418ivan', 'Aemiliali', 'anyatuntiya', 'ASondrio', 'BeatrizLuque', 'ceiss', 'CSS_Stefan', 'darkwingbollin',
+      'deryad', 'EdmeeS', 'Fede__', 'frenchLQA', 'gameatnew', 'grammmych', 'h_jung', 'iamcomingagain', 'Inlingo',
+      'Inlingo_PL2', 'jembawls', 'LiNeu', 'm.s.esteban', 'michprus', 'Mohshiro', 'NarumiT', 'nunomiranda', 'rlarjsdn122',
+      'star_pan9292', 'Taipeivienna', 'thaisc', 'ting.h', 'xabk'
+      ]
+
+    content_dir: '../'
+
+    
+    
+    
 
 #
 # -------------------------------------------------------------
