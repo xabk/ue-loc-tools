@@ -78,7 +78,8 @@ class Parameters:
             if 'token' in fields(self) and not self.token:
                 logger.warning('API token parameter exists but not set!')
             self.post_update()
-            cfg_info = asdict(self).pop('token', None)
+            cfg_info = asdict(self)
+            cfg_info.pop('token', None)
             logger.info(f'{cfg_info}')
             return
 
@@ -126,7 +127,8 @@ class Parameters:
         # Run post_update to compute derivative parameters, if any
         self.post_update()
 
-        cfg_info = asdict(self).pop('token', None)
+        cfg_info = asdict(self)
+        cfg_info.pop('token', None)
         logger.info(f'{cfg_info}')
 
         return
