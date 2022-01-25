@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 
-class UECrowdinCli(CrowdinClient):
+class UECrowdinClient(CrowdinClient):
     def __init__(
         self,
         token: str,

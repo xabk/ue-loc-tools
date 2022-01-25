@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from loguru import logger
 
 from libraries import utilities
-from libraries.crowdin import UECrowdinCli
+from libraries.crowdin import UECrowdinClient
 
 # TODO: Use loguru for logging
 
@@ -59,7 +59,9 @@ class CommunityCreditsUpdater(utilities.Parameters):
         # with open('rep_json.txt', mode='r', encoding='utf-8') as f:
         #    reports = json.loads(f.readline())
 
-        crowdin = UECrowdinCli(self.token, logger, self.organization, self.project_id)
+        crowdin = UECrowdinClient(
+            self.token, logger, self.organization, self.project_id
+        )
 
         reports = crowdin.get_top_translators()
 

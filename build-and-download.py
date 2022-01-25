@@ -7,7 +7,7 @@ from time import sleep
 from loguru import logger
 
 from libraries import utilities
-from libraries.crowdin import UECrowdinCli
+from libraries.crowdin import UECrowdinClient
 
 
 @dataclass
@@ -48,7 +48,9 @@ class BuildAndDLParameters(utilities.Parameters):
         self._temp_path = self._content_path / self.temp_dir
 
     def build_and_download(self):
-        crowdin = UECrowdinCli(self.token, logger, self.organization, self.project_id)
+        crowdin = UECrowdinClient(
+            self.token, logger, self.organization, self.project_id
+        )
 
         build_data = crowdin.check_or_build()
 
