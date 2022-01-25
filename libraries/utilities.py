@@ -3,7 +3,8 @@
 
 from pathlib import Path
 import yaml
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
+import argparse
 
 BASE_CFG = 'base.config.yaml'
 SECRET_CFG = 'crowdin.config.yaml'
@@ -34,14 +35,33 @@ class Parameters:
         '''
         pass
 
+    def get_task_list_from_arguments(self):
+        parser = argparse.ArgumentParser(
+            description='''
+            Create a debug ID locale using settings in base.config.yaml
+            For defaults: test_lang.py
+            For task-specific settings: test_lang.py task_list_name
+            '''
+        )
+
+        parser.add_argument(
+            'tasklist',
+            type=str,
+            nargs='?',
+            help='Task list to run from base.config.yaml',
+        )
+
+        return parser.parse_args().tasklist
+
     def read_config(
         self,
         script,
         logger,
         base_config: str = BASE_CFG,
         secret_config: str = SECRET_CFG,
-        task_list: str = None,
     ):
+
+        task_list = self.get_task_list_from_arguments()
 
         # Update Crowdin API config if exists
         if secret_config and Path(secret_config).exists():
@@ -55,10 +75,11 @@ class Parameters:
         # Use defaults and return if base config does not exist
         if not base_config or not Path(base_config).exists():
             logger.info('No config found. Using default parameters.')
-            if 'token' in self and not self.token:
+            if 'token' in fields(self) and not self.token:
                 logger.warning('API token parameter exists but not set!')
             self.post_update()
-            logger.info(f'{self}')
+            cfg_info = asdict(self).pop('token', None)
+            logger.info(f'{cfg_info}')
             return
 
         with open(base_config, mode='r', encoding='utf-8') as f:
@@ -99,12 +120,13 @@ class Parameters:
                         f'Updated parameters from {task_list} section of base.config.yaml.'
                     )
 
-        if 'token' in self and not self.token:
-            logger.warning('API token parameter exists but not set!')
+        if 'token' in fields(self) and not self.token:
+            logger.error('API token parameter exists but not set!')
 
         # Run post_update to compute derivative parameters, if any
         self.post_update()
 
-        logger.info(f'{self}')
+        cfg_info = asdict(self).pop('token', None)
+        logger.info(f'{cfg_info}')
 
         return

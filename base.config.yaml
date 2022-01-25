@@ -18,11 +18,11 @@ crowdin:
   # Set to your organization name if the project is on enterprise account.
   # Leave this empty, if the project is on crowdin.com.
 
-  # api-token:      APITOKENYOUGENERATEONCROWDIN
+  # token:      APITOKENYOUGENERATEONCROWDIN
   # You can't set it here, you can only set it in crowdin.config.yaml, which you should keep secret.
   # NEVER SHARE YOUR API TOKEN ANYWHERE!
 
-  project-id: 123456
+  project_id: 123456
   # Project ID on Crowdin.
 
 #
@@ -89,6 +89,17 @@ script-parameters:
         - 'msgid' # Example: Hint for lines with 'Zoop' in source (Satisfactory)
         - '\b[Zz]oop'
         - "Please keep this one as is or transliterate/change spelling only. Don't come up with funny names: it brings more harm than good."
+
+  build-and-download.py:
+    loc_targets: ['Game'] # Localization targets, empty = process all targets
+
+    zip_name: 'Localization/~Temp/LocFilesTemp.zip'
+    temp_dir: 'Localization/~Temp/LocFilesTemp'
+
+    dest_dir: 'Localization/{target}/'
+    project_dir: '../'
+
+    locales_to_delete: ['en-US-POSIX']
 
 #
 # -------------------------------------------------------------
