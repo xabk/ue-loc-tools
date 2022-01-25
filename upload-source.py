@@ -1,4 +1,4 @@
-from libraries import crowdin
+from libraries.crowdin import UECrowdinClient
 from time import sleep
 from pathlib import Path
 from loguru import logger
@@ -14,7 +14,7 @@ SRC_LOCALE = 'io'
 
 FNAME = 'Localization/{target}/{locale}/{target}.po'
 
-crowdin_cli = crowdin.init_crowdin()
+crowdin_cli = UECrowdinClient('', None)
 
 
 def main():
@@ -45,7 +45,7 @@ def main():
     for target in TARGETS:
         fpath = content_path / Path(FNAME.format(target=target, locale=SRC_LOCALE))
         logger.info('Uploading file: {fpath}')
-        r = crowdin.upload_file(crowdin_cli, fpath)
+        r = crowdin_cli.update_file(fpath)
         if r == True:
             targets_processed += [target]
             logger.info('File updated.')
