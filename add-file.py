@@ -1,4 +1,4 @@
-from libraries.crowdin import CSPCrowdinClient
+from libraries.crowdin import UECrowdinClient
 from pathlib import Path
 
 # TODO: Add config file support
@@ -14,7 +14,7 @@ FNAME = '{target}.po'
 
 ORG = 'org'
 
-crowdin = CSPCrowdinClient(token='TOKEN', organization=ORG)
+crowdin = UECrowdinClient(token='TOKEN', organization=ORG)
 
 
 def main():
