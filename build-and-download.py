@@ -47,8 +47,6 @@ class BuildAndDLParameters(utilities.Parameters):
         self._zip_path = self._content_path / self.zip_name
         self._temp_path = self._content_path / self.temp_dir
 
-        # TODO: Convert paths to Path()
-
     def build_and_download(self):
         crowdin = UECrowdinCli(self.token, logger, self.organization, self.project_id)
 
