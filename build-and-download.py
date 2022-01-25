@@ -1,4 +1,4 @@
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from zipfile import ZipFile
 import shutil
 import requests
@@ -43,10 +43,9 @@ class BuildAndDLParameters(utilities.Parameters):
 
     def post_update(self):
         super().post_update()
-        project_path = Path(self.content_dir)
-        self._zip_path = project_path / self.zip_name
-        self._temp_path = project_path / self.temp_dir
         self._content_path = Path(self.content_dir)
+        self._zip_path = self._content_path / self.zip_name
+        self._temp_path = self._content_path / self.temp_dir
 
         # TODO: Convert paths to Path()
 
