@@ -287,11 +287,11 @@ class UECrowdinClient(CrowdinClient):
         self.info(f'Language IDs ({len(language_ids)}): {language_ids}')
         self.info(f'Language mappings ({len(language_mappings)}): {language_mappings}')
 
-        game_po_id = self.get_file_ID()
+        game_po_id = self.get_file_ID(filename)
 
         if not game_po_id:
-            self.error(f'Couldn\'t find Game.po, aborting. Response:{game_po_id}')
-            return
+            self.error(f'Couldn\'t find {filename}, aborting. Response: {game_po_id}')
+            return None
 
         game_po_progress = self.translation_status.get_file_progress(
             projectId=self.project_id, fileId=game_po_id, offset=0, limit=100
