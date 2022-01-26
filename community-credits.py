@@ -158,7 +158,7 @@ class CommunityCreditsUpdater(utilities.Parameters):
             csv_writer.writerow(fields)
             csv_writer.writerows(rows)
 
-        return 0
+        return True
 
 
 def main():
