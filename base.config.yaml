@@ -130,17 +130,14 @@ script-parameters:
   # Get completion rates from Crowdin and update the language list CSV file,
   # ready to reimport the data table asset in Unreal
   compl-rate.py:
-    loc_targets: ['Game'] # Localization targets, empty = process all targets
+    loc_targets: ['Game++', 'Game'] # Localization targets, empty = process all targets
 
     cultures_to_skip: ['en-US-POSIX', 'io'] # Locales to skip (native, debug, etc.)
 
     # Relative to Content directory
     csv_name: 'Localization/DT_OptionsMenuLanguages.csv'
-    po_name: 'Localization/{target}/{locale}/{target}.po'
     
     csv_encoding: 'utf-16-le'
-    po_encoding: 'utf-8-sig'
-    po_completion_threshold: 100  # PO-based completion percent to use as 100%
 
     content_dir: '../'
     

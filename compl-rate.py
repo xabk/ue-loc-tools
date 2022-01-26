@@ -1,7 +1,7 @@
 import csv
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from sqlite3 import complete_statement
 from loguru import logger
 
 from libraries import utilities, polib
@@ -34,12 +34,8 @@ class CommunityCreditsUpdater(utilities.Parameters):
     )  # Locales to skip (native, debug, etc.)
 
     csv_name: str = 'Localization/DT_OptionsMenuLanguages.csv'  # Relative to Content the project directory
-    po_name: str = 'Localization/{target}/{locale}/{target}.po'  # Relative to Content the project directory
 
     csv_encoding: str = 'utf-16-le'
-    po_encoding: str = 'utf-8-sig'
-
-    po_completion_threshold: int = 100  # PO-based completion percent to use as 100%
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
@@ -52,7 +48,88 @@ class CommunityCreditsUpdater(utilities.Parameters):
         self._content_path = Path(self.content_dir)
         self._csv_path = self._content_path / self.csv_name
 
-    def update_completion_rates_for_target(self, target: str):
+    def get_completion_rates_for_all_targets(self) -> dict:
+        crowdin = UECrowdinClient(
+            self.token, logger, self.organization, self.project_id
+        )
+
+        completion_rates = {}
+
+        logger.info(
+            f'Targets to query on Crowdin: ({len(self.loc_targets)}): {self.loc_targets}.'
+        )
+
+        targets_processed = []
+
+        for target in self.loc_targets:
+            logger.info(target)
+            if not completion_rates:
+                completion_rates = crowdin.get_completion_rates(filename=target + '.po')
+
+                if not completion_rates:
+                    logger.warning(
+                        f'No completion rates from Crowdin for target: {target}'
+                    )
+                    continue
+
+                logger.info(
+                    f'Initialized completion rates with data for target: {target}'
+                )
+            else:
+                new_rates = crowdin.get_completion_rates(filename=target + '.po')
+
+                if not new_rates:
+                    logger.warning(
+                        f'No completion rates from Crowdin for target: {target}'
+                    )
+                    continue
+
+                for lang, data in completion_rates.items():
+                    for key in data:
+                        completion_rates[lang][key] += new_rates[lang][key]
+
+            targets_processed += [target]
+
+        # All good, received completion rates for all targets
+        if targets_processed and len(targets_processed) == len(self.loc_targets):
+            logger.info(
+                f'Got completion rates for targets ({len(targets_processed)} / {len(self.loc_targets)}): '
+                f'{targets_processed}.'
+            )
+            if len(targets_processed) > 1:
+                for lang, data in completion_rates.items():
+                    completion_rates[lang]['translationProgress'] = round(
+                        completion_rates[lang]['translated']
+                        / completion_rates[lang]['total']
+                    )
+                    completion_rates[lang]['approvalProgress'] = round(
+                        completion_rates[lang]['approved']
+                        / completion_rates[lang]['total']
+                    )
+
+            return completion_rates
+
+        # Only received completion rates for some targets
+        # Data incomplete, better not use it
+        if targets_processed and len(targets_processed) != len(self.loc_targets):
+            logger.error(
+                'Incomplete data from Crowdin. Can\'t use it as it may lead to wrong completion rates!'
+            )
+            logger.error(
+                f'Only recieved data for targets ({len(targets_processed)} / {len(self.loc_targets)}): '
+                f'{targets_processed}. Full list of targets configured: {self.loc_targets}.'
+            )
+
+            return None
+
+        # No data received
+        logger.warning(
+            f'No data recieved from Crowdin for targets: {self.loc_targets}.'
+        )
+
+        return None
+
+    def update_completion_rates(self):
         """
         Updates completion rates for all languages listed in the languages CSV
         by getting translated percetanges from POs it respective locale folders
@@ -71,20 +148,15 @@ class CommunityCreditsUpdater(utilities.Parameters):
         locales_processed = 0
         locales_skipped = 0
 
-        crowdin = UECrowdinClient(
-            self.token, logger, self.organization, self.project_id
-        )
-
-        completion_rates = crowdin.get_completion_rates(filename=target + '.po')
+        completion_rates = self.get_completion_rates_for_all_targets()
 
         if completion_rates:
-            logger.info(f'Got completion rates for {target}.po from Crowdin:')
+            logger.info(f'Got completion rates for from Crowdin:')
             logger.info(completion_rates)
         else:
-            logger.warning(
-                f'No completion rates for {target}.po recieved from Crowdin! '
-                f'Using PO file completion rates with multiplier: {self.po_completion_threshold}.'
-            )
+            # No data to process
+            logger.error(f'No completion rates recieved from Crowdin. Aborting!')
+            return False
 
         for row in rows:
             # Skip the native and test cultures (100% anyway)
@@ -95,7 +167,7 @@ class CommunityCreditsUpdater(utilities.Parameters):
                 locales_skipped += 1
                 continue
 
-            if completion_rates and row[0] in completion_rates:
+            if row[0] in completion_rates:
                 logger.info(
                     f'{row[0]} updated from {row[4]} to {completion_rates[row[0]]["translationProgress"]} '
                     '(Crowdin data).'
@@ -105,35 +177,8 @@ class CommunityCreditsUpdater(utilities.Parameters):
             else:
                 if completion_rates:
                     logger.warning(
-                        f'{row[0]} missing from language mappings. Updating using the PO file.'
+                        f'{row[0]} missing from language mappings. Not updated.'
                     )
-                else:
-                    logger.warning(
-                        f'No completion rates from Crowdin. Updating {row[0]} using the PO file.'
-                    )
-                # Check if the file exists, open it and get completion rate
-                curr_path = Path(self.po_name.format(target=target, locale=row[0]))
-                if curr_path.exists() and curr_path.is_file():
-                    po = polib.pofile(curr_path, encoding=self.po_encoding)
-                    new_completion_rate = 0
-                    if po.percent_translated() >= self.po_completion_threshold:
-                        new_completion_rate = 100
-                    else:
-                        new_completion_rate = round(
-                            self.po_completion_threshold / po.percent_translated()
-                        )
-
-                    logger.info(
-                        f'{curr_path} updated from {row[4]} to {str(po.percent_translated())} '
-                        '(PO-based completion rate).'
-                    )
-                    row[4] = new_completion_rate
-                    locales_processed += 1
-                else:
-                    logger.error(
-                        f'{row[0]} skipped: no info from Crowdin and no PO file found at {curr_path}.'
-                    )
-                    locales_skipped += 1
 
         with open(
             self._csv_path, 'w', encoding=self.csv_encoding, newline=''
@@ -147,28 +192,6 @@ class CommunityCreditsUpdater(utilities.Parameters):
                 f'Processed locales: {locales_processed} / {len(rows)}. Locales skipped: {locales_skipped}.'
             )
             return True
-        else:
-            logger.warning(f'No locales processed for target: {target}.')
-
-        return False
-
-    def update_completion_rates(self):
-        logger.info(
-            f'Targets to process ({len(self.loc_targets)}): {self.loc_targets}.'
-        )
-
-        targets_processed = []
-        for t in self.loc_targets:
-            if self.update_completion_rates_for_target(t):
-                targets_processed += [t]
-
-        if targets_processed:
-            logger.info(
-                f'Targets processed ({len(targets_processed)} / {len(self.loc_targets)}): {targets_processed}.'
-            )
-            return True
-
-        logger.warning('No targets processed.')
 
         return False
 
