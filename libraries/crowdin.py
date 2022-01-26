@@ -265,6 +265,9 @@ class UECrowdinClient(CrowdinClient):
 
     def get_completion_rates(self, filename='Game.po'):
 
+        if not self.data:
+            self.update_file_list_and_project_data()
+
         project_data = self.data['project_data']
         language_ids = project_data['targetLanguageIds']
         supported_languages = self.data['supported_languages']
