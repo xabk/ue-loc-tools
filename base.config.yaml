@@ -59,6 +59,8 @@ parameters:
 # -------------------------------------------------------------
 script-parameters:
 
+  # Creating source locale (sorted, with debug IDs in context, with comments), 
+  # which is also aDebug ID locale, plus creating a Hash locale if needed
   test-lang.py:
 
     loc_targets: ['Game']
@@ -90,20 +92,28 @@ script-parameters:
         - '\b[Zz]oop'
         - "Please keep this one as is or transliterate/change spelling only. Don't come up with funny names: it brings more harm than good."
 
+    content_dir: '../'
+
+  # Build the translation project on Crowdin, download it, unpack,
+  # move to the Unreal Localization directory to make it ready for import
   build-and-download.py:
     loc_targets: ['Game'] # Localization targets, empty = process all targets
 
+    # Relative to Content directory
     zip_name: 'Localization/~Temp/LocFilesTemp.zip'
     temp_dir: 'Localization/~Temp/LocFilesTemp'
-
     dest_dir: 'Localization/{target}/'
-    content_dir: '../'
 
     locales_to_delete: ['en-US-POSIX']
 
+    content_dir: '../'
+
+  # Get top members from Crowdin and update the community credits CSV file,
+  # ready to reimport the data table asset in Unreal
   community-credits.py:
-    # csv_name: 'FactoryGame/Interface/UI/DT_Credits_Community.csv'
-    csv_name: 'Localization/DT_Credits_Community.csv'
+    # Relative to Content directory
+    csv_name: 'FactoryGame/Interface/UI/DT_Credits_Community.csv'
+
     csv_encoding: 'utf-16-le'
 
     translation_threshold: 2000
@@ -117,6 +127,22 @@ script-parameters:
 
     content_dir: '../'
 
+  # Get completion rates from Crowdin and update the language list CSV file,
+  # ready to reimport the data table asset in Unreal
+  compl-rate.py:
+    loc_targets: ['Game'] # Localization targets, empty = process all targets
+
+    cultures_to_skip: ['en-US-POSIX', 'io'] # Locales to skip (native, debug, etc.)
+
+    # Relative to Content directory
+    csv_name: 'Localization/DT_OptionsMenuLanguages.csv'
+    po_name: 'Localization/{target}/{locale}/{target}.po'
+    
+    csv_encoding: 'utf-16-le'
+    po_encoding: 'utf-8-sig'
+    po_completion_threshold: 100  # PO-based completion percent to use as 100%
+
+    content_dir: '../'
     
     
     
