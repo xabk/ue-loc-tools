@@ -62,7 +62,6 @@ class CommunityCreditsUpdater(utilities.Parameters):
         targets_processed = []
 
         for target in self.loc_targets:
-            logger.info(target)
             if not completion_rates:
                 completion_rates = crowdin.get_completion_rates(filename=target + '.po')
 
