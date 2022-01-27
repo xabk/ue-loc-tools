@@ -7,8 +7,6 @@ from loguru import logger
 from libraries import utilities
 from libraries.crowdin import UECrowdinClient
 
-# TODO: Use loguru for logging
-
 
 @dataclass
 class CommunityCreditsUpdater(utilities.Parameters):
