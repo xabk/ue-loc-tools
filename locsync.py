@@ -208,7 +208,7 @@ def main():
                     fpath,
                     uproject,
                     '-run=pythonscript',
-                    f'-script="{py_cwd / task["script"]}"',
+                    f'-script="{py_cwd / task["script"]} {params["task-list"]}"',
                     '-SCCProvider=None',
                     '-Unattended',
                     '-Log="LocSync.log"',
@@ -226,7 +226,7 @@ def main():
                 returncode = process.returncode
         else:
             returncode = subp.run(
-                ['python', py_cwd / task['script']], cwd=py_cwd
+                [sys.executable, py_cwd / task['script'], params['task-list']], cwd=py_cwd
             ).returncode
 
         task_elapsed = timer() - task_start
