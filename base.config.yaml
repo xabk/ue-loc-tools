@@ -44,10 +44,10 @@ parameters:
   # You can also specify additional files for checkout.
   # P4 editor settings are used (from Saved/Config/Windows/SourceControlSettings.ini)
 
-  p4-checkin: False # TODO: implement this
+  p4-checkin: False  # TODO: implement this
   # Should we check in the files back to p4?
 
-  p4-cl-desc: | # TODO: check out the files into a separate CL
+  p4-cl-desc: |  # TODO: check out the files into a separate CL
     * Imported latest translations from Crowdin
     * Updated language completion rates in the language selection menu
     * Updated community translators in credits
@@ -69,18 +69,18 @@ script-parameters:
     hash_prefix: '# '
     hash_suffix: ' ~'
     clear_translations: No
-    id_length: 4 # Start over (clear_translations = True) if you change id length
+    id_length: 4  # Start over (clear_translations = True) if you change id length
     encoding: utf-8-sig
     sort_po: Yes
-    var_regex: '{[^}\[<]+}|<[^/>]+/>' # Looking for {variables} and <empty tags ... />
+    var_regex: '{[^}\[<]+}|<[^/>]+/>'  # Looking for {variables} and <empty tags ... />
     comments_criteria:
 #     - - PO entry field to search (msgctxt, msgid, msgstr, comment)
 #       - RegEx
 #       - Comment to add if RegEx is found in the PO entry field
-      - - 'msgctxt' # Example: Hint for abbreviated items, matched by namespace (Satisfactory)
+      - - 'msgctxt'  # Example: Hint for abbreviated items, matched by namespace (Satisfactory)
         - 'AbbreviatedDisplayName,'
         - "Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\niiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)"
-      - - 'msgid' # Hint for lines with Unreal inline plurals
+      - - 'msgid'  # Hint for lines with Unreal inline plurals
         - '}\|plural\('
         - |-
           "Please adapt to your language plural rules. We only support keywords: zero, one, two, few, many, other.\n"
@@ -88,7 +88,7 @@ script-parameters:
           "Translate only white text in curly braces. Test using the form below the Preview box.\n"
           "Check what keywords stand for here: http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html."
       - 
-        - 'msgid' # Example: Hint for lines with 'Zoop' in source (Satisfactory)
+        - 'msgid'  # Example: Hint for lines with 'Zoop' in source (Satisfactory)
         - '\b[Zz]oop'
         - "Please keep this one as is or transliterate/change spelling only. Don't come up with funny names: it brings more harm than good."
 
@@ -97,7 +97,7 @@ script-parameters:
   # Build the translation project on Crowdin, download it, unpack,
   # move to the Unreal Localization directory to make it ready for import
   build-and-download.py:
-    loc_targets: ['Game'] # Localization targets, empty = process all targets
+    loc_targets: ['Game']  # Localization targets, empty = process all targets
 
     # Relative to Content directory
     zip_name: 'Localization/~Temp/LocFilesTemp.zip'
@@ -119,20 +119,16 @@ script-parameters:
     translation_threshold: 2000
     review_threshold: 2000
 
-    users_to_exclude: [ '418ivan', 'Aemiliali', 'anyatuntiya', 'ASondrio', 'BeatrizLuque', 'ceiss', 'CSS_Stefan', 'darkwingbollin',
-      'deryad', 'EdmeeS', 'Fede__', 'frenchLQA', 'gameatnew', 'grammmych', 'h_jung', 'iamcomingagain', 'Inlingo',
-      'Inlingo_PL2', 'jembawls', 'LiNeu', 'm.s.esteban', 'michprus', 'Mohshiro', 'NarumiT', 'nunomiranda', 'rlarjsdn122',
-      'star_pan9292', 'Taipeivienna', 'thaisc', 'ting.h', 'xabk'
-      ]
+    users_to_exclude: [ ]  # ['logins', 'you', 'want', 'to', 'exclude']
 
     content_dir: '../'
 
   # Get completion rates from Crowdin and update the language list CSV file,
   # ready to reimport the data table asset in Unreal
   compl-rate.py:
-    loc_targets: ['Game'] # Localization targets, empty = process all targets
+    loc_targets: ['Game']  # Localization targets, empty = process all targets
 
-    cultures_to_skip: ['en-US-POSIX', 'io'] # Locales to skip (native, debug, etc.)
+    cultures_to_skip: ['en-US-POSIX', 'io']  # Locales to skip (native, debug, etc.)
 
     # Relative to Content directory
     csv_name: 'Localization/DT_OptionsMenuLanguages.csv'
@@ -141,7 +137,19 @@ script-parameters:
 
     content_dir: '../'
     
+  # Check out Localization directory and any other assets from p4 server
+  p4-checkout.py:
+    loc_targets: ['Game']  # Localization targets, empty = process all targets
+
+    add_assets_to_checkout: [
+      'FactoryGame/Interface/UI/DT_Credits_Community.csv',
+      'FactoryGame/Interface/UI/DT_Credits_Community.uasset',
+      ]
     
+    config_name: '../Saved/Config/Windows/SourceControlSettings.ini'
+    p4_config_section: 'PerforceSourceControl.PerforceSourceControlSettings'
+
+    content_dir: '../'
     
 
 #
@@ -164,7 +172,7 @@ no-source-upload:
 
 #  - description: 'Checkout Localization folder and community credits files'
     # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-#    script: p4checkout.py
+#    script: p4-checkout.py
 #    p4-checkout: True
 
   - description: 'Gather the text in UE for all targets and export all locales'
@@ -206,7 +214,7 @@ upload-source:
 full-sync:
 #  - description: 'Checkout Localization folder and community credits files'
 #    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-#    script: p4checkout.py
+#    script: p4-checkout.py
 #    p4-checkout: True
 
   - description: 'Gather the text in UE for all targets and export the source/test locale draft'
