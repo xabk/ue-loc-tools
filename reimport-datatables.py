@@ -1,5 +1,8 @@
 # Has to be launched via Unreal to work, e.g.:
 # ../../../../Engine/Binaries/Win64/UE4Editor-cmd.exe Games/YourGame/YourGame.uproject -run=pythonscript -script="reimport-datatables.py"
+# Add -stdout -FullStdOutLogOutput for full output
+# Use -script="script.py any parameters" to pass parameters to script
+# ../../../../Engine/Binaries/Win64/UE4Editor-cmd.exe Games/FactoryGame/FactoryGame.uproject -run=pythonscript -script="reimport-datatables.py task-list-name"
 
 # TODO: Add config file support
 # TODO: Move parameters to config file
