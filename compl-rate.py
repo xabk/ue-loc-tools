@@ -1,7 +1,6 @@
 import csv
 from dataclasses import dataclass, field
 from pathlib import Path
-from sqlite3 import complete_statement
 from loguru import logger
 
 from libraries import utilities, polib
