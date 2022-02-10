@@ -39,7 +39,7 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
     )  # Localization targets, empty = process all targets
 
     # Relative to Game/Content directory
-    tasks_to_perform: list = field(
+    tasks: list = field(
         default_factory=lambda: ['Gather', 'Export']
     )  # Steps to perform. Config/Localization .ini file suffixes:
     # Gather, Export, Import, Сompile, GenerateReports, etc.
@@ -138,7 +138,7 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
             loc_target: ';'.join(
                 [
                     self._config_pattern.format(loc_target=loc_target, task=t)
-                    for t in self.tasks_to_perform
+                    for t in self.tasks
                 ]
             )
             for loc_target in self.loc_targets
@@ -175,9 +175,9 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
         return
 
     def run_tasks_for_loc_target(self, loc_target: str):
-        logger.info(f'Processing target {loc_target}. Tasks: {self.tasks_to_perform}')
+        logger.info(f'Processing target {loc_target}. Tasks: {self.tasks}')
 
-        if 'Gather' in self.tasks_to_perform and self.try_patch_dependencies:
+        if 'Gather' in self.tasks and self.try_patch_dependencies:
             self.patch_dependencies(loc_target)
 
         logger.info(
@@ -214,10 +214,7 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
     def run_tasks(self):
 
         logger.info(f'Targets to process ({len(self.loc_targets)}): {self.loc_targets}')
-        logger.info(
-            f'Tasks to perform ({len(self.tasks_to_perform)}): '
-            f'{self.tasks_to_perform}'
-        )
+        logger.info(f'Tasks to perform ({len(self.tasks)}): ' f'{self.tasks}')
 
         targets_processed = []
         for t in self.loc_targets:

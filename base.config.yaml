@@ -208,7 +208,9 @@ no-source-upload:
 #    p4-checkout: True
 
   - description: 'Gather the text in UE for all targets and export all locales'
-    script: ue-gather-and-export.py
+    script: ue-loc-gather-commandlet.py
+    script-parameters:
+      tasks: [Gather, Export]
 
   - description: 'Generate hash and test/source locale with comments and debug IDs'
     script: test-lang.py
@@ -222,7 +224,7 @@ no-source-upload:
 #    script: community_credits.py
 
 #  - description: 'Reimport language list and community credits datatables from CSVs'
-#    script: reimport-datatables.py
+#    script: ue-reimport-assets.py
 #    unreal: True
 
 #  - description: 'Upload the updated source file to Crowdin'
@@ -232,7 +234,9 @@ no-source-upload:
     script: build-and-download.py
 
   - description: 'Import and compile all targets in UE'
-    script: ue-import-and-compile.py
+    script: ue-loc-gather-commandlet.py
+    script-parameters:
+      tasks: [Import, Compile, GenerateReports]
   
 # end of default
 
@@ -250,7 +254,9 @@ full-sync:
 #    p4-checkout: True
 
   - description: 'Gather the text in UE for all targets and export the source/test locale draft'
-    script: ue-gather-and-export.py
+    script: ue-loc-gather-commandlet.py
+    script-parameters:
+      tasks: [Gather, Export]
 
   - description: 'Generate test from draft and source locale with comments and debug IDs'
     script: test-lang.py
@@ -262,7 +268,7 @@ full-sync:
 #    script: community_credits.py
 
 #  - description: 'Reimport language list and community credits datatables from CSVs'
-#    script: reimport-datatables.py
+#    script: ue-reimport-assets.py
 #    unreal: True
 
   - description: 'Upload the updated source file to Crowdin'
@@ -272,7 +278,9 @@ full-sync:
     script: build-and-download.py
 
   - description: 'Import and compile all targets in UE'
-    script: ue-import-and-compile.py
+    script: ue-loc-gather-commandlet.py
+    script-parameters:
+      tasks: [Import, Compile, GenerateReports]
 
 # end of full-sync
 
