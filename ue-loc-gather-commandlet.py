@@ -1,15 +1,27 @@
 #
-# Engine\Binaries\Win64\UE4Editor-cmd.exe Games\FactoryGame\FactoryGame.uproject -run=GatherText
-# -config="Config\Localization\Game_Gather.ini;Config\Localization\Game_Export.ini" -SCCProvider=None
-# -Unattended -LogLocalizationConflict -Log="PyCmdLocGatherAndExport.log"
+# Engine\Binaries\Win64\UE4Editor-cmd.exe Games\FactoryGame\FactoryGame.uproject
+# -run=GatherText
+# -config="Config\Localization\Game_Gather.ini;Config\Localization\Game_Export.ini"
+# -SCCProvider=None
+# -Unattended
+# -LogLocalizationConflict
+# -Log="PyCmdLocGatherAndExport.log"
 
-# Engine\Binaries\Win64\UE4Editor-cmd.exe Games\FactoryGame\FactoryGame.uproject -run=GatherText
-# -config="Config\Localization\Game_Gather.ini;Config\Localization\Game_ExportIO.ini" -SCCProvider=None
-# -Unattended -LogLocalizationConflict -Log="PyCmdLocGatherAndExport.log"
+# Engine\Binaries\Win64\UE4Editor-cmd.exe Games\FactoryGame\FactoryGame.uproject
+# -run=GatherText
+# -config="Config\Localization\Game_Gather.ini;Config\Localization\Game_ExportIO.ini"
+# -SCCProvider=None
+# -Unattended
+# -LogLocalizationConflict
+# -Log="PyCmdLocGatherAndExport.log"
 
-# Engine\Binaries\Win64\UE4Editor-cmd.exe Games\FactoryGame\FactoryGame.uproject -run=GatherText
-# -config="Config\Localization\Game_Import.ini;Config\Localization\Game_Compile.ini" -SCCProvider=None
-# -Unattended -LogLocalizationConflicts -Log="PyCmdLocGatherAndImport.log"
+# Engine\Binaries\Win64\UE4Editor-cmd.exe Games\FactoryGame\FactoryGame.uproject
+# -run=GatherText
+# -config="Config\Localization\Game_Import.ini;Config\Localization\Game_Compile.ini"
+# -SCCProvider=None
+# -Unattended
+# -LogLocalizationConflicts
+# -Log="PyCmdLocGatherAndImport.log"
 
 #
 # add "capture_output=True, text=True" to make it silent and catch output into result
@@ -43,6 +55,10 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
         default_factory=lambda: ['Gather', 'Export']
     )  # Steps to perform. Config/Localization .ini file suffixes:
     # Gather, Export, Import, Сompile, GenerateReports, etc.
+    # Set this in task lists in config. Good combinations for text:
+    # ['Gather', 'Export']
+    # ['Import', 'Compile', 'GenerateReports']
+    # ['Gather', 'Import', 'Compile', 'GenerateReports']
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
