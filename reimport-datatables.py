@@ -4,15 +4,14 @@
 # Use -script="script.py any parameters" to pass parameters to script
 # ../../../../Engine/Binaries/Win64/UE4Editor-cmd.exe Games/FactoryGame/FactoryGame.uproject -run=pythonscript -script="reimport-datatables.py task-list-name"
 
-# TODO: Add config file support
-# TODO: Move parameters to config file
-
 import unreal
 
-assets_to_reimport = [
-    "DataTable'/Game/FactoryGame/Interface/UI/DT_Credits_Community.DT_Credits_Community'",
-    "DataTable'/Game/Localization/DT_OptionsMenuLanguages.DT_OptionsMenuLanguages'",
-]
+import re
+from pathlib import Path
+
+assets_to_reimport = []
+
+CFG_FILE = 'Python/base.config.yaml'  # Relative to Content directory
 
 
 @unreal.uclass()
@@ -24,41 +23,91 @@ def logw(message):
     unreal.log_warning(message)
 
 
-logw('\n\n\n------ REIMPORT DATATABLES SCRIPT ------\n')
+def main():
 
-editorAssetLib = GetEditorAssetLibrary()
+    logw('\n\n\n------ REIMPORT DATATABLES SCRIPT ------\n')
 
-for assetPath in assets_to_reimport:
-    asset = editorAssetLib.find_asset_data(assetPath).get_asset()
+    config_file = Path(unreal.Paths.project_content_dir()) / CFG_FILE
 
-    task = unreal.AssetImportTask()
+    if not config_file.exists():
+        logw(f'Config file not found: {config_file}. Aborting.')
+        return
 
-    task.filename = asset.get_editor_property('asset_import_data').get_first_filename()
-    task.destination_path = asset.get_path_name().rpartition('/')[0]
-    task.destination_name = asset.get_name()
-    task.replace_existing = True
-    task.automated = True
-    task.save = True
+    logw(f'Trying to get asset list from config: {config_file}')
 
-    factory = unreal.CSVImportFactory()
-    factory.set_editor_property(
-        'automated_import_settings',
-        unreal.CSVImportSettings(asset.get_editor_property('row_struct')),
-    )
-    task.factory = factory
+    with open(config_file, 'r') as f:
+        s = f.readlines()
 
-    logw(
-        'Reimporting asset: '
-        + task.destination_path
-        + task.destination_name
-        + ' from '
-        + task.filename
-    )
+    i = 0
+    done = False
+    in_section = False
+    while True:
+        if done or i >= len(s):
+            break
 
-    asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
+        if not in_section and re.match(r'\s*ue-reimport-assets:.*', s[i]):
+            i += 1
+            if not i >= len(s) and re.match(r'\s*assets_to_reimport: \[.*', s[i]):
+                in_section = True
+                i += 1
+                continue
 
-    asset_tools.import_asset_tasks([task])
-    if len(task.result) == 1:
-        logw('Reimported:' + task.result[0])
+        if not in_section:
+            i += 1
+            continue
 
-logw('\n\n\n------ END OF SCRIPT ------\n')
+        if re.match('\s*].*', s[i]):
+            break
+        asset = re.search(r'(?<=")[^"]*(?=",?$)', s[i].strip())
+        if asset and re.match(r'^[^\']+\'[^\']+\'$', asset.group()):
+            assets_to_reimport.append(asset.group())
+        else:
+            logw(f'Couldn\'t parse line in config: {s[i]}')
+
+        i += 1
+
+    logw(f'Assets to reimport: {assets_to_reimport}')
+
+    editorAssetLib = GetEditorAssetLibrary()
+
+    for assetPath in assets_to_reimport:
+        asset = editorAssetLib.find_asset_data(assetPath).get_asset()
+
+        task = unreal.AssetImportTask()
+
+        task.filename = asset.get_editor_property(
+            'asset_import_data'
+        ).get_first_filename()
+        task.destination_path = asset.get_path_name().rpartition('/')[0]
+        task.destination_name = asset.get_name()
+        task.replace_existing = True
+        task.automated = True
+        task.save = True
+
+        factory = unreal.CSVImportFactory()
+        factory.set_editor_property(
+            'automated_import_settings',
+            unreal.CSVImportSettings(asset.get_editor_property('row_struct')),
+        )
+        task.factory = factory
+
+        logw(
+            'Reimporting asset: '
+            + task.destination_path
+            + task.destination_name
+            + ' from '
+            + task.filename
+        )
+
+        asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
+
+        asset_tools.import_asset_tasks([task])
+        if len(task.result) == 1:
+            logw('Reimported:' + task.result[0])
+
+    logw('\n\n\n------ END OF SCRIPT ------\n')
+
+
+# Run the script if the isn't imported
+if __name__ == "__main__":
+    main()
