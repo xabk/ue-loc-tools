@@ -150,6 +150,38 @@ script-parameters:
     p4_config_section: 'PerforceSourceControl.PerforceSourceControlSettings'
 
     content_dir: '../'
+
+  # Warning: For now this script only supports one config here, not in task lists.
+  # Warning: The ue-reimport-assets section is very sensitive to formatting
+  # because it's parsed without the yaml module.
+  # Add one asset per line like this (Copy Reference in UE):
+  # "AssetType'/Game/GameName/Path/To/Asset/Asset_Name.Asset_Name'",
+  # don't add any comments and don't change any other lines in this section.
+  ue-reimport-assets: # Don't change this line
+    assets_to_reimport: [ # Don't change this line, add assets one per line below
+      "DataTable'/Game/FactoryGame/Interface/UI/DT_Credits_Community.DT_Credits_Community'",
+      "DataTable'/Game/Localization/DT_OptionsMenuLanguages.DT_OptionsMenuLanguages'"
+      ] # Don't change this line
+
+  ue-loc-commandlet:
+    loc_targets: ['Game']  # Localization targets, empty = process all targets
+
+
+    # Relative to Game/Content directory
+    tasks_to_perform: [ ]
+    # Steps to perform. Config/Localization .ini file suffixes:
+    # Gather, Export, Import, Сompile, GenerateReports, etc.
+    # Specify this in task lists to run specific tasks.
+    # E.g., [Gather, Export] or [Import, Compile, GenerateReports]
+
+    try_patch_dependencies: Yes
+    # Should we patch dependencies in *_Gather.ini files?
+    # This seems to be needed if the project and engine
+    # are in completely separate directories
+
+    content_dir: '../'
+    # project_dir: ''  # Will try to find it if empty
+    # engine_dir: ''  # Will try to find it if empty
     
 
 #
