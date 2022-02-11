@@ -20,7 +20,7 @@ DEF_ENGINE_DIR = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/'
 
 
 @dataclass
-class Parameters:
+class LocTask:
 
     # TODO: Add some default parameters? Paths?
 

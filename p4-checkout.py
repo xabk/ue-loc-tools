@@ -4,11 +4,11 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from loguru import logger
 
-from libraries import utilities
+from libraries.utilities import LocTask
 
 
 @dataclass
-class AssetsCheckout(utilities.Parameters):
+class CheckoutAssets(LocTask):
 
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to empty list to process all loc targets when implemented
@@ -96,11 +96,11 @@ def main():
 
     logger.info('--- Checkout Localization and additional assets from P4 server ---')
 
-    cfg = AssetsCheckout()
+    task = CheckoutAssets()
 
-    cfg.read_config(Path(__file__).name, logger)
+    task.read_config(Path(__file__).name, logger)
 
-    result = cfg.checkout_assets()
+    result = task.checkout_assets()
 
     logger.info('--- Checkout assets script end ---')
 

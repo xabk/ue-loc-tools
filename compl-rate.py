@@ -3,10 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from loguru import logger
 
-from libraries import utilities, polib
+from libraries.utilities import LocTask
 from libraries.crowdin import UECrowdinClient
-
-# TODO: Add parameter to control fall back to PO file stats (line 73)
 
 # TODO: Support several localization targets
 
@@ -15,7 +13,7 @@ from libraries.crowdin import UECrowdinClient
 
 
 @dataclass
-class CommunityCreditsUpdater(utilities.Parameters):
+class UpdateLanguageCompletionRates(LocTask):
 
     # Declare Crowdin parameters to load them from config
     token: str = None
@@ -212,11 +210,11 @@ def main():
     )
     logger.info('')
 
-    cfg = CommunityCreditsUpdater()
+    task = UpdateLanguageCompletionRates()
 
-    cfg.read_config(Path(__file__).name, logger)
+    task.read_config(Path(__file__).name, logger)
 
-    result = cfg.update_completion_rates()
+    result = task.update_completion_rates()
 
     logger.info('')
     logger.info('--- Completion rates script end ---')

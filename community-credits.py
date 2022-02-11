@@ -4,12 +4,12 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from loguru import logger
 
-from libraries import utilities
+from libraries.utilities import LocTask
 from libraries.crowdin import UECrowdinClient
 
 
 @dataclass
-class CommunityCreditsUpdater(utilities.Parameters):
+class UpdateCommunityCredits(LocTask):
 
     # Declare Crowdin parameters to load them from config
     token: str = None
@@ -175,11 +175,11 @@ def main():
         '--- Create and process reports on Crowdin, create CSV for in-game credits ---'
     )
 
-    cfg = CommunityCreditsUpdater()
+    task = UpdateCommunityCredits()
 
-    cfg.read_config(Path(__file__).name, logger)
+    task.read_config(Path(__file__).name, logger)
 
-    result = cfg.update_community_credits()
+    result = task.update_community_credits()
 
     logger.info('--- Update community credits script end ---')
 

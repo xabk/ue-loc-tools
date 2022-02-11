@@ -38,11 +38,11 @@ from loguru import logger
 
 from dataclasses import dataclass, field
 
-from libraries import utilities
+from libraries.utilities import LocTask
 
 
 @dataclass
-class UnrealLocGatherCommandlet(utilities.Parameters):
+class UnrealLocGatherCommandlet(LocTask):
 
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to None to process all loc targets when implemented

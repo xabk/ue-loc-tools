@@ -6,12 +6,12 @@ from pathlib import Path
 from time import sleep
 from loguru import logger
 
-from libraries import utilities
+from libraries.utilities import LocTask
 from libraries.crowdin import UECrowdinClient
 
 
 @dataclass
-class BuildAndDLParameters(utilities.Parameters):
+class BuildAndDownloadTranslations(LocTask):
 
     # Declare Crowdin parameters to load them from config
     token: str = None
@@ -179,15 +179,15 @@ def main():
         '--- Build and download from Crowdin, extract and move to Localization directory ---'
     )
 
-    cfg = BuildAndDLParameters()
+    task = BuildAndDownloadTranslations()
 
-    cfg.read_config(Path(__file__).name, logger)
+    task.read_config(Path(__file__).name, logger)
 
-    cfg.build_and_download()
+    task.build_and_download()
 
-    cfg.unzip_file()
+    task.unzip_file()
 
-    result = cfg.process_loc_targets()
+    result = task.process_loc_targets()
 
     logger.info('--- Build, download, and move script end ---')
 

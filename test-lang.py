@@ -3,13 +3,12 @@ import re
 import argparse
 from loguru import logger
 from pathlib import Path
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 
 from libraries import (
     polib,  # Modified polib: _POFileParser.handle_oc only splits references by ', '
-    uetools,
-    utilities,
 )
+from libraries.utilities import LocTask
 
 # -------------------------------------------------------------------------------------
 # Defaults - These can be edited, only used if not overridden in configs
@@ -20,7 +19,7 @@ from libraries import (
 # 2. Global params from base.config.yaml (if config file found and parameters found)
 # 3. Defaults below (if no parameters found in config or no config found)
 @dataclass
-class TestLangParameters(utilities.Parameters):
+class TestLangParameters(LocTask):
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to list to process all loc targets when implemented
     loc_targets: list = field(
