@@ -45,12 +45,11 @@ from libraries import utilities
 class UnrealLocGatherCommandlet(utilities.Parameters):
 
     # TODO: Process all loc targets if none are specified
-    # TODO: Change lambda to empty list to process all loc targets when implemented
+    # TODO: Change lambda to None to process all loc targets when implemented
     loc_targets: list = field(
         default_factory=lambda: ['Game']
     )  # Localization targets, empty = process all targets
 
-    # Relative to Game/Content directory
     tasks: list = field(
         default_factory=lambda: ['Gather', 'Export']
     )  # Steps to perform. Config/Localization .ini file suffixes:
@@ -79,7 +78,7 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
     _engine_path: Path = None
     _unreal_binary_path: Path = None
 
-    _tasks: dict = None
+    _config_str: str = None
 
     def post_update(self):
         super().post_update()
@@ -150,15 +149,17 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
             )
             return False
 
-        self._tasks = {
-            loc_target: ';'.join(
-                [
-                    self._config_pattern.format(loc_target=loc_target, task=t)
-                    for t in self.tasks
-                ]
-            )
-            for loc_target in self.loc_targets
-        }
+        self._config_str = ';'.join(
+            [
+                ';'.join(
+                    [
+                        self._config_pattern.format(loc_target=loc_target, task=t)
+                        for t in self.tasks
+                    ]
+                )
+                for loc_target in self.loc_targets
+            ]
+        )
 
         logger.info(f'Project path: {self._project_path}.')
         logger.info(f'Engine path: {self._engine_path}.')
@@ -190,15 +191,19 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
 
         return
 
-    def run_tasks_for_loc_target(self, loc_target: str):
-        logger.info(f'Processing target {loc_target}. Tasks: {self.tasks}')
+    def run_tasks(self):
+        logger.info(
+            f'Processing targets ({len(self.loc_targets)}): '
+            f'{self.loc_targets}. Tasks ({len(self.tasks)}): {self.tasks}'
+        )
 
         if 'Gather' in self.tasks and self.try_patch_dependencies:
-            self.patch_dependencies(loc_target)
+            for loc_target in self.loc_targets:
+                self.patch_dependencies(loc_target)
 
         logger.info(
             f'Running Unreal loc gather commandlet with following config value: '
-            f'{self._tasks[loc_target]}'
+            f'{self._config_str}'
         )
 
         with subp.Popen(
@@ -206,7 +211,7 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
                 self._unreal_binary_path,
                 self._uproject_path,
                 '-run=GatherText',
-                f'-config="{self._tasks[loc_target]}"',
+                f'-config="{self._config_str}"',
                 '-SCCProvider=None',
                 '-Unattended',
                 '-LogLocalizationConflict',
@@ -227,26 +232,6 @@ class UnrealLocGatherCommandlet(utilities.Parameters):
 
         return returncode
 
-    def run_tasks(self):
-
-        logger.info(f'Targets to process ({len(self.loc_targets)}): {self.loc_targets}')
-        logger.info(f'Tasks to perform ({len(self.tasks)}): ' f'{self.tasks}')
-
-        targets_processed = []
-        for t in self.loc_targets:
-            if self.run_tasks_for_loc_target(t):
-                targets_processed += [t]
-
-        if targets_processed:
-            logger.info(
-                f'Targets processed ({len(targets_processed)}): {targets_processed}'
-            )
-            return True
-
-        logger.warning('No targets processed.')
-
-        return False
-
 
 def main():
 
@@ -263,11 +248,11 @@ def main():
     logger.info('--- Unreal gather text commandlet script ---')
     logger.info('')
 
-    cfg = UnrealLocGatherCommandlet()
+    task = UnrealLocGatherCommandlet()
 
-    cfg.read_config(Path(__file__).name, logger)
+    task.read_config(Path(__file__).name, logger)
 
-    returncode = cfg.run_tasks()
+    returncode = task.run_tasks()
 
     if returncode == 0:
         logger.info('')
