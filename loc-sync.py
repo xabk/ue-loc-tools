@@ -16,6 +16,8 @@ except Exception as err:
 BASE_CFG = 'base.config.yaml'
 SECRET_CFG = 'crowdin.config.yaml'
 
+NON_TASK_SECTIONS = ['crowdin', 'parameters', 'script-parameters']
+
 
 def read_config_files():
     with open(BASE_CFG) as f:
@@ -71,7 +73,7 @@ def parse_arguments():
 
 
 def get_task_list_from_user(config):
-    task_lists = [t for t in config if t not in ['crowdin', 'parameters']]
+    task_lists = [t for t in config if t not in NON_TASK_SECTIONS]
     task_list = ''
     while not task_list:
         print('Available task lists from base.config.yaml:')
@@ -98,7 +100,8 @@ def main():
         return
     if missing_modules and not params['setup']:
         print(
-            'Exception during module import. Try running locsync.py -setup to install the needed modules.\n'
+            'Exception during module import. Try running locsync.py -setup '
+            'to install the needed modules.\n'
             'Exception message:',
             err,
         )
@@ -148,7 +151,8 @@ def main():
     with open(next(project_path.glob('*.sln')), mode='r') as f:
         s = f.read()
         engine_path = re.findall(
-            r'"UnrealBuildTool", "(.*?)Engine\\Source\\Programs\\UnrealBuildTool\\UnrealBuildTool.csproj"',
+            r'"UnrealBuildTool", "(.*?)Engine\\Source\\Programs\\'
+            r'UnrealBuildTool\\UnrealBuildTool.csproj"',
             s,
         )
 
@@ -189,12 +193,16 @@ def main():
 
         if 'p4-checkout' in task and not config['parameters']['p4-checkout']:
             skip_task = True
-            reason = 'Skipped, P4 checkout is turned off in parameters (see base.config.yaml)'
+            reason = (
+                'Skipped, P4 checkout is turned off in parameters '
+                '(see base.config.yaml)'
+            )
 
         if 'p4-checkin' in task and not config['parameters']['p4-checkin']:
             skip_task = True
             reason = (
-                'Skipped, P4 checkin is turned off in parameters (see base.config.yaml)'
+                'Skipped, P4 checkin is turned off in parameters '
+                '(see base.config.yaml)'
             )
 
         if skip_task:
@@ -226,7 +234,8 @@ def main():
                 returncode = process.returncode
         else:
             returncode = subp.run(
-                [sys.executable, py_cwd / task['script'], params['task-list']], cwd=py_cwd
+                [sys.executable, py_cwd / task['script'], params['task-list']],
+                cwd=py_cwd,
             ).returncode
 
         task_elapsed = timer() - task_start

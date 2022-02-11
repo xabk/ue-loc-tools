@@ -55,11 +55,14 @@ class LocTask:
 
     def read_config(
         self,
-        script,
+        script: str,
         logger,
         base_config: str = BASE_CFG,
         secret_config: str = SECRET_CFG,
     ):
+
+        if script.endswith('.py'):
+            script = script.rpartition('.')[0]
 
         task_list = self.get_task_list_from_arguments()
 

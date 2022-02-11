@@ -61,7 +61,7 @@ script-parameters:
 
   # Creating source locale (sorted, with debug IDs in context, with comments), 
   # which is also aDebug ID locale, plus creating a Hash locale if needed
-  test-lang.py:
+  test-lang:
 
     loc_targets: ['Game']
     debug_ID_locale: io  # Set to '' (empty) to disable debug ID locale generation
@@ -96,7 +96,7 @@ script-parameters:
 
   # Build the translation project on Crowdin, download it, unpack,
   # move to the Unreal Localization directory to make it ready for import
-  build-and-download.py:
+  build-and-download:
     loc_targets: ['Game']  # Localization targets, empty = process all targets
 
     # Relative to Content directory
@@ -110,7 +110,7 @@ script-parameters:
 
   # Get top members from Crowdin and update the community credits CSV file,
   # ready to reimport the data table asset in Unreal
-  community-credits.py:
+  community-credits:
     # Relative to Content directory
     csv_name: 'FactoryGame/Interface/UI/DT_Credits_Community.csv'
 
@@ -125,7 +125,7 @@ script-parameters:
 
   # Get completion rates from Crowdin and update the language list CSV file,
   # ready to reimport the data table asset in Unreal
-  compl-rate.py:
+  completion-rates:
     loc_targets: ['Game']  # Localization targets, empty = process all targets
 
     cultures_to_skip: ['en-US-POSIX', 'io']  # Locales to skip (native, debug, etc.)
@@ -138,7 +138,7 @@ script-parameters:
     content_dir: '../'
     
   # Check out Localization directory and any other assets from p4 server
-  p4-checkout.py:
+  p4-checkout:
     loc_targets: ['Game']  # Localization targets, empty = process all targets
 
     add_assets_to_checkout: [
@@ -163,7 +163,7 @@ script-parameters:
       "DataTable'/Game/Localization/DT_OptionsMenuLanguages.DT_OptionsMenuLanguages'"
       ] # Don't change this line
 
-  ue-loc-commandlet:
+  ue-loc-gather-cmd:
     loc_targets: ['Game']  # Localization targets, empty = process all targets
 
 
