@@ -79,18 +79,25 @@ script-parameters:
 #       - Comment to add if RegEx is found in the PO entry field
       - - 'msgctxt'  # Example: Hint for abbreviated items, matched by namespace (Satisfactory)
         - 'AbbreviatedDisplayName,'
-        - "Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\niiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)"
+        - |-
+          "Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\n"
+          "iiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)"
       - - 'msgid'  # Hint for lines with Unreal inline plurals
         - '}\|plural\('
         - |-
-          "Please adapt to your language plural rules. We only support keywords: zero, one, two, few, many, other.\n"
+          "Please adapt to your language plural rules. We only support keywords: "
+          "zero, one, two, few, many, other.\n"
           "Use Alt + C on Crowdin to create a skeleton adapted to your language grammar.\n"
-          "Translate only white text in curly braces. Test using the form below the Preview box.\n"
-          "Check what keywords stand for here: http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html."
+          "Translate only white text in curly braces. Test using the form "
+          "below the Preview box.\n"
+          "Check what keywords stand for here: "
+          "http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html."
       - 
         - 'msgid'  # Example: Hint for lines with 'Zoop' in source (Satisfactory)
         - '\b[Zz]oop'
-        - "Please keep this one as is or transliterate/change spelling only. Don't come up with funny names: it brings more harm than good."
+        - |-
+          "Please keep this one as is or transliterate/change spelling only. "
+          "Don't come up with funny names: it brings more harm than good."
 
     content_dir: '../'
 
