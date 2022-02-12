@@ -177,15 +177,15 @@ class UECrowdinClient(CrowdinClient):
                 f'Revision: {file_data["data"]["revisionId"]} → '
                 f'{response["data"]["revisionId"]}'
             )
-            return None
+            return True
 
         self.warning(
-            f'{file_name} ({file_id}) updated but revision number is odd. '
+            f'{file_name} ({file_id}) updated but revision number hasn\'t changed. '
             f'Revision: {file_data["data"]["revisionId"]} → '
             f'{response["data"]["revisionId"]}'
         )
 
-        return None
+        return True
 
     def get_top_translators(self):
 
