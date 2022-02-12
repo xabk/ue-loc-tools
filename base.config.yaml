@@ -189,6 +189,13 @@ script-parameters:
     content_dir: '../'
     # project_dir: ''  # Will try to find it if empty
     # engine_dir: ''  # Will try to find it if empty
+
+  update-source-files:
+    loc_targets: ['Game']  # Localization targets, empty = process all targets
+
+    src_locale: io
+
+    content_dir: '../'
     
 
 #
