@@ -50,16 +50,23 @@ class UpdateSourceFile(LocTask):
             logger.info('Uploading file: {fpath}')
             r = crowdin.update_file(fpath)
             if r == True:
-                targets_processed += [target]
+                targets_processed.append(target)
                 logger.info('File updated.')
             else:
                 logger.error(
                     f'Something went wrong. Here\'s the last response from Crowdin: {r}'
                 )
 
-        if len(targets_processed) > 0:
-            print(f'Targets processed: {len(targets_processed)} > {targets_processed}')
+        if len(targets_processed) == len(self.loc_targets):
+            print(f'Targets processed ({len(targets_processed)}): {targets_processed}')
             return True
+        else:
+            logger.error(
+                'Not all targets have been processed: '
+                f'{len(targets_processed)} out of {len(self.loc_targets)}. '
+                f'Loc targets: {self.loc_targets}. '
+                f'Processed targets: {targets_processed}'
+            )
 
         return False
 
