@@ -59,9 +59,9 @@ class UpdateSourceFile(LocTask):
 
         if len(targets_processed) > 0:
             print(f'Targets processed: {len(targets_processed)} > {targets_processed}')
-            return 0
+            return True
 
-        return 1
+        return False
 
 
 def main():
