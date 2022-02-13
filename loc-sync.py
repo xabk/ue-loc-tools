@@ -3,6 +3,9 @@ import argparse
 import subprocess as subp
 
 missing_modules = False
+# Run with -setup to install required modules
+# (based on requirements.txt)
+# (generated with pipreqs .)
 
 try:
     import yaml
@@ -16,7 +19,7 @@ except Exception as err:
 BASE_CFG = 'base.config.yaml'
 SECRET_CFG = 'crowdin.config.yaml'
 
-NON_TASK_SECTIONS = ['crowdin', 'parameters', 'script-parameters']
+CFG_SECTIONS = ['crowdin', 'parameters', 'script-parameters']
 
 
 def read_config_files():
@@ -73,7 +76,7 @@ def parse_arguments():
 
 
 def get_task_list_from_user(config):
-    task_lists = [t for t in config if t not in NON_TASK_SECTIONS]
+    task_lists = [t for t in config if t not in CFG_SECTIONS]
     task_list = ''
     while not task_list:
         print('Available task lists from base.config.yaml:')
