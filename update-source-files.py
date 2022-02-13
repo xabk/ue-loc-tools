@@ -36,7 +36,6 @@ class UpdateSourceFile(LocTask):
         self._fname = self._fname.format(locale=self.src_locale, target='{target}')
 
     def update_source_files(self):
-
         crowdin = UECrowdinClient(
             self.token, logger, self.organization, self.project_id
         )
