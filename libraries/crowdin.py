@@ -108,7 +108,36 @@ class UECrowdinClient(CrowdinClient):
             self.project_id, build_data['id']
         )['data']
 
-    def add_file(self, filepath: Path, type='auto'):
+    def get_or_create_directory(self, dir, create: bool = True):
+        if not dir:
+            return None
+        r = self.source_files.list_directories(self.project_id)
+        if 'data' not in r:
+            self.error(f'No data in list directories response. Response: {r}')
+            return r
+
+        directories = {d['data']['name']: d['data']['id'] for d in r['data']}
+
+        if directories and dir in directories:
+            return directories[dir]
+
+        if not create:
+            return None
+
+        r = self.source_files.add_directory(self.project_id, dir)
+        if 'data' not in r:
+            self.error(f'No data in create directory response. Response: {r}')
+            return r
+
+        return r['data']['id']
+
+    def add_file(
+        self,
+        filepath: Path,
+        dir: str = None,
+        type: str = 'auto',
+        export_pattern: str = '',
+    ):
         with open(filepath, mode='rb') as file:
             storage = self.storages.add_storage(file)
 
@@ -118,9 +147,27 @@ class UECrowdinClient(CrowdinClient):
 
         self.info(f'{filepath.name} uploaded to storage. Updating file...')
 
-        response = self.source_files.add_file(
-            self.project_id, storage['data']['id'], filepath.name, type=type
-        )
+        dir_id = 0
+        if dir:
+            dir_id = self.get_or_create_directory(dir)
+
+        if dir_id:
+            response = self.source_files.add_file(
+                self.project_id,
+                storage['data']['id'],
+                filepath.name,
+                directoryId=dir_id,
+                type=type,
+                exportOptions={'exportPattern': export_pattern},
+            )
+        else:
+            response = self.source_files.add_file(
+                self.project_id,
+                storage['data']['id'],
+                filepath.name,
+                type=type,
+                exportOptions={'exportPattern': export_pattern},
+            )
 
         if not 'data' in response:
             self.error(f'No data in response. Response:\n{response}')
