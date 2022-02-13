@@ -18,9 +18,13 @@ crowdin:
   # Set to your organization name if the project is on enterprise account.
   # Leave this empty, if the project is on crowdin.com.
 
-  # token:      APITOKENYOUGENERATEONCROWDIN
-  # You can't set it here, you can only set it in crowdin.config.yaml, which you should keep secret.
-  # NEVER SHARE YOUR API TOKEN ANYWHERE!
+  # token:      API TOKEN YOU GENERATE ON CROWDIN
+  # You can't set it here, you can only set it in crowdin.config.yaml, 
+  # which you should keep secret.
+  #
+  # -----------------------------------------------------------
+  # ---------- NEVER SHARE YOUR API TOKEN ANYWHERE! -----------
+  # -----------------------------------------------------------
 
   project_id: 123456
   # Project ID on Crowdin.
@@ -32,22 +36,23 @@ crowdin:
 #
 parameters:
   stop-on-errors: True
-  # Should we stop if one task doesn't work?
+  # Should we stop if one task crashes or returns an error?
 
   use-unreal: True
-  # Should we use features that require unreal.py?
+  # Should we launch scripts that require unreal.py?
   # Requires Unreal Python plugin to be enabled
+  # Launches scripts via unreal-cmd.exe to leverage the unreal.py
 
   p4-checkout: False
   # Should we check out files from p4?
-  # By default, it checks out Localization folder.
-  # You can also specify additional files for checkout.
-  # P4 editor settings are used (from Saved/Config/Windows/SourceControlSettings.ini)
+  # By default, it checks out the whole Localization folder.
+  # You can also specify additional files for checkout in script settings below.
+  # UE editor P4 settings are used (Saved/Config/Windows/SourceControlSettings.ini)
 
   p4-checkin: False  # TODO: implement this
   # Should we check in the files back to p4?
 
-  p4-cl-desc: |  # TODO: check out the files into a separate CL
+  p4-cl-desc: |  # TODO: check out the files into a separate CL with this description
     * Imported latest translations from Crowdin
     * Updated language completion rates in the language selection menu
     * Updated community translators in credits
@@ -59,29 +64,56 @@ parameters:
 # -------------------------------------------------------------
 script-parameters:
 
-  # Creating source locale (sorted, with debug IDs in context, with comments), 
-  # which is also aDebug ID locale, plus creating a Hash locale if needed
+  # Add source files from several loc targets to Crowdin,
+  # with specified type and proper export pattern
+  # (to simplify built translations processing)
+  add-source-files:
+  
+    loc_targets: ['Game']
+
+    file_format: 'auto'  # ...or 'gettext-unreal' (when the full support is there)
+
+    src_locale: io
+    # It's a good idea to use the debug ID locale for this 
+    # because it's sorted, features debug IDs, automated comments, 
+    # repetition markers, and asset names in context
+    # (see test-lang script settings below)
+
+    export_pattern: '{target}/%locale%/{target}.po'
+    # Script will substitute the {target} key, 
+    # %keys% are part of Crowdin export settings,
+    # see https://support.crowdin.com/files-management/#file-export
+    # Also see how to add custom locale codes to match those in Unreal:
+    # https://support.crowdin.com/advanced-project-setup/#adding-custom-language-codes
+
+    content_dir: '../'
+
+
+  # Create source locale (sorted, with debug IDs in context, with comments), 
+  # which also serves as debug ID locale (simple unique debug IDs for all strings).
+  # And creating a Hash locale (basic pseudo-localization) if needed.
   test-lang:
 
     loc_targets: ['Game']
-    debug_ID_locale: io  # Set to '' (empty) to disable debug ID locale generation
+
     hash_locale: ia-001  # Set to '' (empty) to disable hash locale generation
     hash_prefix: '# '
     hash_suffix: ' ~'
+    
+    debug_ID_locale: io  # Set to '' (empty) to disable debug ID locale generation
     clear_translations: No
     id_length: 4  # Start over (clear_translations = True) if you change id length
     encoding: utf-8-sig
     sort_po: Yes
     var_regex: '{[^}\[<]+}|<[^/>]+/>'  # Looking for {variables} and <empty tags ... />
     comments_criteria:
-#     - - PO entry field to search (msgctxt, msgid, msgstr, comment)
-#       - RegEx
-#       - Comment to add if RegEx is found in the PO entry field
-      - - 'msgctxt'  # Example: Hint for abbreviated items, matched by namespace (Satisfactory)
-        - 'AbbreviatedDisplayName,'
-        - |-
-          "Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\n"
-          "iiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)"
+    # Ths will add comments based on criteria (e.g., to explain a feature or syntax)
+    # Format is as follows:
+#     - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
+#       - 'RegEx' = regex to use for checking
+#       - |-
+#         "Multiline comment that requires explicit \n for new lines"
+#         "This comment will be added if `RegEx` is found in the PO entry `field`"
       - - 'msgid'  # Hint for lines with Unreal inline plurals
         - '}\|plural\('
         - |-
@@ -92,8 +124,14 @@ script-parameters:
           "below the Preview box.\n"
           "Check what keywords stand for here: "
           "http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html."
-      - 
-        - 'msgid'  # Example: Hint for lines with 'Zoop' in source (Satisfactory)
+
+      - - 'msgctxt'  # Example: Hint for abbreviated items, matched by namespace
+        - 'AbbreviatedDisplayName,'
+        - |-
+          "Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\n"
+          "iiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)"
+
+      - - 'msgid'  # Example: Hint for lines with 'Zoop' in source (Satisfactory)
         - '\b[Zz]oop'
         - |-
           "Please keep this one as is or transliterate/change spelling only. "
@@ -102,8 +140,10 @@ script-parameters:
     content_dir: '../'
 
   # Build the translation project on Crowdin, download it, unpack,
-  # move to the Unreal Localization directory to make it ready for import
+  # move to the Unreal Localization directory to make it ready for import.
+  # Warning: This will overwrite any existing POs in Unreal Localization directory.
   build-and-download:
+
     loc_targets: ['Game']  # Localization targets, empty = process all targets
 
     # Relative to Content directory
@@ -116,10 +156,11 @@ script-parameters:
     content_dir: '../'
 
   # Get top members from Crowdin and update the community credits CSV file,
-  # ready to reimport the data table asset in Unreal
+  # making it ready to be reimported into the data table asset in Unreal
   community-credits:
-    # Relative to Content directory
+
     csv_name: 'FactoryGame/Interface/UI/DT_Credits_Community.csv'
+    # Relative to Content directory
 
     csv_encoding: 'utf-16-le'
 
@@ -131,11 +172,13 @@ script-parameters:
     content_dir: '../'
 
   # Get completion rates from Crowdin and update the language list CSV file,
-  # ready to reimport the data table asset in Unreal
+  # ready to be reimported into the data table asset in Unreal
   completion-rates:
+
     loc_targets: ['Game']  # Localization targets, empty = process all targets
 
-    cultures_to_skip: ['en-US-POSIX', 'io']  # Locales to skip (native, debug, etc.)
+    cultures_to_skip: ['en-US-POSIX', 'io']
+    # Locales to skip (native, debug, hash, etc.)
 
     # Relative to Content directory
     csv_name: 'Localization/DT_OptionsMenuLanguages.csv'
@@ -170,9 +213,12 @@ script-parameters:
       "DataTable'/Game/Localization/DT_OptionsMenuLanguages.DT_OptionsMenuLanguages'"
       ] # Don't change this line
 
+  # Run the Unreal gather text commandlet for any number of loc targets
+  # with any number of ini files as parameters
+  # Set the defaults here, and specify ini files (steps) in task lists
   ue-loc-gather-cmd:
-    loc_targets: ['Game']  # Localization targets, empty = process all targets
 
+    loc_targets: ['Game']  # Localization targets, empty = process all targets
 
     # Relative to Game/Content directory
     tasks_to_perform: [ ]
@@ -190,10 +236,14 @@ script-parameters:
     # project_dir: ''  # Will try to find it if empty
     # engine_dir: ''  # Will try to find it if empty
 
+  # Update source files for several loc targets on Crowdin
   update-source-files:
+
     loc_targets: ['Game']  # Localization targets, empty = process all targets
 
     src_locale: io
+    # It's a good idea to use the same locale here and in add-source-files
+    # It's also a good idea to use debug ID locale :)
 
     content_dir: '../'
     
@@ -203,16 +253,20 @@ script-parameters:
 # ------------------------ TASK LISTS -------------------------
 # -------------------------------------------------------------
 #
-# Task lists are lists of scripts that are executed one after another.
+# Task lists are lists of scripts to be executed one after another.
 # You can add as many task lists as you like.
 # Launch them by running 'locsync.py scenario_name'
 # A list of tasks, each task is a few of key-value pairs like this:
-#   description: required, this will be printed as the task is performed, and in the summary
-#   script: required, relative path to the script file
-#   unreal: optional, True/False, flags if this script has to be launched via unreal-cmd.exe
-#   p4-checkout/p4-checkin: optional, True/False, flags if the script is checks out assets or checks them in
-#   script-parameters: can contain any script specific parameters that will override defaults
-# All scripts should also use this config and crowdin.config.yaml for any configuration.
+#   description: required, this will be printed as the task is performed, 
+#                and in the summary
+#   script: 'script_filename.py', required, relative path to the script file
+#   unreal: optional, True/False, 
+#           flags if this script has to be launched via unreal-cmd.exe
+#   p4-checkout/p4-checkin: optional, True/False, 
+#                           flags if the script is checks out assets or checks them in
+#   script-parameters: can contain any script specific parameters 
+#                      that will override the defaults above
+# All scripts use this config and crowdin.config.yaml for configuration.
 
 no-source-upload:
 
