@@ -33,7 +33,7 @@ class UpdateSourceFile(LocTask):
     def post_update(self):
         super().post_update()
         self._content_path = Path(self.content_dir).resolve()
-        self._fname = self._fname.format(locale=self.src_locale)
+        self._fname = self._fname.format(locale=self.src_locale, target='{target}')
 
     def update_source_files(self):
 
