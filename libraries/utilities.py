@@ -72,7 +72,9 @@ class LocTask:
                 yaml_config = yaml.safe_load(f)
 
             for key, value in yaml_config['crowdin'].items():
-                if key in [field.name for field in fields(self)]:
+                if not key.startswith('_') and key in [
+                    field.name for field in fields(self)
+                ]:
                     self.__setattr__(key, value)
 
         # Use defaults and return if base config does not exist
@@ -93,7 +95,9 @@ class LocTask:
         updated = False
         if script in yaml_config['script-parameters']:
             for key, value in yaml_config['script-parameters'][script].items():
-                if key in [field.name for field in fields(self)]:
+                if not key.startswith('_') and key in [
+                    field.name for field in fields(self)
+                ]:
                     updated = True
                     self.__setattr__(key, value)
             if updated:
@@ -116,7 +120,9 @@ class LocTask:
                 for key, value in yaml_config[task_list][task_id[0]][
                     'script-parameters'
                 ].items():
-                    if key in [field.name for field in fields(self)]:
+                    if not key.startswith('_') and key in [
+                        field.name for field in fields(self)
+                    ]:
                         updated = True
                         self.__setattr__(key, value)
                 if updated:
