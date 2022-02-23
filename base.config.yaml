@@ -270,8 +270,9 @@ script-parameters:
 
 no-source-upload:
 
+# Enable p4-checkout to let this work or check out Localization folder 
+# and other assets manually
 #  - description: 'Checkout Localization folder and community credits files'
-    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
 #    script: p4-checkout.py
 #    p4-checkout: True
 
@@ -285,10 +286,10 @@ no-source-upload:
 #   script-parameters:
 #     hash_locale: '' # Disable hash locale generation
 
-#  - description: 'Pull language completion rates from Crowdin and save them to a CSV file'
+#  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
 #    script: compl_rate.py
 
-#  - description: 'Pull top members from Crowdin, generate date for credits and save it to a CSV file'
+#  - description: 'Pull top members from Crowdin, save the data to a CSV file'
 #    script: community_credits.py
 
 #  - description: 'Reimport language list and community credits datatables from CSVs'
