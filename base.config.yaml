@@ -277,7 +277,7 @@ no-source-upload:
 #    p4-checkout: True
 
   - description: 'Gather the text in UE for all targets and export all locales'
-    script: ue-loc-gather-commandlet.py
+    script: ue-loc-gather-cmd.py
     script-parameters:
       tasks: [Gather, Export]
 
@@ -303,7 +303,7 @@ no-source-upload:
     script: build-and-download.py
 
   - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-commandlet.py
+    script: ue-loc-gather-cmd.py
     script-parameters:
       tasks: [Import, Compile, GenerateReports]
   
@@ -329,7 +329,7 @@ full-sync:
 #    p4-checkout: True
 
   - description: 'Gather the text in UE for all targets and export the source/test locale draft'
-    script: ue-loc-gather-commandlet.py
+    script: ue-loc-gather-cmd.py
     script-parameters:
       tasks: [Gather, Export]
 
@@ -355,7 +355,7 @@ full-sync:
     script: build-and-download.py
 
   - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-commandlet.py
+    script: ue-loc-gather-cmd.py
     script-parameters:
       tasks: [Import, Compile, GenerateReports]
 
