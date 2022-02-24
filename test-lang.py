@@ -126,9 +126,28 @@ class ProcessTestAndHashLocales(LocTask):
         '''
         max_id = 0
 
+        po_files = []
+        missing_files = []
+
         for target in self.loc_targets:
+            fname = self._content_path / self._debug_id_file.format(target=target)
+            if not fname.exists():
+                missing_files.append(fname)
+            else:
+                po_files.append(fname)
+
+        if missing_files:
+            logger.error(
+                f'Check loc targets configuration. Missing PO files: {missing_files}'
+            )
+
+        if not po_files:
+            logger.error('No PO files found at all. Max used ID is set to 0.')
+            return 0
+
+        for fname in po_files:
             po = polib.pofile(
-                self._content_path / self._debug_id_file.format(target=target),
+                fname,
                 wrapwidth=0,
                 encoding=self.encoding,
             )
