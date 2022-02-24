@@ -231,7 +231,10 @@ def main():
             ) as process:
                 while True:
                     for line in process.stdout:
-                        logger.info(f'| UE | {line.strip()}')
+                        if 'Error: ' in line:
+                            logger.error(f'| UE | {line.strip()}')
+                        else:
+                            logger.info(f'| UE | {line.strip()}')
                     if process.poll() != None:
                         break
                 returncode = process.returncode
