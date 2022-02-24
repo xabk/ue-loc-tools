@@ -173,7 +173,7 @@ class UnrealLocGatherCommandlet(LocTask):
             self._project_path / f'Config/Localization/{loc_target}_Gather.ini', 'r'
         ) as file:
             gather_ini = file.read()
-            engine_path = re.subn(r'\\', '/', self._engine_path)[0]
+            engine_path = re.subn(r'\\', '/', str(self._engine_path))[0]
             gather_ini, patched_dependencies = re.subn(
                 r'(?<=ManifestDependencies=)[^\r\n]*?(?=Engine/Content/Localization/)',
                 engine_path,
