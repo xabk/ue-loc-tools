@@ -225,7 +225,12 @@ class UnrealLocGatherCommandlet(LocTask):
             while True:
                 for line in process.stdout:
                     line = re.sub(r"^\[[^]]+]", "", line.strip())
-                    logger.info(f'| UE | {line}')
+                    if 'Error: ' in line:
+                        logger.error(f'| UE | {line.strip()}')
+                    elif 'Warning: ' in line:
+                        logger.warning(f'| UE | {line.strip()}')
+                    else:
+                        logger.info(f'| UE | {line.strip()}')
                 if process.poll() != None:
                     break
             returncode = process.returncode

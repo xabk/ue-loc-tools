@@ -233,6 +233,8 @@ def main():
                     for line in process.stdout:
                         if 'Error: ' in line:
                             logger.error(f'| UE | {line.strip()}')
+                        elif 'Warning: ' in line:
+                            logger.warning(f'| UE | {line.strip()}')
                         else:
                             logger.info(f'| UE | {line.strip()}')
                     if process.poll() != None:
