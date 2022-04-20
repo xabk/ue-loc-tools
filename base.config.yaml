@@ -79,7 +79,7 @@ script-parameters:
     # repetition markers, and asset names in context
     # (see test-lang script settings below)
 
-    export_pattern: '{target}/%locale%/{target}.po'
+    export_pattern: '/{target}/%locale%/{target}.po'
     # Script will substitute the {target} key, 
     # %keys% are part of Crowdin export settings,
     # see https://support.crowdin.com/files-management/#file-export

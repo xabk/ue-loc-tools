@@ -25,7 +25,7 @@ class AddSourceFiles(LocTask):
 
     src_locale: str = 'io'
 
-    export_pattern: str = '{target}/%locale%/{target}.po'
+    export_pattern: str = '/{target}/%locale%/{target}.po'
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
