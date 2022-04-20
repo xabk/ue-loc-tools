@@ -242,7 +242,11 @@ def main():
                 returncode = process.returncode
         else:
             returncode = subp.run(
-                [sys.executable, py_cwd / task['script'], params['task-list']],
+                [
+                    sys.executable,
+                    py_cwd / (task['script'] + '.py'),
+                    params['task-list'],
+                ],
                 cwd=py_cwd,
             ).returncode
 
