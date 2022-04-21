@@ -3,6 +3,7 @@ from configparser import ConfigParser
 from pathlib import Path
 from dataclasses import dataclass, field
 from loguru import logger
+from itertools import chain
 
 from libraries.utilities import LocTask
 
@@ -62,8 +63,13 @@ class CheckoutAssets(LocTask):
 
         logger.info('Connected to p4.')
 
-        loc_dir = self._content_path / 'Localization'
-        files = [item for item in loc_dir.glob('**/*') if item.is_file()]
+        loc_root = self._content_path / 'Localization'
+        files = list(
+            chain.from_iterable(
+                [item for item in (loc_root / target).glob('**/*') if item.is_file()]
+                for target in self.loc_targets
+            )
+        )
         files += [self._content_path / asset for asset in self.add_assets_to_checkout]
 
         logger.info(f'Trying to check out {len(files)} assets')
