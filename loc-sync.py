@@ -79,7 +79,7 @@ def get_task_list_from_user(config):
     task_lists = [t for t in config if t not in CFG_SECTIONS]
     task_list = ''
     while not task_list:
-        print('Available task lists from base.config.yaml:')
+        print('\nAvailable task lists from base.config.yaml:')
         for i, task in enumerate(task_lists, start=1):
             print(f'{i}. {task}')
         name_or_num = input('Enter the number or name of a task list to run: ')
@@ -90,6 +90,16 @@ def get_task_list_from_user(config):
                 task_list = task_lists[int(name_or_num) - 1]
             except:
                 print('Error. Please enter the task list name or its number.')
+        if task_list:
+            print(f'\nSelected taks list: {task_list}:')
+            for task in config[task_list]:
+                print(task)
+            conf = input(
+                f'\nEnter Y to execute task list {task_list}. '
+                'Anything else to go back to task list selection... '
+            )
+            if conf != 'Y' and conf != 'y':
+                task_list = None
     return task_list
 
 
