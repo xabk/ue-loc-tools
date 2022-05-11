@@ -72,6 +72,7 @@ class BuildAndDownloadTranslations(LocTask):
         )
 
         response = requests.get(build_data['url'])
+        self._zip_path.parent.mkdir(parents=True, exist_ok=True)
         self._zip_path.touch(exist_ok=True)
         self._zip_path.write_bytes(response.content)
 
