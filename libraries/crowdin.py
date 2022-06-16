@@ -173,7 +173,7 @@ class UECrowdinClient(CrowdinClient):
             self.error(f'No data in response. Response:\n{response}')
             return response
 
-        return None
+        return True
 
     def update_file(self, filepath: Path, fname: str = None, fID: int = None):
         if fname:

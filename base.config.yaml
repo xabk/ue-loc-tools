@@ -79,7 +79,7 @@ script-parameters:
     # repetition markers, and asset names in context
     # (see test-lang script settings below)
 
-    export_pattern: '{target}/%locale%/{target}.po'
+    export_pattern: '/{target}/%locale%/{target}.po'
     # Script will substitute the {target} key, 
     # %keys% are part of Crowdin export settings,
     # see https://support.crowdin.com/files-management/#file-export
@@ -259,7 +259,7 @@ script-parameters:
 # A list of tasks, each task is a few of key-value pairs like this:
 #   description: required, this will be printed as the task is performed, 
 #                and in the summary
-#   script: 'script_filename.py', required, relative path to the script file
+#   script: 'script_filename', required, relative path to the script file
 #   unreal: optional, True/False, 
 #           flags if this script has to be launched via unreal-cmd.exe
 #   p4-checkout/p4-checkin: optional, True/False, 
@@ -273,37 +273,37 @@ no-source-upload:
 # Enable p4-checkout to let this work or check out Localization folder 
 # and other assets manually
 #  - description: 'Checkout Localization folder and community credits files'
-#    script: p4-checkout.py
+#    script: p4-checkout
 #    p4-checkout: True
 
   - description: 'Gather the text in UE for all targets and export all locales'
-    script: ue-loc-gather-cmd.py
+    script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Gather, Export]
 
   - description: 'Generate hash and test/source locale with comments and debug IDs'
-    script: test-lang.py
+    script: test-lang
 #   script-parameters:
 #     hash_locale: '' # Disable hash locale generation
 
 #  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
-#    script: completion-rates.py
+#    script: completion-rates
 
 #  - description: 'Pull top members from Crowdin, save the data to a CSV file'
-#    script: community-credits.py
+#    script: community-credits
 
 #  - description: 'Reimport language list and community credits datatables from CSVs'
-#    script: ue-reimport-assets.py
+#    script: ue-reimport-assets
 #    unreal: True
 
 #  - description: 'Upload the updated source file to Crowdin'
-#    script: update-source-files.py
+#    script: update-source-files
 
   - description: 'Build the project on Crowdin and download all targets to Content/Localization'
-    script: build-and-download.py
+    script: build-and-download
 
   - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-cmd.py
+    script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Import, Compile, GenerateReports]
   
@@ -312,50 +312,50 @@ no-source-upload:
 update-source:
 # Upload new source file from test/io locale to Crowdin
   - description: 'Upload the updated source file to Crowdin'
-    script: update-source-files.py
+    script: update-source-files
 
 # end of upload-source
 
 add-source:
   - description: 'Upload the updated source file to Crowdin'
-    script: add-source-files.py
+    script: add-source-files
 
 # end of add source files
 
 full-sync:
 #  - description: 'Checkout Localization folder and community credits files'
 #    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-#    script: p4-checkout.py
+#    script: p4-checkout
 #    p4-checkout: True
 
   - description: 'Gather the text in UE for all targets and export the source/test locale draft'
-    script: ue-loc-gather-cmd.py
+    script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Gather, Export]
 
   - description: 'Generate test from draft and source locale with comments and debug IDs'
-    script: test-lang.py
+    script: test-lang
 #   script-parameters:
 #     hash_locale: '' # Disable hash locale generation
 
 #  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
-#    script: completion-rates.py
+#    script: completion-rates
 
 #  - description: 'Pull top members from Crowdin, save the data to a CSV file'
-#    script: community-credits.py
+#    script: community-credits
 
 #  - description: 'Reimport language list and community credits datatables from CSVs'
-#    script: ue-reimport-assets.py
+#    script: ue-reimport-assets
 #    unreal: True
 
   - description: 'Upload the updated source file to Crowdin'
-    script: update-source-files.py
+    script: update-source-files
 
   - description: 'Build the project on Crowdin and download all targets to Content/Localization'
-    script: build-and-download.py
+    script: build-and-download
 
   - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-cmd.py
+    script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Import, Compile, GenerateReports]
 
@@ -363,7 +363,7 @@ full-sync:
 
 recreate-test-language:
   - description: 'Generate hash and test/source locale with comments and debug IDs'
-    script: test-lang.py
+    script: test-lang
     script-parameters:
       hash_locale: '' # Disable hash locale generation
       clear_translations: Yes

@@ -157,6 +157,7 @@ class ProcessTestAndHashLocales(LocTask):
                     for entry in po
                     if re.search(self._id_regex, entry.msgstr)
                 ]
+                + [0]
             )
 
             max_id = max(local_max_id, max_id)

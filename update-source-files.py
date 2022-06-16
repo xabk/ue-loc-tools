@@ -40,13 +40,15 @@ class UpdateSourceFile(LocTask):
             self.token, logger, self.organization, self.project_id
         )
 
+        crowdin.update_file_list_and_project_data()
+
         logger.info(f'Content path: {self._content_path}')
 
         targets_processed = []
 
         for target in self.loc_targets:
             fpath = self._content_path / self._fname.format(target=target)
-            logger.info('Uploading file: {fpath}')
+            logger.info(f'Uploading file: {fpath}')
             r = crowdin.update_file(fpath)
             if r == True:
                 targets_processed.append(target)
