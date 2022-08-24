@@ -55,6 +55,8 @@ class UELocTarget:
     project_path: Path
     name: str
 
+    # TODO: write my own __init__ to preformat path strings
+
     # Relative to project root
     _default_game_ini: str = 'Config/DefaultEditor.ini'
     _loc_task_inis: tuple = (
@@ -63,9 +65,11 @@ class UELocTarget:
         'Config/Localization/{loc_target}_Export.ini',
         'Config/Localization/{loc_target}_ExportDialogueScript.ini',
         'Config/Localization/{loc_target}_Gather.ini',
-        'Config/Localization/{loc_target}_GenerateReports.ini',
         'Config/Localization/{loc_target}_Import.ini',
         'Config/Localization/{loc_target}_ImportDialogue.ini',
+    )
+    _loc_task_inis_no_native_culture: tuple = (
+        'Config/Localization/{loc_target}_GenerateReports.ini',
     )
     # TODO: Fix this to Content/Localization after testing
     _loc_root: str = 'Localization/{loc_target}/'
@@ -199,7 +203,7 @@ class UELocTarget:
         with open(self.project_path / self._default_game_ini, 'w') as f:
             f.writelines(strings)
 
-    def _update_target_loc_ini(
+    def _update_target_loc_ini_native(
         self,
         ini: str,
         native_locale: str,
@@ -235,6 +239,39 @@ class UELocTarget:
 
         if not native_culture_found:
             raise Exception(f'Could not find native culture line in config: {ini}')
+
+        with open(self.project_path / ini.format(loc_target=self.name), 'w') as f:
+            f.writelines(new_config_lines)
+        pass
+
+    def _update_target_loc_ini_no_native(
+        self,
+        ini: str,
+        native_locale: str,
+        locales: list[str],
+    ) -> int or None:
+        '''
+        Internal: updates any specified {loc_target}_{loc_task}.ini file
+        '''
+        with open(self.project_path / ini.format(loc_target=self.name), 'r') as f:
+            strings = f.readlines()
+
+        new_config_lines = []
+        processed = False
+
+        for s in strings:
+            if s.startswith(self._task_ini_culture_line_start):
+                if processed:
+                    continue
+
+                processed = True
+                new_config_lines += [
+                    self._task_ini_culture_line_format.format(culture=locale)
+                    for locale in locales
+                ]
+                continue
+
+            new_config_lines.append(s)
 
         with open(self.project_path / ini.format(loc_target=self.name), 'w') as f:
             f.writelines(new_config_lines)
@@ -339,7 +376,14 @@ class UELocTarget:
         self._update_default_editor_ini(new_native_locale_index, new_locales)
 
         for ini in self._loc_task_inis:
-            self._update_target_loc_ini(ini, new_native_locale, new_locales)
+            self._update_target_loc_ini_native(
+                ini.format(loc_target=self.name), new_native_locale, new_locales
+            )
+
+        for ini in self._loc_task_inis_no_native_culture:
+            self._update_target_loc_ini_no_native(
+                ini.format(loc_target=self.name), new_native_locale, new_locales
+            )
 
         if delete_obsolete_loc_folders:
             print('Deleting obsolete folders is not implemented yet =(')

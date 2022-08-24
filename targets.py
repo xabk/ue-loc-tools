@@ -9,7 +9,7 @@ from libraries.uetools import UELocTarget
 
 
 @dataclass
-class ManipulateLocTargets(LocTask):
+class AddLocales(LocTask):
 
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to None to process all loc targets when implemented
@@ -156,6 +156,16 @@ class ManipulateLocTargets(LocTask):
         return returncode
 
 
+@dataclass
+class ReplaceLocales(LocTask):
+    pass
+
+
+@dataclass
+class RenameLocale(LocTask):
+    pass
+
+
 def main():
 
     logger.add(
@@ -171,15 +181,15 @@ def main():
     logger.info('--- Unreal gather text commandlet script ---')
     logger.info('')
 
-    loc_target = UELocTarget(Path('../'), 'Audio')
+    # loc_target = UELocTarget(Path('../'), 'Audio')
 
-    print(loc_target.get_current_locales())
-    print(loc_target.get_native_locale())
+    # print(loc_target.get_current_locales())
+    # print(loc_target.get_native_locale())
 
-    loc_target.replace_all_locales(
-        ['en', 'io', 'NEW-ta-dam'],
-        keep_native_locale=True,
-    )
+    # loc_target.replace_all_locales(
+    #     ['en', 'io'],
+    #     keep_native_locale=True,
+    # )
 
     # task =
 
