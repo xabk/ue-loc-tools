@@ -159,6 +159,50 @@ class UELocTarget:
 
         return self.replace_all_locales(locales)
 
+    # TODO: better logging
+    def remove_locales(
+        self,
+        locales_to_remove: list[str] or str,
+    ) -> int:
+        '''
+        Remove locales from existing locale list for target.
+        Changes DefaultEditor.ini and ini files in Config/Localization.
+        By default, does NOT delete locale folders in Content/Localization.
+
+        Args:
+            locales_to_remove: list of locales to add, duplicates will be ignored
+        '''
+
+        if type(locales_to_remove) is str:
+            locales_to_remove = [locales_to_remove]
+
+        if len(list(dict.fromkeys(locales_to_remove))) != len(locales_to_remove):
+            raise ValueError('Supplied locales_to_remove list contains duplicates.')
+
+        native_culture = self.get_native_locale()[1]
+
+        if native_culture in locales_to_remove:
+            raise ValueError(
+                'Impossible to delete native locale. '
+                'Change the native locale to a new locale first.'
+            )
+
+        locales = self.get_current_locales()
+        number_of_locales = len(locales)
+        number_of_locales_to_remove = len(locales_to_remove)
+
+        if locales is None:
+            raise Exception('Could not get current locales for target.')
+        locales = [loc for loc in locales if loc not in locales_to_remove]
+
+        if number_of_locales - number_of_locales_to_remove != len(locales):
+            print(
+                'Not all locales from locales_to_remove were found and removed '
+                'from the existing locales list.'
+            )
+
+        return self.replace_all_locales(locales)
+
     def _update_default_editor_ini(
         self,
         native_locale_index: int,
@@ -204,6 +248,7 @@ class UELocTarget:
 
         return 0
 
+    # TODO: refactor update_loc_ini_native / non_native into one function
     def _update_target_loc_ini_native(
         self,
         ini: str,
@@ -307,6 +352,27 @@ class UELocTarget:
             )
 
         folder_path.rename(new_folder_path)
+
+        return 0
+
+    def _delete_loc_folder(
+        self,
+        name: str,
+    ) -> int:
+        '''
+        Internal: deletes folder in Content/Localization
+        '''
+        folder_path = self.project_path / self._locale_folder_pattern.format(
+            loc_target=self.name, locale=name
+        )
+
+        if not folder_path.exists():
+            raise ValueError(
+                f'Folder for locale old_name not found in '
+                f'{self._loc_root.format(loc_target=self.name)}'
+            )
+
+        folder_path.unlink()
 
         return 0
 
