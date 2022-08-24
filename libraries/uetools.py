@@ -163,6 +163,8 @@ class UELocTarget:
     def remove_locales(
         self,
         locales_to_remove: list[str] or str,
+        *,
+        delete_obsolete_loc_folders: bool = False,
     ) -> int:
         '''
         Remove locales from existing locale list for target.
@@ -201,7 +203,9 @@ class UELocTarget:
                 'from the existing locales list.'
             )
 
-        return self.replace_all_locales(locales)
+        return self.replace_all_locales(
+            locales, delete_obsolete_loc_folders=delete_obsolete_loc_folders
+        )
 
     def _update_default_editor_ini(
         self,
@@ -376,6 +380,7 @@ class UELocTarget:
 
         return 0
 
+    # TODO: Implement delete obsolete loc folders
     def replace_all_locales(
         self,
         new_locales: list[str],
