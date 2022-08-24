@@ -56,6 +56,7 @@ class UELocTarget:
     name: str
 
     # TODO: write my own __init__ to preformat path strings
+    # TODO: add and implement delete_locale method
 
     # Relative to project root
     _default_game_ini: str = 'Config/DefaultEditor.ini'
@@ -137,7 +138,7 @@ class UELocTarget:
     def add_locales(
         self,
         new_locales: list[str],
-    ) -> int or None:
+    ) -> int:
         '''
         Add new locales without producing duplicates.
         Keep any existing locales and any any new locales from the supplied list.
@@ -147,8 +148,6 @@ class UELocTarget:
         Args:
             new_locales: list of locales to add, duplicates will be ignored
         '''
-        # Unique only, preserving order: list(dict.fromkeys(...))
-
         if len(list(dict.fromkeys(new_locales))) != len(new_locales):
             raise ValueError('Supplied new_locales list contains duplicates.')
 
@@ -164,7 +163,7 @@ class UELocTarget:
         self,
         native_locale_index: int,
         locales: list[str],
-    ) -> int or None:
+    ) -> int:
         '''
         Internal: updates the DefaultEditor.ini file
         '''
@@ -202,6 +201,8 @@ class UELocTarget:
 
         with open(self.project_path / self._default_game_ini, 'w') as f:
             f.writelines(strings)
+
+        return 0
 
     def _update_target_loc_ini_native(
         self,
@@ -277,6 +278,38 @@ class UELocTarget:
             f.writelines(new_config_lines)
         pass
 
+    def _rename_loc_folder(
+        self,
+        old_name: str,
+        new_name: str,
+    ) -> int:
+        '''
+        Internal: renames folder in Content/Localization
+        '''
+        folder_path = self.project_path / self._locale_folder_pattern.format(
+            loc_target=self.name, locale=old_name
+        )
+
+        if not folder_path.exists():
+            raise ValueError(
+                f'Folder for locale old_name not found in '
+                f'{self._loc_root.format(loc_target=self.name)}'
+            )
+
+        new_folder_path = self.project_path / self._locale_folder_pattern.format(
+            loc_target=self.name, locale=new_name
+        )
+
+        if new_folder_path.exists():
+            raise ValueError(
+                f'Folder for locale new_name already exists in '
+                f'{self._loc_root.format(loc_target=self.name)}'
+            )
+
+        folder_path.rename(new_folder_path)
+
+        return 0
+
     def replace_all_locales(
         self,
         new_locales: list[str],
@@ -285,7 +318,7 @@ class UELocTarget:
         new_native_locale: str = None,
         new_native_locale_index: int = None,
         delete_obsolete_loc_folders: bool = False,
-    ) -> int or None:
+    ) -> int:
         '''
         Replace existing locales with new ones.
         Changes DefaultEditor.ini and ini files in Config/Localization.
@@ -369,7 +402,8 @@ class UELocTarget:
 
             if keep_native_locale:
                 new_native_locale = native_locale
-                new_native_locale_index = new_locales.index(new_native_locale)
+
+            new_native_locale_index = new_locales.index(new_native_locale)
 
             break
 
@@ -388,13 +422,15 @@ class UELocTarget:
         if delete_obsolete_loc_folders:
             print('Deleting obsolete folders is not implemented yet =(')
 
+        return 0
+
     def rename_locale(
         self,
         old_name: str,
         new_name: str,
         *,
         rename_loc_folder: bool = True,
-    ):
+    ) -> int or None:
         '''
         Renames the locale and keeps the translations by default.
         Changes DefaultEditor.ini and ini files in Config/Localization.
@@ -406,8 +442,34 @@ class UELocTarget:
             rename_loc_folder: controls whether to rename
                 locale folder in Content/Localization
         '''
-        # TODO: Implement rename_locale
-        pass
+
+        if new_name == old_name:
+            raise ValueError('Locale names old_name and new_name identical.')
+
+        locales = self.get_current_locales()
+        native_locale_index, native_locale = self.get_native_locale()
+
+        if old_name not in locales:
+            raise ValueError('Locale old_name not found in current locales.')
+
+        if new_name in locales:
+            raise ValueError(
+                'Locale new_name already in current locales. '
+                'Impossible to rename or it would create a duplicate locale.'
+            )
+
+        locales[locales.index(old_name)] = new_name
+
+        self.replace_all_locales(
+            locales,
+            keep_native_locale=False,
+            new_native_locale_index=native_locale_index,
+        )
+
+        if not rename_loc_folder:
+            return 0
+
+        return self._rename_loc_folder(old_name, new_name)
 
 
 class UnrealProject:
