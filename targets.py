@@ -181,7 +181,9 @@ def main():
     logger.info('--- Unreal gather text commandlet script ---')
     logger.info('')
 
-    # loc_target = UELocTarget(Path('../'), 'Audio')
+    loc_target = UELocTarget(Path('../'), 'Audio')
+
+    # loc_target._rename_loc_folder('en', 'en-US')
 
     # print(loc_target.get_current_locales())
     # print(loc_target.get_native_locale())
