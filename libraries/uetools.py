@@ -406,6 +406,7 @@ class UELocTarget:
             rename_loc_folder: controls whether to rename
                 locale folder in Content/Localization
         '''
+        # TODO: Implement rename_locale
         pass
 
 
