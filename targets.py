@@ -1,6 +1,5 @@
 import argparse
 from pathlib import Path
-from typing import NamedTuple
 from loguru import logger
 
 from dataclasses import dataclass, field
