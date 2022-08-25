@@ -8,15 +8,6 @@ from dataclasses import dataclass, field
 from libraries.utilities import LocTask
 from libraries.uetools import UELocTarget
 
-LOC_TARGET_ACTIONS = ['add', 'replace', 'delete']
-
-
-class LocTargetParameters(NamedTuple):
-    action: str
-    source: str
-    targets: list[str]
-    locales: list[str]
-
 
 @dataclass
 class LocaleTask(LocTask):
@@ -51,13 +42,17 @@ class LocaleTask(LocTask):
 
     _project_path: Path = None
 
+    # This is not intended to be launched from loc-sync.py
+    def get_task_list_from_arguments(self):
+        return None
+
     def post_update(self) -> bool:
         super().post_update()
 
         if self.project_dir:
             self._project_path = Path(self.project_dir).resolve()
         else:
-            self._project_path = self._project_path.parent.resolve()
+            self._project_path = Path(__file__).parent.parent.parent.resolve()
 
         if not (
             (self._project_path / 'Content').exists()
@@ -92,10 +87,57 @@ class LocaleTask(LocTask):
     def run(self):
         pass
 
+    def _perform_tasks(self, task_name: str, method):
+        logger.info(f'Running {task_name} cultures in targets task.')
+
+        if not self._loc_targets:
+            logger.error('No targets to modify.')
+            return None
+
+        if self._source_target is not None:
+            self.locales = self._source_target.get_current_locales()
+
+        if type(self.locales) is not list or len(self.locales) == 0:
+            logger.error('No locales specified.')
+
+        logger.info(f'Targets to modify: {self.loc_targets}')
+        logger.info(f'Locales to {task_name}: {self.locales}')
+
+        for target in self._loc_targets:
+            print(target.__getattribute__(method).__name__)
+            # target.__getattribute__(method)(self.locales)
+
 
 @dataclass
 class ReplaceLocales(LocaleTask):
-    pass
+    def run(self):
+        self._perform_tasks('replace', UELocTarget.replace_all_locales.__name__)
+
+
+@dataclass
+class AddLocales(LocaleTask):
+    def run(self):
+        self._perform_tasks('add', UELocTarget.add_locales.__name__)
+
+
+@dataclass
+class DeleteLocales(LocaleTask):
+    def run(self):
+        self._perform_tasks('delete', UELocTarget.remove_locales.__name__)
+
+
+@dataclass
+class RenameLocales(LocaleTask):
+    def run(self):
+        self._perform_tasks('rename', UELocTarget.rename_locale.__name__)
+
+
+LOC_TARGET_ACTIONS = {
+    'add': AddLocales,
+    'replace': ReplaceLocales,
+    'delete': DeleteLocales,
+    'rename': RenameLocales,
+}
 
 
 def parse_arguments():
@@ -112,20 +154,23 @@ def parse_arguments():
         'action',
         nargs='?',
         choices=LOC_TARGET_ACTIONS,
-        help='''Action to perform: `replace`, `add`, or `delete`
-        Replace and add require either -source and -targets or -targets and -locales
-        Delete accepts -targets and -locales''',
+        help='''Action to perform: `replace`, `add`, `delete`, `rename`\n
+        `replace` and `add` require either -source and -targets or -targets and -locales\n
+        `delete` requires -targets and -locales\n
+        `rename` requires -targets and exactly 2 locales in -locales: old and new name''',
     )
 
     parser.add_argument(
         '-source',
+        '-s',
         default=None,
-        nargs=1,
+        type=str,
         help='Source target to use for `replace` and `add` tasks. Defaults to `Game`',
     )
 
     parser.add_argument(
         '-targets',
+        '-t',
         default=None,
         nargs='*',
         help='Loc targets to modify, a space-separated list of target names',
@@ -133,6 +178,7 @@ def parse_arguments():
 
     parser.add_argument(
         '-locales',
+        '-l',
         default=None,
         nargs='*',
         help='Locales to add/replace/delete, a space-separated list of locale names',
@@ -140,24 +186,41 @@ def parse_arguments():
 
     args, unknown = parser.parse_known_args()
 
-    print(args)
-
     if args.action is None or args.action not in LOC_TARGET_ACTIONS:
         logger.error('Argument error: action not supported')
         return None
 
-    if args.targets is None or type(args.targets) is not list:
+    if args.targets is None or type(args.targets) is not list or len(args.targets) == 0:
         print(type(args.targets))
         logger.error('Argument error: targets not specified')
         return None
 
     if args.action == 'delete':
-        if args.locales is None or type(args.locales) is not list:
-            logger.error('Argument error: no locales or error for delete action')
+        if (
+            args.locales is None
+            or type(args.locales) is not list
+            or len(args.locales) == 0
+        ):
+            logger.error('Argument error: no locales for delete action')
+            return None
+
+    if args.action == 'rename':
+        if (
+            args.locales is None
+            or type(args.locales) is not list
+            or len(args.locales) != 2
+        ):
+            logger.error(
+                'Argument error: no or wrong number of locales for rename action'
+            )
             return None
 
     if args.source is None:
-        if args.locales is None or type(args.locales) is not list:
+        if (
+            args.locales is None
+            or type(args.locales) is not list
+            or len(args.locales) == 0
+        ):
             logger.error(
                 'Argument error: no locales and no source for add or replace action'
             )
@@ -169,13 +232,9 @@ def parse_arguments():
         )
         return None
 
-    parameters = LocTargetParameters(
-        args.action, args.source, args.targets, args.locales
-    )
+    logger.info(args)
 
-    logger.info(parameters)
-
-    return parameters
+    return args
 
 
 def main():
@@ -194,9 +253,15 @@ def main():
     logger.info('')
 
     params = parse_arguments()
+    if params == None:
+        logger.error('No parameters parsed. Aborting.')
+        return 1
 
-    task = LocaleTask('Game', 'Audio')
+    task = LOC_TARGET_ACTIONS[params.action](
+        params.source, params.targets, params.locales, '../'
+    )
     task.read_config(Path(__file__).name, logger)
+    task.run()
 
     returncode = 0  # task.run_tasks()
 
