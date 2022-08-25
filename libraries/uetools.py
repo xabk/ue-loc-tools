@@ -21,6 +21,8 @@ class UELocTarget:
 
     Attributes
     ----------
+    project_path: Path
+        Project directory
     name : str
         Localization target name
     '''
