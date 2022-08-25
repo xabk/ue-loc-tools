@@ -104,8 +104,7 @@ class LocaleTask(LocTask):
         logger.info(f'Locales to {task_name}: {self.locales}')
 
         for target in self._loc_targets:
-            print(target.__getattribute__(method).__name__)
-            # target.__getattribute__(method)(self.locales)
+            target.__getattribute__(method)(self.locales)
 
 
 @dataclass
@@ -260,10 +259,10 @@ def main():
     task = LOC_TARGET_ACTIONS[params.action](
         params.source, params.targets, params.locales, '../'
     )
-    task.read_config(Path(__file__).name, logger)
-    task.run()
 
-    returncode = 0  # task.run_tasks()
+    task.read_config(Path(__file__).name, logger)
+
+    returncode = task.run()
 
     if returncode == 0:
         logger.info('')
