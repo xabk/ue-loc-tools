@@ -102,32 +102,35 @@ class LocaleTask(LocTask):
         logger.info(f'Targets to modify: {self.loc_targets}')
         logger.info(f'Locales to {task_name}: {self.locales}')
 
+        rc = 0
         for target in self._loc_targets:
-            target.__getattribute__(method)(self.locales)
+            rc += target.__getattribute__(method)(self.locales)
+
+        return rc
 
 
 @dataclass
 class ReplaceLocales(LocaleTask):
     def run(self):
-        self._perform_tasks('replace', UELocTarget.replace_all_locales.__name__)
+        return self._perform_tasks('replace', UELocTarget.replace_all_locales.__name__)
 
 
 @dataclass
 class AddLocales(LocaleTask):
     def run(self):
-        self._perform_tasks('add', UELocTarget.add_locales.__name__)
+        return self._perform_tasks('add', UELocTarget.add_locales.__name__)
 
 
 @dataclass
 class DeleteLocales(LocaleTask):
     def run(self):
-        self._perform_tasks('delete', UELocTarget.remove_locales.__name__)
+        return self._perform_tasks('delete', UELocTarget.remove_locales.__name__)
 
 
 @dataclass
 class RenameLocales(LocaleTask):
     def run(self):
-        self._perform_tasks('rename', UELocTarget.rename_locale.__name__)
+        return self._perform_tasks('rename', UELocTarget.rename_locale.__name__)
 
 
 LOC_TARGET_ACTIONS = {
