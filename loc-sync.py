@@ -162,7 +162,7 @@ def main():
 
     logger.info(f'Project directory: {project_path}')
 
-    engine_path = params.get('engine_dir', None)
+    engine_path = config['parameters'].get('engine_dir', None)
 
     if engine_path is None:
         # Trying to find the path to Unreal Build Tool in the .sln file
