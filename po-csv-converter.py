@@ -7,6 +7,7 @@ from libraries import (
     polib,  # Modified polib: _POFileParser.handle_oc only splits references by ', '
 )
 from libraries.utilities import LocTask
+from libraries.uetools import UELocTarget
 
 # -------------------------------------------------------------------------------------
 # Defaults - These can be edited, only used if not overridden in configs
@@ -17,7 +18,7 @@ from libraries.utilities import LocTask
 # 2. Global params from base.config.yaml (if config file found and parameters found)
 # 3. Defaults below (if no parameters found in config or no config found)
 @dataclass
-class UEPOCSVConverter(LocTask):
+class UE_PO_CSV_Converter(LocTask):
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to list to process all loc targets when implemented
     loc_targets: list = field(
@@ -32,35 +33,29 @@ class UEPOCSVConverter(LocTask):
     # Will be skipped as a language but used to add Debug IDs to context
     debug_ID_locale: str = 'io'
 
-    skipped_locales: list = field(
-        default_factory=lambda: ['ia-001']
-    )  # Localization targets, empty = process all locales
+    skipped_locales: list = None  # Locales to skip
 
-    # TODO: Implement bilingual CSVs
-    # Put all languages into one CSV file?
-    # Import all languages from one CSV file?
+    # If true, exports all languages into one multilingual CSV
+    # and expects one multilingual CSV on import
+    # If false, exports every language into its own bilingual CSV
+    # and expects separate bilingual CSVs on import
+    # ----
+    # Warning: Expects the same structure on import
     multilingual_CSV: bool = True
 
-    # TODO: Implement per-target CSVs
-    # Put all targets into one CSV file?
-    # Import all targets from one CSV file?
-    all_targets_in_one_CSV: bool = True
-    # By default, one multilingual CSV with strings from all targets is created
-    # on export and expected on import
-    #
-    # If both multilingual CSV and collapse targets are True,
-    # you'll get a single CSV file with all languages and targets
-    #
-    # If only multilingual CSV is True,
-    # you'll get one CSV file per target (with all languages)
-    #
-    # If only collapse targets is True,
-    # you'll get one CSV per language (with all targets)
-    #
+    # TODO: Implement rules and splitting
+    # Will split CSV file(s) based on the rules provided
+    # Intended to bring some organization into projects with a single loc target
+    # ----
+    # Warning: Expects the same structure on import
+    split_CSV_using_script_rules: bool = False
+    splitting_rules = None
 
     # TODO: Implement conversion
+    # ----
+    # Warning: If True, expects ICU plurals on import, to be converted back to UE plurals
     convert_UE_plurals: bool = True
-    stop_if_conversion_fails: bool = False
+    stop_if_conversion_fails: bool = True
 
     po_encoding: str = 'utf-8-sig'  # PO file encoding
     csv_encoding: str = 'utf-8'  # CSV file encoding
@@ -108,53 +103,34 @@ class UEPOCSVConverter(LocTask):
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
 
-    # PO files, relative to Content directory
-    _debug_id_file = 'Localization/{target}/{locale}/{target}.po'
-    _native_file = 'Localization/{target}/{locale}/{target}.po'
+    # Internal
+    _loc_targets: list[UELocTarget] = None
+    _locale_file: str = 'Localization/{target}/{locale}/{target}.po'
+
+    _csv_name: str = '{target}'
+    _split_csv_name: str = '{target}.{split_name}'
+    _bilingual_csv_name: str = '{name}.{locale}.{ext}'
+    _multilingual_csv_name: str = '{name}.{ext}'
+
+    _csv_extension: str = 'tsv'
+    _content_path: Path = None
+    _csv_path: Path = None
 
     def post_update(self):
         super().post_update()
         self._content_path = Path(self.content_dir)
-        if self.debug_ID_locale:
-            self._debug_id_file = self._debug_id_file.format(
-                target='{target}', locale=self.debug_ID_locale
-            )
-        if self.native_locale:
-            self._native_file = self._native_file.format(
-                target='{target}', locale=self.native_locale
-            )
+        self._loc_targets = [
+            UELocTarget(self._content_path.parent, target)
+            for target in self.loc_targets
+        ]
 
-    @staticmethod
-    def parse_target_and_id_string(text_id: str):
-        '''
-        Takes a text ID from CSV and returns (target, namespace, key) for PO
-        '''
-        target, po_id = text_id.split('/')
+        if self.csv_delimiter != 'tab':
+            self._csv_extension = 'csv'
 
-        comma_index = None
-        is_escaped = False
-
-        for i in range(len(po_id)):
-            if is_escaped:
-                is_escaped = False
-                continue
-
-            if po_id[i] == ',':
-                comma_index = i
-                break
-
-            if po_id[i] == '\\':
-                is_escaped = True
-                continue
-
-        if comma_index is None:
-            namespace = po_id
-            key = ''
-        else:
-            namespace = po_id[:i]
-            key = po_id[i + 1 :]
-
-        return (target, namespace, key)
+        self._bilingual_csv_name.format(
+            name='{name}', locale='{locale}', ext=self._csv_extension
+        )
+        self._multilingual_csv_name.format(name='{name}', ext=self._csv_extension)
 
     @staticmethod
     def parse_po_id(po_id: str):
@@ -187,10 +163,6 @@ class UEPOCSVConverter(LocTask):
 
         return (namespace, key)
 
-    @staticmethod
-    def create_po_id(namespace: str, key: str) -> str:
-        return f'{namespace},{key}'
-
     def source_PO_to_list(self, target: str) -> list:
         '''
         Load a PO file for the specified target
@@ -215,7 +187,7 @@ class UEPOCSVConverter(LocTask):
 
         entries = []
         for e in po:
-            namespace, key = UEPOCSVConverter.parse_po_id(e.msgctxt)
+            key = e.msgctxt
 
             char_limit = re.search(r'InfoMetaData:\t"Char Limit" : "(\d+)"', e.comment)
             char_limit = char_limit[1] if char_limit is not None else ''
@@ -271,9 +243,8 @@ class UEPOCSVConverter(LocTask):
             )
 
             d = {
-                'id': f'{target}/{e.msgctxt}',
+                'id': e.msgctxt,
                 'target': target,
-                'namespace': namespace,
                 'key': key,
                 'source_references': occurrences,
                 'char_limit': char_limit,
@@ -494,7 +465,7 @@ def main():
     logger.info('--- Converting PO files into CSV file(s) ---')
     logger.info('')
 
-    task = UEPOCSVConverter()
+    task = UE_PO_CSV_Converter()
 
     task.read_config(Path(__file__).name, logger)
 
