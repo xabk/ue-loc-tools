@@ -160,23 +160,31 @@ def main():
 
     project_path = Path(__file__).parent.parent.parent.absolute()
 
-    # Trying to find the path to Unreal Build Tool in the .sln file
-    with open(next(project_path.glob('*.sln')), mode='r') as f:
-        s = f.read()
-        engine_path = re.findall(
-            r'"UnrealBuildTool", "(.*?)Engine\\Source\\Programs\\'
-            r'UnrealBuildTool\\UnrealBuildTool.csproj"',
-            s,
-        )
+    logger.info(f'Project directory: {project_path}')
 
-    if len(engine_path) == 0:
-        logger.error(
-            'Couldn\'t find Engine path in the project solution file. Aborting.'
-        )
+    engine_path = params.get('engine_dir', None)
 
-    ue_cwd = (project_path / engine_path[0]).resolve()
+    if engine_path is None:
+        # Trying to find the path to Unreal Build Tool in the .sln file
+        with open(next(project_path.glob('*.sln')), mode='r') as f:
+            s = f.read()
+            engine_path = re.findall(
+                r'"UnrealBuildTool", "(.*?)Engine\\Source\\Programs\\'
+                r'UnrealBuildTool\\UnrealBuildTool.csproj"',
+                s,
+            )
+            if len(engine_path) == 0:
+                logger.error(
+                    'Couldn\'t find Engine path in the project solution file. Aborting.'
+                )
+                return
+            engine_path = engine_path[0]
+
+    ue_cwd = (project_path / engine_path).resolve()
 
     fpath = (ue_cwd / 'Engine/Binaries/Win64/UE4Editor-cmd.exe').absolute()
+
+    logger.info(f'Engine executable: {fpath}')
 
     # Finding the .uproject file path
     uproject = next(project_path.glob('*.uproject')).absolute()

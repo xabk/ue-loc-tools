@@ -59,6 +59,8 @@ parameters:
     * Updated the source file on Crowdin
   # Default CL descripiton to use for check-outs and check-ins
 
+  engine_dir: '../../' # Relative to project path
+
 # -------------------------------------------------------------
 # ----- SCRIPT PARAMETERS: SET DEFAULTS FOR SCRIPTS HERE ------
 # -------------------------------------------------------------
