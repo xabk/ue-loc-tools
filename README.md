@@ -1,6 +1,8 @@
 # ueloctools library
 Localization Tools for Unreal, plus UE and Crowdin API integration
 
+### Unreal Localization Targets: add/delete cultures for loc targets, copy cultures from one target to other targets
+
 ### Add source files to Crowdin project
 
 ### Update source files in Crowdin project
@@ -10,8 +12,6 @@ Localization Tools for Unreal, plus UE and Crowdin API integration
 ### Generate user contribution reports on Crowdin and save the data to CSV (to reimport the data table)
 
 ### Generate translation status reports on Crowidn and save the data to CSV (to reimport the data table)
-
-### Test the UI: Create a combination of MT and pseudo localization, or generate a long-ass-words locale
 
 ### Check out the assets you're about to update from Perforce
 
