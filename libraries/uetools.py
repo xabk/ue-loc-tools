@@ -74,9 +74,9 @@ class UELocTarget:
     _loc_task_inis_no_native_culture: tuple = (
         'Config/Localization/{loc_target}_GenerateReports.ini',
     )
-    # TODO: Fix this to Content/Localization after testing
-    _loc_root: str = 'Localization/{loc_target}/'
-    _locale_folder_pattern: str = 'Localization/{loc_target}/{locale}'
+
+    _loc_root: str = 'Content/Localization/{loc_target}/'
+    _locale_folder_pattern: str = 'Content/Localization/{loc_target}/{locale}'
 
     _culture_config_line_start_format: str = '+GameTargetsSettings=(Name="{name}",Guid='
     _task_ini_native_culture_line_start: str = 'NativeCulture='
@@ -382,7 +382,6 @@ class UELocTarget:
 
         return 0
 
-    # TODO: Implement delete obsolete loc folders
     def replace_all_locales(
         self,
         new_locales: list[str],
@@ -456,29 +455,19 @@ class UELocTarget:
 
         # Get current locale data
 
-        with open(self.project_path / self._default_game_ini, 'r') as f:
-            strings = f.readlines()
+        locales = self.get_current_locales()
+        native_locale = self.get_native_locale()[1]
 
-        for i, s in enumerate(strings):
-            if not s.startswith(
-                self._culture_config_line_start_format.format(name=self.name)
-            ):
-                continue
-            native_index = int(re.search(self._native_culture_idx_regex, s).group(1))
-            native_locale = re.findall(self._culture_regex, s)[native_index]
+        if keep_native_locale and native_locale not in new_locales:
+            raise ValueError(
+                'keep_native_locale is true but current native locale '
+                'is not present in the new_locales list'
+            )
 
-            if keep_native_locale and native_locale not in new_locales:
-                raise ValueError(
-                    'keep_native_locale is true but current native locale '
-                    'is not present in the new_locales list'
-                )
+        if keep_native_locale:
+            new_native_locale = native_locale
 
-            if keep_native_locale:
-                new_native_locale = native_locale
-
-            new_native_locale_index = new_locales.index(new_native_locale)
-
-            break
+        new_native_locale_index = new_locales.index(new_native_locale)
 
         self._update_default_editor_ini(new_native_locale_index, new_locales)
 
@@ -493,7 +482,8 @@ class UELocTarget:
             )
 
         if delete_obsolete_loc_folders:
-            print('Deleting obsolete folders is not implemented yet =(')
+            for name in [loc for loc in locales if loc not in new_locales]:
+                self._delete_loc_folder(name)
 
         return 0
 
@@ -539,10 +529,10 @@ class UELocTarget:
             new_native_locale_index=native_locale_index,
         )
 
-        if not rename_loc_folder:
-            return 0
+        if rename_loc_folder:
+            return self._rename_loc_folder(old_name, new_name)
 
-        return self._rename_loc_folder(old_name, new_name)
+        return 0
 
 
 class UnrealProject:
