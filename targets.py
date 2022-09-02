@@ -259,7 +259,7 @@ def main():
         return 1
 
     task = LOC_TARGET_ACTIONS[params.action](
-        params.source, params.targets, params.locales, '../'
+        params.source, params.targets, params.locales
     )
 
     task.read_config(Path(__file__).name, logger)
