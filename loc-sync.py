@@ -237,7 +237,7 @@ def main():
                     fpath,
                     uproject,
                     '-run=pythonscript',
-                    f'-script="{py_cwd / task["script"]} {params["task-list"]}"',
+                    f'-script="{task["script"]}.py"',
                     '-SCCProvider=None',
                     '-Unattended',
                     '-Log="LocSync.log"',
