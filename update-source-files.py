@@ -31,7 +31,6 @@ class UpdateSourceFile(LocTask):
         # list of rules, each rule is a list: [property to check, regex, comment to add]
         #  - property to check: msgid, msgctx, etc. See libraries/polib
         default_factory=lambda: [
-            # Satis: remove Boombox stuff for now
             [
                 'comment',
                 r'SourceLocation:	/Any/Path/You/Want/',
