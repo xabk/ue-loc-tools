@@ -247,7 +247,21 @@ script-parameters:
     # It's a good idea to use the same locale here and in add-source-files
     # It's also a good idea to use debug ID locale :)
 
+    encoding: utf-8-sig
+
     content_dir: '../'
+    temp_dir: 'Localization/~Temp/FilesToUpload'
+
+    delete_criteria:
+    # This will delete any entries that match any of the criteria before uploading
+    # Format is as follows:
+#     - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
+#       - 'RegEx' = regex to use for checking
+      - - 'comment'  # Based on source location
+        - 'SourceLocation:	/Any/Path/You/Want/'
+
+      - - 'msgctxt'  # Based on context (namespace,key)
+        - 'some_namespace,some_key_pattern_you_want_to_delete'
     
 
 #

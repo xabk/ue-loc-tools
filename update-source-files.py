@@ -2,9 +2,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from dataclasses import dataclass, field
 from loguru import logger
+import re
 
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask
+from libraries import polib
 
 
 @dataclass
@@ -23,17 +25,59 @@ class UpdateSourceFile(LocTask):
 
     src_locale: str = 'io'
 
+    encoding: str = 'utf-8-sig'  # PO file encoding
+
+    delete_criteria: list = field(
+        # list of rules, each rule is a list: [property to check, regex, comment to add]
+        #  - property to check: msgid, msgctx, etc. See libraries/polib
+        default_factory=lambda: [
+            # Satis: remove Boombox stuff for now
+            [
+                'comment',
+                r'SourceLocation:	/Any/Path/You/Want/',
+            ],
+            [
+                'msgctxt',
+                r'Any_Key_Pattern_You_Want_To_Delete',
+            ],
+        ]
+    )
+
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
+    temp_dir: str = 'Localization/~Temp/FilesToUpload'
 
     _fname: str = 'Localization/{target}/{locale}/{target}.po'
 
     _content_path: Path = None
+    _temp_path: Path = None
 
     def post_update(self):
         super().post_update()
         self._content_path = Path(self.content_dir).resolve()
+        self._temp_path = Path(self._content_path / self.temp_dir)
         self._fname = self._fname.format(locale=self.src_locale, target='{target}')
+
+    def need_delete_entry(self, entry):
+        for [prop, crit] in self.delete_criteria:
+            if re.search(crit, getattr(entry, prop)):
+                return True
+        return False
+
+    def filter_file(self, fpath: Path):
+        po = polib.pofile(fpath, encoding=self.encoding, wrapwidth=0)
+        new_po = polib.POFile(encoding=self.encoding, wrapwidth=0)
+        for entry in po:
+            if self.need_delete_entry(entry):
+                logger.info(
+                    f'Removed: {fpath.name} / {entry.msgstr} @ {entry.occurrences[0][0]}\n{entry.msgid}'
+                )
+                continue
+            new_po.append(entry)
+
+        self._temp_path.mkdir(parents=True, exist_ok=True)
+        new_po.save(self._temp_path / fpath.name)
+        return self._temp_path / fpath.name
 
     def update_source_files(self):
         crowdin = UECrowdinClient(
@@ -48,6 +92,15 @@ class UpdateSourceFile(LocTask):
 
         for target in self.loc_targets:
             fpath = self._content_path / self._fname.format(target=target)
+            if self.delete_criteria:
+                logger.info(
+                    f'Filtering file: {fpath} to {self._temp_path}/{fpath.name}'
+                )
+                fpath = self.filter_file(fpath)
+                if not fpath.exists():
+                    logger.error('Error during file content filtering. Aborting!')
+                    return False
+
             logger.info(f'Uploading file: {fpath}')
             r = crowdin.update_file(fpath)
             if r == True:
