@@ -7,6 +7,12 @@ from dataclasses import dataclass, field
 from libraries.utilities import LocTask
 from libraries.uetools import UELocTarget
 
+# Run loc target-related actions. Reads config from base.config.yaml and command line.
+#    Examples: targets.py replace source=Game target=Audio
+#              targets.py add source=Game target=Audio
+#              targets.py delete target=Audio locale=io
+#              targets.py add target=Audio locale=io
+
 
 @dataclass
 class LocaleTask(LocTask):
