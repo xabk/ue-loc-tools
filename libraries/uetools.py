@@ -1,10 +1,3 @@
-try:
-    import unreal
-
-    UNREAL = True
-except:
-    UNREAL = False
-
 from pathlib import Path
 from loguru import logger
 import re
