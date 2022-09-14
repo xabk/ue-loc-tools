@@ -13,6 +13,9 @@ from libraries.uetools import UELocTarget
 #              targets.py delete target=Audio locale=io
 #              targets.py add target=Audio locale=io
 
+# TODO: Create debug/hash locale-only ini files to speed up export/import for big projects
+# TODO: Statistics?
+
 
 @dataclass
 class LocaleTask(LocTask):
