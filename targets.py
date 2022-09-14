@@ -27,10 +27,12 @@ class LocaleTask(LocTask):
     Attributes
     ----------
     source_target
-        Target to use as source (e.g., to add/copy locales from)
+        Target to use as source (to add/copy locales from)
     loc_targets
         List of targets or a target to modify (add/remove/replace locales)
         Defaults to None to prevent unintentional modifications
+    locales
+        List of locales to use
     project_dir
         Project directory
         Defaults to ../../ based on the scripts being in Content/Python
