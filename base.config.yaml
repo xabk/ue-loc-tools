@@ -59,6 +59,8 @@ parameters:
     * Updated the source file on Crowdin
   # Default CL descripiton to use for check-outs and check-ins
 
+  engine_dir: '../../' # Relative to project path
+
 # -------------------------------------------------------------
 # ----- SCRIPT PARAMETERS: SET DEFAULTS FOR SCRIPTS HERE ------
 # -------------------------------------------------------------
@@ -117,25 +119,30 @@ script-parameters:
       - - 'msgid'  # Hint for lines with Unreal inline plurals
         - '}\|plural\('
         - |-
-          "Please adapt to your language plural rules. We only support keywords: "
-          "zero, one, two, few, many, other.\n"
-          "Use Alt + C on Crowdin to create a skeleton adapted to your language grammar.\n"
-          "Translate only white text in curly braces. Test using the form "
-          "below the Preview box.\n"
-          "Check what keywords stand for here: "
-          "http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html."
+          Please adapt to your language plural rules. We only support keywords: 
+          zero, one, two, few, many, other.\n
+          Use Alt + C on Crowdin to create a skeleton adapted to your language grammar.\n
+          Translate only white text in curly braces. Test using the form 
+          below the Preview box.\n
+          Check what keywords stand for here: 
+          http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html.
 
       - - 'msgctxt'  # Example: Hint for abbreviated items, matched by namespace
         - 'AbbreviatedDisplayName,'
         - |-
-          "Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\n"
-          "iiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)"
+          Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\n
+          iiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)
 
       - - 'msgid'  # Example: Hint for lines with 'Zoop' in source (Satisfactory)
         - '\b[Zz]oop'
         - |-
-          "Please keep this one as is or transliterate/change spelling only. "
-          "Don't come up with funny names: it brings more harm than good."
+          Please keep this one as is or transliterate/change spelling only. 
+          Don't come up with funny names: it brings more harm than good.
+
+    delete_comments_criteria: [
+      '^Key:.*$'  # Delete 'Key: NNN' comments: we have them in msgctxt
+    ]
+    delete_occurences: Yes # Delete occurences: we have them in SourceLocation comments
 
     content_dir: '../'
 
@@ -245,7 +252,21 @@ script-parameters:
     # It's a good idea to use the same locale here and in add-source-files
     # It's also a good idea to use debug ID locale :)
 
+    encoding: utf-8-sig
+
     content_dir: '../'
+    temp_dir: 'Localization/~Temp/FilesToUpload'
+
+    delete_criteria:
+    # This will delete any entries that match any of the criteria before uploading
+    # Format is as follows:
+#     - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
+#       - 'RegEx' = regex to use for checking
+      - - 'comment'  # Based on source location
+        - 'SourceLocation:	/Any/Path/You/Want/'
+
+      - - 'msgctxt'  # Based on context (namespace,key)
+        - 'some_namespace,some_key_pattern_you_want_to_delete'
     
 
 #

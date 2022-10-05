@@ -15,7 +15,6 @@ class UECrowdinClient(CrowdinClient):
         project_id: int = None,
         silent: bool = False,
     ):
-        super().__init__()
         if not token:
             raise Exception(
                 'No API token specified for Crowdin. '
@@ -37,6 +36,8 @@ class UECrowdinClient(CrowdinClient):
 
         self.file_list = None
         self.data = dict()
+
+        super().__init__()
 
     def info(self, message: str, *args, **kwargs):
         if self.silent:

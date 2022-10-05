@@ -51,7 +51,7 @@ class LocTask:
             help='Task list to run from base.config.yaml',
         )
 
-        return parser.parse_args().tasklist
+        return parser.parse_known_args()[0].tasklist
 
     def read_config(
         self,

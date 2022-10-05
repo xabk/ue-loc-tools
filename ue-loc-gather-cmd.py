@@ -102,6 +102,7 @@ class UnrealLocGatherCommandlet(LocTask):
 
         if self.engine_dir:
             self._engine_path = Path(self.engine_dir).resolve()
+            self._unreal_binary_path = self._engine_path / self._unreal_binary
         else:
             # Try to find it as if we're in Games/..
             logger.info('Checking if engine path is ../../ from project directory.')
@@ -175,7 +176,7 @@ class UnrealLocGatherCommandlet(LocTask):
             gather_ini = file.read()
             engine_path = re.subn(r'\\', '/', str(self._engine_path))[0]
             gather_ini, patched_dependencies = re.subn(
-                r'(?<=ManifestDependencies=)[^\r\n]*?(?=Engine/Content/Localization/)',
+                r'(?<=ManifestDependencies=)[^\r\n]*?(?=/Engine/Content/Localization/)',
                 engine_path,
                 gather_ini,
             )

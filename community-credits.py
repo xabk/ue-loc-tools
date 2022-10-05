@@ -129,10 +129,6 @@ class UpdateCommunityCredits(LocTask):
             if not users_string:
                 continue
 
-            # TODO: Move to config file somehow?..
-            if lang == 'en-shax':
-                users_string += ', and greeny for the initial script :)'
-
             logger.info(
                 f'{report["language_name"]} ({report["language_id"]}): {users_string}'
             )
