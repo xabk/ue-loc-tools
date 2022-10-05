@@ -139,6 +139,11 @@ script-parameters:
           Please keep this one as is or transliterate/change spelling only. 
           Don't come up with funny names: it brings more harm than good.
 
+    delete_comments_criteria: [
+      '^Key:.*$'  # Delete 'Key: NNN' comments: we have them in msgctxt
+    ]
+    delete_occurences: Yes # Delete occurences: we have them in SourceLocation comments
+
     content_dir: '../'
 
   # Build the translation project on Crowdin, download it, unpack,

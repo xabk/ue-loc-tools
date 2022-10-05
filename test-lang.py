@@ -39,6 +39,14 @@ class ProcessTestAndHashLocales(LocTask):
     encoding: str = 'utf-8-sig'  # PO file encoding
     sort_po: bool = True  # Sort the file by source reference?
 
+    delete_comments_criteria: list = field(
+        default_factory=lambda: [
+            r'^Key:.*$',  # Delete 'Key: NNN' comments: we have them in msgctxt
+        ]
+    )
+    # Delete occurences: we have them in 'SourceLocation: NNN' comments
+    delete_occurences: bool = True
+
     # Regex to match variables that we want to keep in 'translation'
     # TODO: Add support for UE/ICU syntax (plural, genders, etc.)
     var_regex: str = (
@@ -108,16 +116,21 @@ class ProcessTestAndHashLocales(LocTask):
         index = re.sub(r'\d+', lambda match: match.group().zfill(width), match.group(2))
         return match.group(1) + index + match.group(3)
 
-    @staticmethod
-    def get_additional_comments(entry: polib.POEntry, criteria: list) -> list:
+    def get_additional_comments(self, entry: polib.POEntry) -> list:
         '''
         Get additional comments based on criteria
         '''
         comments = []
-        for [prop, crit, comment] in criteria:
+        for [prop, crit, comment] in self.comments_criteria:
             if re.search(crit, getattr(entry, prop)):
                 comments += [comment]
         return comments
+
+    def should_delete_comment(self, comment: str) -> bool:
+        for expr in self.delete_comments_criteria:
+            if re.match(expr, comment):
+                return True
+        return False
 
     def find_max_ID(self) -> int:
         '''
@@ -206,12 +219,6 @@ class ProcessTestAndHashLocales(LocTask):
                         oc0 = re.sub(self.ind_regex, self.ind_repl, oc[0])
                     occurrences.append((oc0, oc[1]))
                 entry.occurrences = occurrences
-                entry.comment = '\n'.join(
-                    [
-                        re.sub(self.ind_regex, self.ind_repl, c)
-                        for c in entry.comment.splitlines(False)
-                    ]
-                )
 
             po.sort()
 
@@ -256,8 +263,6 @@ class ProcessTestAndHashLocales(LocTask):
 
                 current_id += 1
 
-            comments = entry.comment.splitlines(False)
-
             debug_ID = 'Debug ID:\t' + entry.msgstr
 
             asset_name = re.search(
@@ -271,16 +276,24 @@ class ProcessTestAndHashLocales(LocTask):
             if strings.count(entry.msgid) > 1:
                 debug_ID += '\t\t// ###Repetition###'
 
-            for i in range(len(comments)):
-                if comments[i].startswith('Debug ID:\t'):
-                    comments[i] = debug_ID
-                    break
-            else:
-                comments.append(debug_ID)
+            debug_ID_found = False
+            new_comments = []
+            for comment in entry.comment.splitlines(False):
+                if comment.startswith('Debug ID:'):
+                    new_comments.append(debug_ID)
+                    debug_ID_found = True
+                    continue
+                if not self.should_delete_comment(comment):
+                    new_comments.append(comment)
+            if not debug_ID_found:
+                new_comments.append(debug_ID)
 
-            comments += self.get_additional_comments(entry, self.comments_criteria)
+            new_comments += self.get_additional_comments(entry)
 
-            entry.comment = '\n'.join(comments)
+            entry.comment = '\n'.join(new_comments)
+
+            if self.delete_occurences:
+                entry.occurrences = []
 
         # TODO: Check for duplicate IDs across all targets
         ids = [entry.msgstr for entry in po.translated_entries()]
