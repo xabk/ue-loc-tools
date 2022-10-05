@@ -102,6 +102,7 @@ class UnrealLocGatherCommandlet(LocTask):
 
         if self.engine_dir:
             self._engine_path = Path(self.engine_dir).resolve()
+            self._unreal_binary_path = self._engine_path / self._unreal_binary
         else:
             # Try to find it as if we're in Games/..
             logger.info('Checking if engine path is ../../ from project directory.')
