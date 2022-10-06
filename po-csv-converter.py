@@ -1,4 +1,5 @@
 import re
+import csv
 from loguru import logger
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -33,7 +34,35 @@ class UE_PO_CSV_Converter(LocTask):
     # Will be skipped as a language but used to add Debug IDs to context
     debug_ID_locale: str = 'io'
 
-    skipped_locales: list = None  # Locales to skip
+    skipped_locales: list = field(
+        default_factory=lambda: ['io', 'ia-001']
+    )  # Locales to skip
+
+    # Order of locales if you want
+    # Locales not listed here will go after the ones in the list,
+    # in the order they appear in DefaultGame config
+    locales_order: list = field(
+        default_factory=lambda: [
+            'fr',
+            'it',
+            'de',
+            'es',
+            'zh-Hans',
+            'zh-Hant',
+            'ja',
+            'ko',
+        ]
+    )
+
+    sort_strings: bool = True
+
+    CSV_fields: list = field(
+        default_factory=lambda: [
+            'id',
+            'char_limit',
+            'crowdin_context',
+        ]
+    )  # Fields to export to CSV, translations added automatically
 
     # If true, exports all languages into one multilingual CSV
     # and expects one multilingual CSV on import
@@ -41,7 +70,7 @@ class UE_PO_CSV_Converter(LocTask):
     # and expects separate bilingual CSVs on import
     # ----
     # Warning: Expects the same structure on import
-    multilingual_CSV: bool = True
+    multilingual_CSV: bool = False
 
     # TODO: Implement rules and splitting
     # Will split CSV file(s) based on the rules provided
@@ -49,7 +78,7 @@ class UE_PO_CSV_Converter(LocTask):
     # ----
     # Warning: Expects the same structure on import
     split_CSV_using_script_rules: bool = False
-    splitting_rules = None
+    splitting_rules: list = None
 
     # TODO: Implement conversion
     # ----
@@ -59,7 +88,7 @@ class UE_PO_CSV_Converter(LocTask):
 
     po_encoding: str = 'utf-8-sig'  # PO file encoding
     csv_encoding: str = 'utf-8'  # CSV file encoding
-    csv_delimiter: str = 'tab'  # tab (default), colon, semicolon
+    csv_delimiter: str = '\t'  # \t by default, can be , or ;
 
     # Remove comments that start with these strings
     # Default list removes what's already extracted into separate columns
@@ -98,19 +127,20 @@ class UE_PO_CSV_Converter(LocTask):
         ]
     )
 
-    csv_dir: str = 'Localization/CSV/'
+    multilingual_csv_name: str = 'Localization/{name}.{ext}'
+    bilingual_csv_name: str = 'Localization/{target}/{locale}/{target}.{locale}.{ext}'
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
 
     # Internal
+    _strings: dict[list[dict]] = None  # 'target' -> ['string', ...]
+
     _loc_targets: list[UELocTarget] = None
     _locale_file: str = 'Localization/{target}/{locale}/{target}.po'
 
-    _csv_name: str = '{target}'
-    _split_csv_name: str = '{target}.{split_name}'
-    _bilingual_csv_name: str = '{name}.{locale}.{ext}'
-    _multilingual_csv_name: str = '{name}.{ext}'
+    _multilingual_csv_name: str = None
+    _bilingual_csv_name: str = None
 
     _csv_extension: str = 'tsv'
     _content_path: Path = None
@@ -119,23 +149,29 @@ class UE_PO_CSV_Converter(LocTask):
     def post_update(self):
         super().post_update()
         self._content_path = Path(self.content_dir)
+
         self._loc_targets = [
-            UELocTarget(self._content_path.parent, target)
+            UELocTarget(self._content_path, target)  # .parent, target)
             for target in self.loc_targets
         ]
 
-        if self.csv_delimiter != 'tab':
+        self._strings = {}
+
+        if self.csv_delimiter != '\t':
             self._csv_extension = 'csv'
 
-        self._bilingual_csv_name.format(
-            name='{name}', locale='{locale}', ext=self._csv_extension
+        self._multilingual_csv_name = self.multilingual_csv_name.format(
+            name='{target}', ext=self._csv_extension
         )
-        self._multilingual_csv_name.format(name='{name}', ext=self._csv_extension)
+
+        self._bilingual_csv_name = self.bilingual_csv_name.format(
+            target='{target}', locale='{locale}', ext=self._csv_extension
+        )
 
     @staticmethod
     def parse_po_id(po_id: str):
         '''
-        Takes a text ID from CSV and returns (target, namespace, key) for PO
+        Takes a text ID from CSV and returns (namespace, key) for PO
         '''
 
         comma_index = None
@@ -163,7 +199,7 @@ class UE_PO_CSV_Converter(LocTask):
 
         return (namespace, key)
 
-    def source_PO_to_list(self, target: str) -> list:
+    def load_source_PO(self, target: str) -> int:
         '''
         Load a PO file for the specified target
         and return a list of dicts containing all the data
@@ -175,7 +211,9 @@ class UE_PO_CSV_Converter(LocTask):
 
         logger.info(f'Processing {po_path}')
 
-        po = polib.pofile(po_path, wrapwidth=0, encoding=self.po_encoding)
+        src_po = polib.pofile(po_path, wrapwidth=0, encoding=self.po_encoding)
+
+        # TODO: Patch occurences and/or sorting: PO or list?
 
         if self.debug_ID_locale:
             debug_po = polib.pofile(
@@ -186,34 +224,37 @@ class UE_PO_CSV_Converter(LocTask):
             )
 
         entries = []
-        for e in po:
-            key = e.msgctxt
+        strings = [e.msgstr for e in src_po]
+        for e in src_po:
+            (namespace, key) = self.parse_po_id(e.msgctxt)
 
             char_limit = re.search(r'InfoMetaData:\t"Char Limit" : "(\d+)"', e.comment)
             char_limit = char_limit[1] if char_limit is not None else ''
 
             context = [
-                line.replace('InfoMetaData:\t', '').replace('\t', '    ')
+                # TODO: Omit empty metadata fields
+                re.sub(
+                    r'^InfoMetaData:\t"(.*?)" : "(.*?)"$',
+                    r'\1: \2',
+                    line,
+                ).replace('\t', '    ')
                 for line in e.comment.splitlines()
                 if not line.startswith(self.comments_to_delete)
+                and not re.match(r'^InfoMetaData:\t"(.*?)" : ""$', line)
             ]
-
-            add_context_line = ''
 
             if self.debug_ID_locale:
                 debug_entry = debug_po.find(e.msgctxt, 'msgctxt')
                 if debug_entry:
                     if debug_entry.msgstr != '':
-                        add_context_line += f'Debug ID: {debug_entry.msgstr}'
+                        debug_id = debug_entry.msgstr
                     else:
                         logger.warning(
                             'Debug ID empty for entry. '
                             'Debug ID locale might need to be reprocessed.'
                             f'\n{e.msgctxt}\n{e.msgstr}'
                         )
-                        add_context_line += (
-                            'Debug ID: #−−−−'  # Using minus to align with numbers
-                        )
+                        debug_id = 'Warning: Entry found but debug ID empty'
                 else:
                     logger.warning(
                         'Debug ID entry not found for entry. '
@@ -221,16 +262,17 @@ class UE_PO_CSV_Converter(LocTask):
                         'reexported from UE and then reprocessed.'
                         f'\n{e.msgctxt}\n{e.msgstr}'
                     )
+                    debug_id = 'Warning: Entry not found in debug ID locale'
 
-            # TODO: Implement asset names extraction
-            if self.extract_asset_names_to_context:
-                pass
+            asset_name = re.search(
+                r'[^.]*(\.cpp|\.h)?', e.occurrences[0][0].rpartition('/')[2]
+            )
+            if asset_name:
+                asset_name = asset_name[0]
 
-            # TODO: Implement repetition markers
-            if self.add_repetition_markers:
-                pass
-
-            context += [add_context_line]
+            repetition = ''
+            if (count := strings.count(e.msgstr)) > 1:
+                repetition = f'Repetition: {count}'
 
             # TODO: Implement comments
             if self.add_comments:
@@ -242,212 +284,163 @@ class UE_PO_CSV_Converter(LocTask):
                 [(f'{e[0]}:{e[1]}' if e[1] != '' else f'{e[0]}') for e in e.occurrences]
             )
 
+            # TODO: Extract this to a func
             d = {
-                'id': e.msgctxt,
-                'target': target,
+                'id': f'{target}/{e.msgctxt}',
+                'msgctxt': e.msgctxt,
+                'target': self.native_locale,
+                'namespace': namespace,
                 'key': key,
+                'debug_id': debug_id,
+                'asset_name': asset_name,
+                'repetition': repetition,
                 'source_references': occurrences,
                 'char_limit': char_limit,
                 'context': context,
-                'source': e.msgstr,
+                'crowdin_context': '\n'.join(
+                    filter(
+                        None,
+                        [
+                            context,
+                            ' / '.join(
+                                filter(
+                                    None,
+                                    [
+                                        f'Debug ID: {debug_id}',
+                                        f'Asset: {asset_name}',
+                                        repetition,
+                                    ],
+                                )
+                            ),
+                            occurrences,
+                        ],
+                    )
+                ),
+                self.native_locale: e.msgstr,
             }
 
             entries.append(d)
 
-        for line in (
-            [list(entries[0].keys())] + [list(entry.values()) for entry in entries]
-        )[:20]:
-            print(line)
+        # TODO: Implement repetition markers within the target or all targets?
 
-    def x(self):
-        pass
+        self._strings[target] = entries[:]
 
-    def process_debug_ID_locale(self, po_file: str, starting_id: int) -> int:
-        '''
-        Process the PO file to insert #12345 IDs as 'translations'
-        and add them to context
-        '''
+        return 0
 
-        logger.info(f'Processing {po_file}')
+    def _load_translated_PO(self, target: str, locale: str) -> int:
+        entries = self._strings[target][:]
 
-        current_id = starting_id
+        po_path = self._content_path / f'Localization/{target}/{locale}/{target}.po'
 
-        po = polib.pofile(po_file, wrapwidth=0, encoding=self.encoding)
+        logger.info(f'Processing {po_path}')
 
-        logger.info(
-            'Source file translation rate: {rate:.0%}'.format(
-                rate=po.percent_translated() / 100
-            )
-        )
+        po = polib.pofile(po_path, wrapwidth=0, encoding=self.po_encoding)
 
-        #
-        # Make indices in source reference zero-padded to fix the sorting
-        #
-        # And sort the PO by source reference to overcome the 'randomness' of the default
-        # Unreal Engine GUIDs and get at least some logical grouping
-        #
-        if self.sort_po:
-            for entry in po:
-                ctxt = re.sub(
-                    r'\d+', lambda match: match.group().zfill(3), entry.msgctxt
-                )
-                occurrences = []
-                for oc in entry.occurrences:
-                    # Zero-pad array indices and add keys with zero-padded numbers to occurences
-                    oc0 = ''
-                    if '### Key: ' not in oc[0]:
-                        oc0 = (
-                            re.sub(self.ind_regex, self.ind_repl, oc[0])
-                            + f' ### Key: {ctxt}'
-                        )
-                    else:
-                        oc0 = re.sub(self.ind_regex, self.ind_repl, oc[0])
-                    occurrences.append((oc0, oc[1]))
-                entry.occurrences = occurrences
-                entry.comment = '\n'.join(
-                    [
-                        re.sub(self.ind_regex, self.ind_repl, c)
-                        for c in entry.comment.splitlines(False)
-                    ]
-                )
-
-            po.sort()
-
-        if not self.clear_translations:
-            # Check existing translations and log strings
-            # that are translated but do not contain a debug ID
-            odd_strings = [
-                entry
-                for entry in po.translated_entries()
-                if not re.search(self._id_regex, entry.msgstr)
-            ]
-
-            if odd_strings:
-                logger.warning(
-                    f'Translated lines with no IDs in them ({len(odd_strings)}):'
-                )
-                for entry in odd_strings:
-                    logger.warning(
-                        "\n".join([entry.msgctxt, entry.msgid, entry.msgstr])
-                    )
-
-        logger.info(f'Starting ID: {current_id}')
-
-        strings = [entry.msgid for entry in po]
-
-        # Iterate over all entries to generate debug IDs, patch and add comments
-        for entry in po:
-            variables = []
-
-            # If we want to retranslate all entries or if entry is not translated
-            if self.clear_translations or not entry.translated():
-                variables = [
-                    str(var) for var in re.findall(self.var_regex, entry.msgid)
-                ]
-
-                # Generate and save the ID
-                entry.msgstr = self.id_gen(current_id, self.id_length)
-
-                # Add the variables back
-                if len(variables) > 0:
-                    entry.msgstr += " " + " ".join('<{0}>'.format(v) for v in variables)
-
-                current_id += 1
-
-            comments = entry.comment.splitlines(False)
-
-            debug_ID = 'Debug ID:\t' + entry.msgstr
-
-            asset_name = re.search(
-                r'[^.]*(\.cpp|\.h)?', entry.occurrences[0][0].rpartition('/')[2]
-            )
-
-            if asset_name:
-                asset_name = asset_name[0]
-            debug_ID += f'\t\tAsset: {asset_name}'
-
-            if strings.count(entry.msgid) > 1:
-                debug_ID += '\t\t// ###Repetition###'
-
-            for i in range(len(comments)):
-                if comments[i].startswith('Debug ID:\t'):
-                    comments[i] = debug_ID
-                    break
-            else:
-                comments.append(debug_ID)
-
-            comments += self.get_additional_comments(entry, self.comments_criteria)
-
-            entry.comment = '\n'.join(comments)
-
-        # TODO: Check for duplicate IDs across all targets
-        ids = [entry.msgstr for entry in po.translated_entries()]
-        if len(set(ids)) != len(ids):
-            logger.error(
-                'Duplicate #IDs spotted, please recompile the debug IDs from scratch (use CLEAR_TRANSLATIONS = True)'
-            )
-
-        logger.info(
-            'Target file translation rate: {rate:.0%}'.format(
-                rate=po.percent_translated() / 100
-            )
-        )
-        logger.info(f'Last used ID: {current_id-1}')
-
-        #
-        # Save the file
-        #
-        po.save(po_file)
-        logger.info(f'Saved target file: {po_file}')
-
-        return current_id
-
-    def process_locales(self):
-
-        logger.info(f'Content path: {Path(self._content_path).absolute()}')
-
-        starting_id = 1
-        if not self.clear_translations and self.debug_ID_locale:
-            starting_id = self.find_max_ID() + 1
-
-        if not (self.debug_ID_locale or self.hash_locale):
-            logger.error(
-                'At least one of the locales must be specified (debug id or hash)'
-            )
-            return False
-
-        hash_locales_processed = []
-        debug_locales_processed = []
-        errors = False
-
-        for target in self.loc_targets:
-            logger.info(f'Processing target: {target}')
-            if self.debug_ID_locale:
-                debug_id_PO = self._content_path / self._debug_id_file.format(
-                    target=target
-                )
-                logger.info(f'Debug IDs PO file: {debug_id_PO}')
-                if not debug_id_PO.exists():
-                    logger.error(
-                        f'Debug locale {self.debug_ID_locale} file not found: '
-                        f'{debug_id_PO}'
-                    )
+        for e in entries:
+            translation = ''
+            translated_entry = po.find(e['msgctxt'], 'msgctxt')
+            if translated_entry:
+                if translated_entry.msgstr != '':
+                    translation = translated_entry.msgstr
                 else:
-                    starting_id = self.process_debug_ID_locale(debug_id_PO, starting_id)
-                    debug_locales_processed.append(target)
+                    logger.warning(
+                        f'{target} -> {locale}: No translation for entry: '
+                        f'\n{e["msgctxt"]}\n{e[self.native_locale]}'
+                    )
+            else:
+                logger.warning(
+                    f'{target} -> {locale}: Entry not found in translated PO: '
+                    f'\n{e["msgctxt"]}\n{e[self.native_locale]}'
+                )
 
-        if self.debug_ID_locale and not len(debug_locales_processed) == len(
-            self.loc_targets
-        ):
-            logger.error(
-                'Not all debug locales have been processed: '
-                f'{len(debug_locales_processed)} out of {len(self.loc_targets)}. '
-                f'Loc targets: {self.loc_targets}. Debug locale: {self.debug_ID_locale}. '
-                f'Processed debug locale targets: {hash_locales_processed}'
+            e[locale] = translation
+
+        self._strings[target] = entries[:]
+
+        return 0
+
+    def load_POs_for_all_targets(self) -> int:
+        for target in self._loc_targets:
+            locales = target.get_current_locales()
+            self.load_source_PO(target.name)
+            for locale in locales:
+                if locale in self.skipped_locales or locale == self.native_locale:
+                    continue
+                self._load_translated_PO(target.name, locale)
+
+    def _load_translated_CSV(self, target: str, locale: str):
+        csv_name = self._bilingual_csv_name.format(target=target, locale=locale)
+        csv_name = self._content_path / csv_name
+        logger.info(f'Loading CSV for {target}/{locale} from:\n{csv_name}')
+        translations = []
+        with open(csv_name, 'r', encoding=self.csv_encoding, newline='') as f:
+            csv_file = csv.DictReader(f, delimiter=self.csv_delimiter)
+            for row in csv_file:
+                translations.append({row['id']: row[locale]})
+        entries = []
+        for string in self._strings[target]:
+            if string['id'] in translations:
+                string[locale] = translations[string['id']]
+            entries.append(string)
+
+    def _save_to_CSV(
+        self,
+        filename: str,
+        strings: list[dict],
+        fields: list,
+    ):
+        with open(filename, 'w', newline='', encoding=self.csv_encoding) as f:
+            csv_file = csv.writer(
+                f, delimiter=self.csv_delimiter, quoting=csv.QUOTE_MINIMAL
             )
-            errors = True
 
-        return errors
+            if len(strings) < 1:
+                logger.warning(f'No strings supplied to CSV: {filename}')
+                return 0
+
+            missing_fields = [f for f in fields if f not in strings[0].keys()]
+            if missing_fields:
+                logger.error(f'Fields not found among strings fields: {missing_fields}')
+                return 1
+
+            csv_file.writerow(fields)  # Field names
+            for string in strings:
+                csv_file.writerow([string[f] for f in fields])
+
+    def save_bilingual_CSVs_per_target(self):
+        logger.info(
+            f'Saving CSVs for targets ({len(self._loc_targets)}): '
+            f'{[target.name for target in self._loc_targets]}.'
+        )
+        for target in self._loc_targets:
+            locales = sorted(target.get_current_locales())
+            locales = [
+                locale
+                for locale in locales
+                if locale not in self.skipped_locales and locale != self.native_locale
+            ]
+            if self.locales_order:
+                locales = [
+                    locale for locale in self.locales_order if locale in locales
+                ] + sorted(
+                    [locale for locale in locales if locale not in self.locales_order]
+                )
+            logger.info(
+                f'Saving CSVs for target: {target.name}. '
+                f'Locales ({len(locales)}): {locales}.'
+            )
+            for locale in locales:
+                csv_name = self._bilingual_csv_name.format(
+                    target=target.name, locale=locale
+                )
+                csv_name = self._content_path / csv_name
+                logger.info(f'Saving CSV for {target.name}/{locale} to:\n{csv_name}')
+                self._save_to_CSV(
+                    csv_name,
+                    self._strings[target.name],
+                    self.CSV_fields + [self.native_locale, locale],
+                )
+                logger.info(f'{target.name}/{locale} saved!')
 
 
 def main():
@@ -469,7 +462,11 @@ def main():
 
     task.read_config(Path(__file__).name, logger)
 
-    result = task.source_PO_to_list('Goat2UIStringTables')
+    # result = task.load_POs_for_all_targets()
+    # result = task.save_bilingual_CSVs_per_target()
+
+    result = task.load_source_PO(task._loc_targets[1].name)
+    result = task._load_translated_CSV(task._loc_targets[1].name, 'de')
 
     logger.info('')
     logger.info('--- Process debug id/test/source, and hash locales script end ---')
