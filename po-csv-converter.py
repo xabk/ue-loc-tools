@@ -1,6 +1,7 @@
 import re
 import csv
 import copy
+from time import time
 from loguru import logger
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -349,12 +350,13 @@ class UE_PO_CSV_Converter(LocTask):
         logger.info(f'Processing {po_path}')
 
         po = polib.pofile(po_path, wrapwidth=0, encoding=self.po_encoding)
+        po_entries = {e.msgctxt: e for e in po}
 
         for entry in self._strings[target].values():
             translation = ''
             msgctxt = entry['msgctxt']
-            translated_entry = po.find(msgctxt, 'msgctxt')
-            if translated_entry:
+            translated_entry = po_entries.pop(msgctxt, None)
+            if translated_entry is not None:
                 if translated_entry.msgstr != '':
                     translation = translated_entry.msgstr
                 else:
@@ -473,7 +475,7 @@ class UE_PO_CSV_Converter(LocTask):
                     continue
                 self._save_translated_PO(target.name, locale)
 
-    def _save_to_CSV(
+    def _save_CSV(
         self,
         filename: str,
         strings: dict[str:dict],
@@ -527,7 +529,7 @@ class UE_PO_CSV_Converter(LocTask):
                 )
                 csv_name = self._content_path / csv_name
                 logger.info(f'Saving CSV for {target.name}/{locale} to:\n{csv_name}')
-                self._save_to_CSV(
+                self._save_CSV(
                     csv_name,
                     self._strings[target.name],
                     self.CSV_fields + [self.native_locale, locale],
@@ -552,40 +554,40 @@ def main():
 
     # --- Load source and translated POs and save to CSVs ---
 
-    # task_PO_to_CSVs = UE_PO_CSV_Converter()
+    task_PO_to_CSVs = UE_PO_CSV_Converter()
 
-    # task_PO_to_CSVs.read_config(Path(__file__).name, logger)
+    task_PO_to_CSVs.read_config(Path(__file__).name, logger)
 
-    # result = task_PO_to_CSVs.load_POs_for_all_targets()
+    result = task_PO_to_CSVs.load_POs_for_all_targets()
 
-    # for key, value in list(
-    #     task_PO_to_CSVs._strings[task_PO_to_CSVs._loc_targets[1].name].items()
-    # )[:5]:
-    #     print(f'{key} -> {value}')
-    # result = task_PO_to_CSVs.save_bilingual_CSVs_per_target()
+    for key, value in list(
+        task_PO_to_CSVs._strings[task_PO_to_CSVs._loc_targets[1].name].items()
+    )[:5]:
+        print(f'{key} -> {value}')
+    result = task_PO_to_CSVs.save_bilingual_CSVs_per_target()
 
     # --- Load source POs and load translations from CSVs ---
 
-    task2 = UE_PO_CSV_Converter()
+    # task2 = UE_PO_CSV_Converter()
 
-    task2.read_config(Path(__file__).name, logger)
+    # task2.read_config(Path(__file__).name, logger)
 
-    result = task2.load_source_PO(task2._loc_targets[1].name)
-    result = task2.load_source_PO(task2._loc_targets[0].name)
-    for line in list(task2._strings[task2._loc_targets[1].name])[:2]:
-        print(line, '->', task2._strings[task2._loc_targets[1].name][line])
+    # result = task2.load_source_PO(task2._loc_targets[1].name)
+    # result = task2.load_source_PO(task2._loc_targets[0].name)
+    # for line in list(task2._strings[task2._loc_targets[1].name])[:2]:
+    #     print(line, '->', task2._strings[task2._loc_targets[1].name][line])
 
-    result = task2.load_all_translated_CSVs()
-    for line in list(task2._strings[task2._loc_targets[1].name])[:2]:
-        print(line, '->', task2._strings[task2._loc_targets[1].name][line])
+    # result = task2.load_all_translated_CSVs()
+    # for line in list(task2._strings[task2._loc_targets[1].name])[:2]:
+    #     print(line, '->', task2._strings[task2._loc_targets[1].name][line])
 
-    # --- Save to translated POs ---
+    # # --- Save to translated POs ---
 
-    result = task2._save_translated_PO(task2._loc_targets[1].name, 'de')
+    # result = task2._save_translated_PO(task2._loc_targets[1].name, 'de')
 
-    logger.info('')
-    logger.info('--- Process debug id/test/source, and hash locales script end ---')
-    logger.info('')
+    # logger.info('')
+    # logger.info('--- Process debug id/test/source, and hash locales script end ---')
+    # logger.info('')
 
     if result:
         return 0
