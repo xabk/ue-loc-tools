@@ -292,7 +292,7 @@ class ProcessTestAndHashLocales(LocTask):
 
             entry.comment = '\n'.join(new_comments)
 
-            if self.delete_occurences:
+            if self.delete_occurrences:
                 entry.occurrences = []
 
         # TODO: Check for duplicate IDs across all targets
