@@ -142,7 +142,7 @@ script-parameters:
     delete_comments_criteria: [
       '^Key:.*$'  # Delete 'Key: NNN' comments: we have them in msgctxt
     ]
-    delete_occurences: Yes # Delete occurences: we have them in SourceLocation comments
+    delete_occurrences: Yes # Delete occurences: we have them in SourceLocation comments
 
     content_dir: '../'
 

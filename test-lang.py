@@ -45,7 +45,7 @@ class ProcessTestAndHashLocales(LocTask):
         ]
     )
     # Delete occurences: we have them in 'SourceLocation: NNN' comments
-    delete_occurences: bool = True
+    delete_occurrences: bool = True
 
     # Regex to match variables that we want to keep in 'translation'
     # TODO: Add support for UE/ICU syntax (plural, genders, etc.)
