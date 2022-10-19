@@ -141,7 +141,7 @@ script-parameters:
 
     delete_comments_criteria: [
       '^Key:.*$',  # Delete 'Key: NNN' comments: we have them in msgctxt
-      'InfoMetaData:\t".*?" : ""' # Empty InfoMetaData fields
+      'InfoMetaData:\t".*?" : "\s*"' # Empty InfoMetaData fields
     ]
     delete_occurrences: Yes # Delete occurences: we have them in SourceLocation comments
 
