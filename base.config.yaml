@@ -392,4 +392,59 @@ recreate-test-language:
 
 # end of recreate-test-language
 
+local-gather-test-import:
+  - description: 'Checkout Localization folder and community credits files'
+    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+    script: p4-checkout
+    p4-checkout: True
+
+  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+    script: ue-loc-gather-cmd
+    script-parameters:
+      tasks: [Gather, Export]
+
+  - description: 'Generate test from draft and source locale with comments and debug IDs'
+    script: test-lang
+    script-parameters:
+      hash_locale: '' # Disable hash locale generation
+
+  - description: 'Import and compile all targets in UE'
+    script: ue-loc-gather-cmd-2
+    script-parameters:
+      tasks: [Import, Compile, GenerateReports]
+
+# end of local-gather-test-import
+
+gather-and-update-source-only:
+  - description: 'Checkout Localization folder and community credits files'
+    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+    script: p4-checkout
+    p4-checkout: True
+
+  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+    script: ue-loc-gather-cmd
+    script-parameters:
+      tasks: [Gather, Export]
+
+  - description: 'Generate test from draft and source locale with comments and debug IDs'
+    script: test-lang
+    script-parameters:
+      hash_locale: '' # Disable hash locale generation
+
+#  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
+#    script: completion-rates
+
+#  - description: 'Pull top members from Crowdin, save the data to a CSV file'
+#    script: community-credits
+
+#  - description: 'Reimport language list and community credits datatables from CSVs'
+#    script: ue-reimport-assets
+#    unreal: True
+
+  - description: 'Upload the updated source file to Crowdin'
+    script: update-source-files
+
+# end of gather-and-update-source-only
+
+
 ...
