@@ -69,7 +69,7 @@ class UpdateSourceFile(LocTask):
         for entry in po:
             if self.need_delete_entry(entry):
                 logger.info(
-                    f'Removed: {fpath.name} / {entry.msgstr} @ {entry.occurrences[0][0]}\n{entry.msgid}'
+                    f'Removed: {fpath.name} / {entry.msgstr} @ {entry.comment}\n{entry.msgid}'
                 )
                 continue
             new_po.append(entry)

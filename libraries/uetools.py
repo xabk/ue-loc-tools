@@ -460,7 +460,10 @@ class UELocTarget:
         if keep_native_locale:
             new_native_locale = native_locale
 
-        new_native_locale_index = new_locales.index(new_native_locale)
+        if new_native_locale_index is None:
+            new_native_locale_index = new_locales.index(new_native_locale)
+        else:
+            new_native_locale = new_locales[new_native_locale_index]
 
         self._update_default_editor_ini(new_native_locale_index, new_locales)
 
@@ -482,8 +485,7 @@ class UELocTarget:
 
     def rename_locale(
         self,
-        old_name: str,
-        new_name: str,
+        old_and_new_locale_names: list,
         *,
         rename_loc_folder: bool = True,
     ) -> int or None:
@@ -498,6 +500,13 @@ class UELocTarget:
             rename_loc_folder: controls whether to rename
                 locale folder in Content/Localization
         '''
+
+        if len(old_and_new_locale_names) != 2:
+            raise ValueError(
+                'You should supply a list of exactly two locales: old and new name'
+            )
+
+        old_name, new_name = old_and_new_locale_names
 
         if new_name == old_name:
             raise ValueError('Locale names old_name and new_name identical.')

@@ -45,7 +45,7 @@ class ProcessTestAndHashLocales(LocTask):
         ]
     )
     # Delete occurences: we have them in 'SourceLocation: NNN' comments
-    delete_occurences: bool = True
+    delete_occurrences: bool = True
 
     # Regex to match variables that we want to keep in 'translation'
     # TODO: Add support for UE/ICU syntax (plural, genders, etc.)
@@ -283,8 +283,15 @@ class ProcessTestAndHashLocales(LocTask):
                     new_comments.append(debug_ID)
                     debug_ID_found = True
                     continue
-                if not self.should_delete_comment(comment):
-                    new_comments.append(comment)
+                if self.should_delete_comment(comment):
+                    continue
+                if comment.startswith('InfoMetaData:\t'):
+                    # Remove prefix, remove quotes around field name and value,
+                    # unescape internal quotes
+                    comment = comment.partition('InfoMetaData:\t')[2]
+                    comment = re.sub(r'^"(.*?)" : "(.*?)"$', r'\1: \2', comment)
+                    comment = comment.replace("\\\"", "\"")
+                new_comments.append(comment)
             if not debug_ID_found:
                 new_comments.append(debug_ID)
 
@@ -292,7 +299,7 @@ class ProcessTestAndHashLocales(LocTask):
 
             entry.comment = '\n'.join(new_comments)
 
-            if self.delete_occurences:
+            if self.delete_occurrences:
                 entry.occurrences = []
 
         # TODO: Check for duplicate IDs across all targets
