@@ -25,7 +25,7 @@ choose `Open in Terminal` and this will open a terminal window.
 Type `python loc-sync.py` to run the script and you'll see the task lists available 
 (configured in base.config.yaml).
 
-# Loc Sync task lists
+# Loc sync task lists
 When you run the loc sync script it reads tasks, parameters 
 and task lists from base.config.yaml and prints them out for you to choose.
 
@@ -76,7 +76,7 @@ and then update the sources on Crowdin.
 ## Launch a new batch of translations (update source files on Crowdin)
 Make sure you sync to latest change list in Perforce/UGS, run the loc sync script 
 and choose `#7: gather-and-update-source-only` if you only want to update the sources 
-on Crowdin, or `#4: full-sync` if you also want to import latest translations from 
+on Crowdin, or `#4: full-sync` if you also want to import the latest translations from 
 Crowdin first.
 
 ## Import translations from Crowdin
