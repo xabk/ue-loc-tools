@@ -26,6 +26,8 @@ class MTPseudo(LocTask):
     # TODO: Add missing Crowdin languages if specified here?
     languages = ['ru']
 
+    engine_id: int or None = 1
+
     file_format: str = 'gettext_unreal'  # gettext_unreal to use the Unreal PO parser on Crowdin
 
     src_locale: str = 'io'
@@ -112,14 +114,43 @@ class MTPseudo(LocTask):
         response = crowdin.translations.pre_translation_status(self.project_id, pre_id)
 
         while response['data']['status'] != 'finished':
-            logger.info(f"Progress: {response['data']['progress']}. ETA: {response['data']['eta']}")
+            logger.info(f"Progress: {response['data']['progress']}. "
+                        f"ETA: {response['data']['eta']}")
             sleep(10)
             response = crowdin.translations.pre_translation_status(self.project_id, pre_id)
 
         logger.info('SUCCESS: TM pretranslation complete.')
 
     def mt(self, file_id: int):
-        pass
+        crowdin = UECrowdinClient(
+            self.token, logger, self.organization, self.project_id
+        )
+
+        # logger.info(crowdin.machine_translations.list_mts())
+
+        response = crowdin.translations.apply_pre_translation(
+            projectId=self.project_id,
+            languageIds=self.languages,
+            fileIds=[file_id],
+            method='mt',
+            engineId=self.engine_id,
+        )
+
+        if not 'data' in response:
+            logger.error(f'Error. Crowdin response: {response}')
+            return response
+
+        pre_id = response['data']['identifier']
+
+        response = crowdin.translations.pre_translation_status(self.project_id, pre_id)
+
+        while response['data']['status'] != 'finished':
+            logger.info(f"Progress: {response['data']['progress']}. "
+                        f"ETA: {response['data']['eta']}")
+            sleep(10)
+            response = crowdin.translations.pre_translation_status(self.project_id, pre_id)
+
+        logger.info('SUCCESS: MT complete.')
 
     def download_transalted_files(self):
         pass
@@ -165,6 +196,8 @@ def main():
     # result = task.add_source_files()
 
     task.pretranslate(948)
+
+    task.mt(948)
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
