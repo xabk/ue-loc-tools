@@ -1,5 +1,6 @@
 from pathlib import Path
 from dataclasses import dataclass, field
+from time import sleep
 from loguru import logger
 import sys
 
@@ -20,6 +21,10 @@ class MTPseudo(LocTask):
     loc_targets: list = field(
         default_factory=lambda: ['MTTest']
     )  # Localization targets, empty = process all targets
+
+    # TODO: Empty = all languages for project on Crowdin
+    # TODO: Add missing Crowdin languages if specified here?
+    languages = ['ru']
 
     file_format: str = 'gettext_unreal'  # gettext_unreal to use the Unreal PO parser on Crowdin
 
@@ -57,14 +62,14 @@ class MTPseudo(LocTask):
         self._fname = self._fname.format(locale=self.src_locale, target='{target}')
         self._temp_path = Path(self.temp_dir).resolve()
 
-    def add_source_files(self) -> int:
+    def add_source_files(self) -> dict:
         crowdin = UECrowdinClient(
             self.token, logger, self.organization, self.project_id
         )
 
         logger.info(f'Content path: {self._content_path}')
 
-        targets_processed = []
+        targets_processed = {}
 
         for target in self.loc_targets:
             fpath = self._content_path / self._fname.format(target=target)
@@ -75,7 +80,7 @@ class MTPseudo(LocTask):
                 export_pattern=self.export_pattern.format(target=target),
             )
             if isinstance(r, int):
-                targets_processed += [target]
+                targets_processed[target] = r
                 logger.info(f'File for {target} added.')
             else:
                 logger.error(
@@ -83,15 +88,37 @@ class MTPseudo(LocTask):
                 )
 
         if len(targets_processed) == len(self.loc_targets):
-            print('Targets processed', len(targets_processed), targets_processed)
-            return True
+            logger.info(f'Targets processed ({len(targets_processed)}): {targets_processed}')
+            return targets_processed
 
-        return False
+        return targets_processed
 
-    def pretranslate(self, id: int):
-        pass
+    def pretranslate(self, file_id: int):
+        crowdin = UECrowdinClient(
+            self.token, logger, self.organization, self.project_id
+        )
+        response = crowdin.translations.apply_pre_translation(
+            projectId=self.project_id,
+            languageIds=self.languages,
+            fileIds=[file_id],
+        )
 
-    def mt(self, id: int):
+        if not 'data' in response:
+            logger.error(f'Error. Crowdin response: {response}')
+            return response
+
+        pre_id = response['data']['identifier']
+
+        response = crowdin.translations.pre_translation_status(self.project_id, pre_id)
+
+        while response['data']['status'] != 'finished':
+            logger.info(f"Progress: {response['data']['progress']}. ETA: {response['data']['eta']}")
+            sleep(10)
+            response = crowdin.translations.pre_translation_status(self.project_id, pre_id)
+
+        logger.info('SUCCESS: TM pretranslation complete.')
+
+    def mt(self, file_id: int):
         pass
 
     def download_transalted_files(self):
@@ -101,6 +128,9 @@ class MTPseudo(LocTask):
         pass
 
     def create_monster_language(self):
+        pass
+
+    def add_to_TM(self, file_id: int):
         pass
 
 
@@ -132,13 +162,15 @@ def main():
 
     task.read_config(Path(__file__).name, logger)
 
-    result = task.add_source_files()
+    # result = task.add_source_files()
+
+    task.pretranslate(948)
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
     logger.info('')
 
-    if result:
+    if 0:
         return 0
 
     return 1
