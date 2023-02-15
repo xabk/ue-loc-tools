@@ -138,7 +138,7 @@ class UECrowdinClient(CrowdinClient):
         dir: str = None,
         type: str = 'auto',
         export_pattern: str = '',
-    ):
+    ) -> int or str:
         with open(filepath, mode='rb') as file:
             storage = self.storages.add_storage(file)
 
@@ -174,7 +174,7 @@ class UECrowdinClient(CrowdinClient):
             self.error(f'No data in response. Response:\n{response}')
             return response
 
-        return True
+        return response['data']['id']
 
     def update_file(self, filepath: Path, fname: str = None, fID: int = None):
         if fname:

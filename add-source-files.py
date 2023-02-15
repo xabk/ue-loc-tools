@@ -56,7 +56,7 @@ class AddSourceFiles(LocTask):
                 type=self.file_format,
                 export_pattern=self.export_pattern.format(target=target),
             )
-            if r == True:
+            if isinstance(r, int):
                 targets_processed += [target]
                 logger.info(f'File for {target} added.')
             else:
