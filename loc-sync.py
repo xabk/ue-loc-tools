@@ -21,7 +21,6 @@ SECRET_CFG = 'crowdin.config.yaml'
 
 CFG_SECTIONS = ['crowdin', 'parameters', 'script-parameters']
 
-
 def read_config_files():
     with open(BASE_CFG) as f:
         config = yaml.safe_load(f)

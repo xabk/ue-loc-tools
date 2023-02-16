@@ -25,7 +25,7 @@ choose `Open in Terminal` and this will open a terminal window.
 Type `python loc-sync.py` to run the script and you'll see the task lists available 
 (configured in base.config.yaml).
 
-# Loc Sync task lists
+# Loc sync task lists
 When you run the loc sync script it reads tasks, parameters 
 and task lists from base.config.yaml and prints them out for you to choose.
 
@@ -75,8 +75,9 @@ and then update the sources on Crowdin.
 
 ## Launch a new batch of translations (update source files on Crowdin)
 Make sure you sync to latest change list in Perforce/UGS, run the loc sync script 
-and choose `#7: gather-and-update-source-only` if you only want to update the sources on Crowdin, 
-or `#4: full-sync` if you also want to import latest translations from Crowdin first.
+and choose `#7: gather-and-update-source-only` if you only want to update the sources 
+on Crowdin, or `#4: full-sync` if you also want to import the latest translations from 
+Crowdin first.
 
 ## Import translations from Crowdin
 Sync to latest in Perforce/UGS, run the loc sync script 
@@ -107,6 +108,24 @@ to the `loc_targets` array. Leave the rest of the parameters unchanged unless yo
 know what you're doing. The run `#6: local-gather-test-import` followed by 
 `#3: add-source`.
 
+## If you want to fix a typo and keep the translations
+The way Unreal works with POs, fixing a typo results in all translations being dropped. 
+Same happens on Crowdin, since Unreal doesn't use the PO features to avoid it. So you 
+have to take care of this manually.
+
+1. Fix the typo on Crowdin. Change both the source text and the key: because 
+for POs, source is part of the key. And choose to Keep translations.
+2. Fix the typo in Unreal. Make sure you have the same text in Unreal, and on Crowdin :)
+3. Run the loc sync and choose `#4: full-sync`. You could only download translations
+instead but then you'd lose the ability to check if it really worked, and risk finding 
+out that it hasn't worked only the next time you update the source on Crowdin.
+4. Check the Activity stream on Crowdin to make sure you don't have any changes in the 
+lines where you fixed the typos. If all is done right, there will be none because the 
+source and ket on Crowdin and in Unreal are the same even before you run the sync.
+5. Open the Localization Dashboard and check that the translations for these lines 
+are imported back to Unreal.
+
+
 # Errors and logging
 If everything goes as intended, the script will end with a list of tasks performed, 
 their execution times and return codes. If all return codes are zeros (Return code: 0), 
@@ -116,4 +135,5 @@ While it runs, the script reroutes the logs from Unreal Editor, and those usuall
 contain a whole bunch of warnings and non-critical errors. Don't be afraid of that.
 
 However, if a script crashes with an exception or if it prints that a task has failed, 
-then something's off. Logs are located under `Content/Python/logs`.
+or if you see return code that isn't zero, then something's off. 
+Logs are located under `Content/Python/logs`.
