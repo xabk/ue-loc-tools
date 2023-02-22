@@ -249,6 +249,17 @@ script-parameters:
 
     loc_targets: ['Game']  # Localization targets, empty = process all targets
 
+    # Set this to Yes if you'd like to update the files manually
+    # E.g., to decide which translations to keep and which ones to drop
+    # Then the script will create the files and open the folder for you
+    # to upload the files manually
+    manual_upload: No
+
+    # Set this to yes if you want the script to wait until you upload the files
+    # (Recommended to set this to Yes if manual_upload is set to Yes)
+    # (It has no effect on the script if manual_upload is set to No)
+    wait_for_upload_confirmation: No
+
     src_locale: io
     # It's a good idea to use the same locale here and in add-source-files
     # It's also a good idea to use debug ID locale :)
