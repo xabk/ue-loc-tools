@@ -3,6 +3,8 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from loguru import logger
 import re
+import requests
+import shutil
 
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask
@@ -28,8 +30,13 @@ class ImportScreenshots(LocTask):
     link_croql_filter: str = 'https://drive.google.com/file/d/'
     
     # Link regex to extract link from comment
+    # Group 0 will be used as link
     # Group 1 will be used as filename on Crowdin
-    link_regex: str = r'(https://drive.google.com/file/d/([^/]+)/view)'
+    # and as {name} to create a download link if dl_link is set
+    link_regex: str = '(https://drive.google.com/file/d/([^/]+)/view)'
+
+    # If set, it will be formatted with {name} and used to download the file
+    dl_link: str = 'https://drive.google.com/uc?id={name}&export=download'
 
     src_locale: str = 'en-ZA'
    
@@ -42,8 +49,8 @@ class ImportScreenshots(LocTask):
     _content_path: Path = None
     _temp_path: Path = None
 
-    _screenshots_to_download: dict = None
-    _screens_to_tag: dict = None
+    _screens_to_dl: dict = None
+    _screens_on_crowdin: dict = None
 
     def post_update(self):
         super().post_update()
@@ -55,8 +62,22 @@ class ImportScreenshots(LocTask):
         )
 
     def get_screens_names_and_ids_from_crowdin(self) -> dict[str: str]:
-        resp = self._crowdin.screenshots.list_screenshots(self.project_id)
-        print(resp)
+        resp = self._crowdin.screenshots.with_fetch_all().list_screenshots(self.project_id)        
+        # print(f'Screens resp:\n{resp}')
+
+        if 'data' not in resp:
+            logger.error(f'Error, no data in response. Response:\n{resp}')
+            return None
+        
+        self._screens_on_crowdin = {}
+        for screen in resp['data']:
+            self._screens_on_crowdin[screen['data']['name']] = {
+                'id': screen['data']['id'],
+                'tags': [tag['stringId'] for tag in screen['data']['tags']]
+            }
+
+        print(f'Screens:\n{self._screens_on_crowdin}')
+        return self._screens_on_crowdin
 
     def get_screens_links_and_string_ids_from_crowdin_strings(
             self
@@ -66,19 +87,60 @@ class ImportScreenshots(LocTask):
             self.project_id,
             croql=f'context contains "{self.link_croql_filter}"'
         )
-        print(resp)
+        # print(f'Strings resp:\n{resp}')
 
         if 'data' not in resp:
             logger.error(f'Error, no data in response. Response:\n{resp}')
             return None
         
-        screenshots = {}
+        self._screens_to_dl = {}
         for string in resp['data']:
             links = re.findall(self.link_regex, string['data']['context'])
             for link in links:
-                if link[0] not in screenshots:
-                    screenshots[link[0]] = []
-                screenshots[link[0]].append(string['data']['id'])
+                if link[0] not in self._screens_to_dl:
+                    self._screens_to_dl[link[0]] = []
+                self._screens_to_dl[link[0]].append(string['data']['id'])
+        
+        print(f'Screens:\n{self._screens_to_dl}')
+        return self._screens_to_dl
+
+    def download_screenshot(
+            self,
+            url: str or Path,
+            name: str = None,
+            path: Path = None
+    ):
+        if not path:
+            path = self._temp_path
+
+        if not name:
+            _name = re.search(self.link_regex, url)[2]
+
+        _url = url
+        if self.dl_link is not None:
+            _url = self.dl_link.format(name=re.search(self.link_regex, url)[2])
+
+        r = requests.get(_url, allow_redirects=True)
+
+        suffix: str = ''
+
+        cd = r.headers.get('content-disposition', None)
+        if cd:
+            fname = re.findall('filename=(.+)', cd)
+            if len(fname) > 0:
+                suffix = Path(fname[0]).suffix
+        
+        if not suffix:
+            logger.warning('No filename in headers. Assuming the screenshots is PNG...')
+            suffix = '.png'
+        
+        file_path = path / f'{_name}{suffix}'
+
+        logger.info(f'Saving: {file_path}')
+
+        open(file_path, 'wb').write(r.content)
+
+        return
 
 
     def add_screenshot_to_crowdin(
@@ -148,7 +210,12 @@ def main():
 
     task.read_config(Path(__file__).name, logger)
 
-    result = task.get_screens_links_and_string_ids_from_crowdin_strings()()
+    task.download_screenshot()
+    return
+
+    task.get_screens_names_and_ids_from_crowdin()
+
+    result = task.get_screens_links_and_string_ids_from_crowdin_strings()
 
     logger.info('')
     logger.info('--- Update source files on Crowdin script end ---')
