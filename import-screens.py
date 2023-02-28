@@ -51,8 +51,7 @@ class ImportScreenshots(LocTask):
 
     def get_screens_names_and_ids_from_crowdin(self) -> dict[str: dict]:
         resp = self._crowdin.screenshots.with_fetch_all().list_screenshots(self.project_id)        
-        # print(f'Screens resp:\n{resp}')
-
+        
         if 'data' not in resp:
             logger.error(f'Error, no data in response. Response:\n{resp}')
             return None
@@ -67,18 +66,15 @@ class ImportScreenshots(LocTask):
                 'tags': [tag['stringId'] for tag in screen['data']['tags']]
             }
 
-        # print(f'Screens:\n{self._screens_on_crowdin}')
         return screens_on_crowdin
 
     def get_screens_links_and_string_ids_from_crowdin_strings(
             self
     ) -> dict[str: list[int]]:
         resp = self._crowdin.source_strings.with_fetch_all().list_strings(
-        # resp = self._crowdin.source_strings.list_strings(
             self.project_id,
             croql=f'context contains "{self.link_croql_filter}"'
         )
-        # print(f'Strings resp:\n{resp}')
 
         if 'data' not in resp:
             logger.error(f'Error, no data in response. Response:\n{resp}')
@@ -92,7 +88,6 @@ class ImportScreenshots(LocTask):
                     screens_linked_in_strings[link[0]] = []
                 screens_linked_in_strings[link[0]].append(string['data']['id'])
         
-        # print(f'Screens:\n{self._screens_to_dl}')
         return screens_linked_in_strings
     
     def get_screenshots_to_download(
