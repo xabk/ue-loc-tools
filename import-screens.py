@@ -18,12 +18,6 @@ class ImportScreenshots(LocTask):
     organization: str = None
     project_id: int = None
 
-    # TODO: Process all loc targets if none are specified
-    # TODO: Change lambda to empty list to process all loc targets when implemented
-    loc_targets: list = field(
-        default_factory=lambda: ['Game']
-    )  # Localization targets, empty = process all targets
-
     # Link filter for Croql
     # (part of the link common to all screenshots
     # used to fetch strings with screenshot links from Crowdin)
@@ -39,14 +33,10 @@ class ImportScreenshots(LocTask):
     dl_link: str = 'https://drive.google.com/uc?id={name}&export=download'
 
     def_ext: str = '.png'
-
-    src_locale: str = 'en-ZA'
    
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
     temp_dir: str = 'Localization/~Temp/Screenshots'
-
-    _fname: str = 'Localization/{target}/{locale}/{target}.po'
 
     _content_path: Path = None
     _temp_path: Path = None    
@@ -55,12 +45,11 @@ class ImportScreenshots(LocTask):
         super().post_update()
         self._content_path = Path(self.content_dir).resolve()
         self._temp_path = Path(self._content_path / self.temp_dir)
-        self._fname = self._fname.format(locale=self.src_locale, target='{target}')
         self._crowdin = UECrowdinClient(
             self.token, logger, self.organization, self.project_id
         )
 
-    def get_screens_names_and_ids_from_crowdin(self) -> dict[str: str]:
+    def get_screens_names_and_ids_from_crowdin(self) -> dict[str: dict]:
         resp = self._crowdin.screenshots.with_fetch_all().list_screenshots(self.project_id)        
         # print(f'Screens resp:\n{resp}')
 
@@ -84,8 +73,8 @@ class ImportScreenshots(LocTask):
     def get_screens_links_and_string_ids_from_crowdin_strings(
             self
     ) -> dict[str: list[int]]:
-        # resp = self._crowdin.source_strings.with_fetch_all().list_strings(
-        resp = self._crowdin.source_strings.list_strings(
+        resp = self._crowdin.source_strings.with_fetch_all().list_strings(
+        # resp = self._crowdin.source_strings.list_strings(
             self.project_id,
             croql=f'context contains "{self.link_croql_filter}"'
         )
@@ -149,7 +138,7 @@ class ImportScreenshots(LocTask):
 
         if r.status_code == 403:
             logger.error('Response 403, Google hates me :( Use VPN to download more screens.')
-            return None
+            raise
 
         suffix: str = ''
 
@@ -227,7 +216,32 @@ class ImportScreenshots(LocTask):
         
         return processed_screens
     
+    def get_strings_to_tag(
+            self, 
+            screens_linked_in_strings: dict[str: list[int]] = None,
+            screens_on_crowdin: dict[str:dict] = None,
+    ) -> dict[str: str]:
+        if not screens_linked_in_strings:
+            screens_linked_in_strings = self.get_screens_links_and_string_ids_from_crowdin_strings()
+
+        if not screens_on_crowdin:
+            screens_on_crowdin = self.get_screens_names_and_ids_from_crowdin()
+        
+        tags = []
+        for link, string_ids in screens_linked_in_strings.items():
+            id = re.search(self.link_regex, link)[2]
+            if id not in screens_on_crowdin.keys():
+                logger.warning(f'Missing screenshot on Crowdin: {id}. Please upload missing screens, then tag.')
+
+            for string_id in string_ids:
+                if string_id in screens_on_crowdin[id]['tags']:
+                    continue
+                tags.append((screens_on_crowdin[id]['id'], string_id))
+
+        return tags
+    
     def tag_string(self, screen_id: int, string_id: int) -> bool:
+        logger.info(f'Tagging string {string_id} on screenshot {screen_id}...')
         tags = self._crowdin.screenshots.list_tags(self.project_id, screen_id)
         if not 'data' in tags:
             logger.error(f'No data in response for screenshot {screen_id}')
@@ -242,17 +256,21 @@ class ImportScreenshots(LocTask):
             return True
         else:
             logger.error(f'No data in response:\n{response}')
+            return None
     
     def tag_strings(self, tags: list[tuple]) -> list[tuple]:
         processed_tags = []
         for tag in tags:
-            processed_tags.append(self.tag_string(tag[0], tag[1]))
+            tag = self.tag_string(tag[0], tag[1])
+            if tag is not None:
+                processed_tags.append(tag)
 
         if len(processed_tags) == len(tags):
             logger.info(f'All good, tagged {len(tags)} strings!')
         else:
             logger.error(f'Tagged only {len(processed_tags)}/{len(tags)} '
-                         f'screenshots:\n{processed_tags}')
+                         f'screenshots:\n{processed_tags}'
+                         f'Failed to process:\n{[tag for tag in tags if tag not in processed_tags]}')
         
         return processed_tags
 
@@ -294,7 +312,7 @@ class ImportScreenshots(LocTask):
         logger.info('Dwonloading updated list of screenshots on Crowdin...')
         screens_on_crowdin = self.get_screens_names_and_ids_from_crowdin()
 
-        missing_screens = [s for s in added_screens if s not in screens_on_crowdin.keys()]
+        missing_screens = [s for s in added_screens if s.keys()[0] not in screens_on_crowdin.keys()]
 
         if missing_screens:
             logger.error(f'Not all screenshots are uploaded. Missing screenshots:\n'
@@ -302,9 +320,17 @@ class ImportScreenshots(LocTask):
         else:
             logger.info(f'No missing screenshots! Proceeding to tagging.')
         
-        # Tag
+        logger.info('Making a list of strings to tag...')
+        strings_to_tag = self.get_strings_to_tag(links_in_strings, screens_on_crowdin)
+        logger.info(f'Success. Strings to tag: {len(strings_to_tag)}')
 
-        return False
+        logger.info('Tagging strings...')
+        tagged_strings = self.tag_strings(strings_to_tag)
+        if not len(tagged_strings) == len(strings_to_tag):
+            strings_to_tag = self.get_strings_to_tag()
+            logger.warning(f'Not all strings have been tagged, missing {len(strings_to_tag)}')
+
+        return True
 
 
 def main():
@@ -324,8 +350,6 @@ def main():
     task = ImportScreenshots()
 
     task.read_config(Path(__file__).name, logger)
-
-    # task.get_screens_names_and_ids_from_crowdin()
 
     result = task.import_screens_from_crowdin()
 
