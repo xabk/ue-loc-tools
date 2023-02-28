@@ -309,8 +309,9 @@ class ImportScreenshots(LocTask):
         else:
             logger.info(f'Downloaded screenshots: {len(added_screens)}')
         
-        logger.info('Dwonloading updated list of screenshots on Crowdin...')
-        screens_on_crowdin = self.get_screens_names_and_ids_from_crowdin()
+        if len(added_screens) > 0:
+            logger.info('Dwonloading updated list of screenshots on Crowdin...')
+            screens_on_crowdin = self.get_screens_names_and_ids_from_crowdin()
 
         missing_screens = [s for s in added_screens if s.keys()[0] not in screens_on_crowdin.keys()]
 
