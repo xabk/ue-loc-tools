@@ -3,6 +3,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from loguru import logger
 import re
+import os
 
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask
@@ -26,6 +27,10 @@ class UpdateSourceFile(LocTask):
     src_locale: str = 'io'
 
     encoding: str = 'utf-8-sig'  # PO file encoding
+
+    manual_upload: bool = False
+
+    wait_for_upload_confirmation: bool = False
 
     delete_criteria: list = field(
         # list of rules, each rule is a list: [property to check, regex, comment to add]
@@ -99,7 +104,11 @@ class UpdateSourceFile(LocTask):
                 if not fpath.exists():
                     logger.error('Error during file content filtering. Aborting!')
                     return False
-
+            
+            if self.manual_upload:
+                targets_processed.append(target)
+                continue
+            
             logger.info(f'Uploading file: {fpath}')
             r = crowdin.update_file(fpath)
             if r == True:
@@ -109,6 +118,18 @@ class UpdateSourceFile(LocTask):
                 logger.error(
                     f'Something went wrong. Here\'s the last response from Crowdin: {r}'
                 )
+
+        if self.manual_upload:
+            logger.info('Created files to upload to Crowdin manually. Openning folder...')
+            os.startfile(self._temp_path)
+
+            if self.wait_for_upload_confirmation:
+                logger.info('>>> Waiting for confirmation to continue the script execution <<<')
+                while True:
+                    y = input('Type Y to continue... ')
+                    if y in ['y','Y']:
+                        break
+
 
         if len(targets_processed) == len(self.loc_targets):
             print(f'Targets processed ({len(targets_processed)}): {targets_processed}')
