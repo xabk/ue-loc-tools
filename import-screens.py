@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from loguru import logger
 import re
 import requests
-import shutil
+from time import sleep
 
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask
@@ -38,6 +38,8 @@ class ImportScreenshots(LocTask):
     # If set, it will be formatted with {name} and used to download the file
     dl_link: str = 'https://drive.google.com/uc?id={name}&export=download'
 
+    def_ext: str = '.png'
+
     src_locale: str = 'en-ZA'
    
     # TODO: Do I need this here? Or rather in smth from uetools lib?
@@ -47,10 +49,7 @@ class ImportScreenshots(LocTask):
     _fname: str = 'Localization/{target}/{locale}/{target}.po'
 
     _content_path: Path = None
-    _temp_path: Path = None
-
-    _screens_to_dl: dict = None
-    _screens_on_crowdin: dict = None
+    _temp_path: Path = None    
 
     def post_update(self):
         super().post_update()
@@ -69,19 +68,22 @@ class ImportScreenshots(LocTask):
             logger.error(f'Error, no data in response. Response:\n{resp}')
             return None
         
-        self._screens_on_crowdin = {}
+        screens_on_crowdin = {}
         for screen in resp['data']:
-            self._screens_on_crowdin[screen['data']['name']] = {
+            (name, _, ext) = screen['data']['name'].rpartition('.')
+            if not name:
+                name = ext
+            screens_on_crowdin[name] = {
                 'id': screen['data']['id'],
                 'tags': [tag['stringId'] for tag in screen['data']['tags']]
             }
 
-        print(f'Screens:\n{self._screens_on_crowdin}')
-        return self._screens_on_crowdin
+        # print(f'Screens:\n{self._screens_on_crowdin}')
+        return screens_on_crowdin
 
     def get_screens_links_and_string_ids_from_crowdin_strings(
             self
-    ) -> dict[str: int]:
+    ) -> dict[str: list[int]]:
         # resp = self._crowdin.source_strings.with_fetch_all().list_strings(
         resp = self._crowdin.source_strings.list_strings(
             self.project_id,
@@ -93,16 +95,35 @@ class ImportScreenshots(LocTask):
             logger.error(f'Error, no data in response. Response:\n{resp}')
             return None
         
-        self._screens_to_dl = {}
+        screens_linked_in_strings = {}
         for string in resp['data']:
             links = re.findall(self.link_regex, string['data']['context'])
             for link in links:
-                if link[0] not in self._screens_to_dl:
-                    self._screens_to_dl[link[0]] = []
-                self._screens_to_dl[link[0]].append(string['data']['id'])
+                if link[0] not in screens_linked_in_strings:
+                    screens_linked_in_strings[link[0]] = []
+                screens_linked_in_strings[link[0]].append(string['data']['id'])
         
-        print(f'Screens:\n{self._screens_to_dl}')
-        return self._screens_to_dl
+        # print(f'Screens:\n{self._screens_to_dl}')
+        return screens_linked_in_strings
+    
+    def get_screenshots_to_download(
+            self, 
+            screens_linked_in_strings: dict,
+            screens_on_crowdin: dict,
+    ) -> dict[str: str]:
+        if not screens_linked_in_strings:
+            screens_linked_in_strings = self.get_screens_links_and_string_ids_from_crowdin_strings()
+
+        if not screens_on_crowdin:
+            screens_on_crowdin = self.get_screens_names_and_ids_from_crowdin()
+        
+        links = {}
+        for link in screens_linked_in_strings.keys():
+            id = re.search(self.link_regex, link)[2]
+            if id not in screens_on_crowdin.keys():
+                links[id] = link
+    
+        return links
 
     def download_screenshot(
             self,
@@ -115,12 +136,20 @@ class ImportScreenshots(LocTask):
 
         if not name:
             _name = re.search(self.link_regex, url)[2]
+            if (path / f'{_name}{self.def_ext}').exists():
+                logger.info(f'Found the file, skipping download: { path / (_name + self.def_ext)}')
+                return path / f'{_name}{self.def_ext}'
 
         _url = url
         if self.dl_link is not None:
             _url = self.dl_link.format(name=re.search(self.link_regex, url)[2])
 
+        logger.info(f'Trying to download the file: {_url}')
         r = requests.get(_url, allow_redirects=True)
+
+        if r.status_code == 403:
+            logger.error('Response 403, Google hates me :( Use VPN to download more screens.')
+            return None
 
         suffix: str = ''
 
@@ -131,8 +160,8 @@ class ImportScreenshots(LocTask):
                 suffix = Path(fname[0]).suffix
         
         if not suffix:
-            logger.warning('No filename in headers. Assuming the screenshots is PNG...')
-            suffix = '.png'
+            logger.warning(f'No filename in headers. Assuming the screenshots is {self.def_ext}...')
+            suffix = self.def_ext
         
         file_path = path / f'{_name}{suffix}'
 
@@ -140,25 +169,38 @@ class ImportScreenshots(LocTask):
 
         open(file_path, 'wb').write(r.content)
 
-        return
+        return file_path
+    
+    def download_screenshots(self, urls: list[str], path: Path = None) -> list[Path]:
+        processed_screens = []
+        for url in urls:
+            processed_screens.append(self.download_screenshot(url=url, path=path))            
+
+        if len(processed_screens) == len(urls):
+            logger.info(f'All good, uploaded {len(urls)} screenshots!')
+        else:
+            logger.error(f'Uploaded only {len(processed_screens)}/{len(urls)} screenshots:\n'
+                         f'{processed_screens}')
+        
+        return processed_screens
 
 
     def add_screenshot_to_crowdin(
             self,
-            filepath: str or Path,
+            path: str or Path,
             name: str = None
     ) -> dict[str: int]:
-        with open(filepath, mode='rb') as file:
+        with open(path, mode='rb') as file:
             storage = self._crowdin.storages.add_storage(file)
 
         if 'data' not in storage or 'id' not in storage['data']:
             logger.error(f'Error, no storage ID recieved. Response:\n{storage}')
             return storage
 
-        self.info(f'{filepath.name} uploaded to storage. Moving to screenshots...')
+        logger.info(f'{path.name} uploaded to storage. Moving to screenshots...')
 
         if name is None:
-            name = Path(filepath).stem
+            name = Path(path).name
 
         response = self._crowdin.screenshots.add_screenshot(
             projectId=self.project_id,
@@ -168,26 +210,99 @@ class ImportScreenshots(LocTask):
         )
 
         if not 'data' in response:
-            self.error(f'No data in response. Response:\n{response}')
+            logger.error(f'No data in response. Response:\n{response}')
             return response
         
         return {name: response['data']['id']}
-
-    def import_screens_from_crowdin(self):
-        logger.info(f'Content path: {self._content_path}')
-
-        targets_processed = []
-
-        if len(targets_processed) == len(self.loc_targets):
-            print(f'Targets processed ({len(targets_processed)}): {targets_processed}')
+    
+    def add_screenshots_to_crowdin(self, paths: list[Path]) -> list[dict]:
+        processed_screens = []
+        for path in paths:
+            processed_screens.append(self.add_screenshot_to_crowdin(path=path))
+        if len(processed_screens) == len(paths):
+            logger.info(f'All good, uploaded {len(paths)} screenshots!')
+        else:
+            logger.error(f'Uploaded only {len(processed_screens)}/{len(paths)} '
+                         f'screenshots:\n{processed_screens}')
+        
+        return processed_screens
+    
+    def tag_string(self, screen_id: int, string_id: int) -> bool:
+        tags = self._crowdin.screenshots.list_tags(self.project_id, screen_id)
+        if not 'data' in tags:
+            logger.error(f'No data in response for screenshot {screen_id}')
+            return None
+        
+        if string_id in [tag['data']['stringId'] for tag in tags['data']]:
+            logger.info(f'String {string_id} already tagged on screenshot {screen_id}.')
+            return True
+        
+        response = self._crowdin.screenshots.add_tag(self.project_id, screen_id, [{'stringId': string_id}])
+        if 'data' in response:
             return True
         else:
-            logger.error(
-                'Not all targets have been processed: '
-                f'{len(targets_processed)} out of {len(self.loc_targets)}. '
-                f'Loc targets: {self.loc_targets}. '
-                f'Processed targets: {targets_processed}'
-            )
+            logger.error(f'No data in response:\n{response}')
+    
+    def tag_strings(self, tags: list[tuple]) -> list[tuple]:
+        processed_tags = []
+        for tag in tags:
+            processed_tags.append(self.tag_string(tag[0], tag[1]))
+
+        if len(processed_tags) == len(tags):
+            logger.info(f'All good, tagged {len(tags)} strings!')
+        else:
+            logger.error(f'Tagged only {len(processed_tags)}/{len(tags)} '
+                         f'screenshots:\n{processed_tags}')
+        
+        return processed_tags
+
+    def import_screens_from_crowdin(self):
+        strings_processed = []
+
+        logger.info('Downloading links from strings on Crowdin...')
+        links_in_strings = self.get_screens_links_and_string_ids_from_crowdin_strings()
+        logger.info(f'Links from strings on Crowdin: {len(links_in_strings)}')
+
+        logger.info('Downloading list of screenshots on Crowdin...')
+        screens_on_crowdin = self.get_screens_names_and_ids_from_crowdin()
+        logger.info(f'Screenshots already on Crowdin: {len(screens_on_crowdin)}')
+        
+        logger.info('Making a list of screenshots to dowlnoad via links and upload to Crowdin...')
+        screens_to_add = self.get_screenshots_to_download(links_in_strings, screens_on_crowdin)
+        logger.info(f'Screenshots to download and upload: {len(screens_to_add)}')
+
+        logger.info('Downloading screenshots...')
+        paths = self.download_screenshots(screens_to_add.values())
+        if len(paths) != len(screens_to_add):
+            logger.error(f'Not all screenshots have been downloaded. Downloaded screenshots:\n'
+                         f'{paths}\n'
+                         f'Screenshots to upload:\n'
+                         f'{screens_to_add}\n')
+        else:
+            logger.info(f'Downloaded screenshots: {len(paths)}')
+
+        logger.info('Uploading screenshots to Crowdin...')
+        added_screens = self.add_screenshots_to_crowdin(paths)
+        if len(added_screens) != len(paths):
+            logger.error(f'Not all screenshots have been uploaded. Uploaded screenshots:\n'
+                         f'{added_screens}\n'
+                         f'Screenshots to upload:\n'
+                         f'{paths}\n')
+        else:
+            logger.info(f'Downloaded screenshots: {len(added_screens)}')
+        
+        logger.info('Dwonloading updated list of screenshots on Crowdin...')
+        screens_on_crowdin = self.get_screens_names_and_ids_from_crowdin()
+
+        missing_screens = [s for s in added_screens if s not in screens_on_crowdin.keys()]
+
+        if missing_screens:
+            logger.error(f'Not all screenshots are uploaded. Missing screenshots:\n'
+                         f'{missing_screens}')
+        else:
+            logger.info(f'No missing screenshots! Proceeding to tagging.')
+        
+        # Tag
 
         return False
 
@@ -210,12 +325,9 @@ def main():
 
     task.read_config(Path(__file__).name, logger)
 
-    task.download_screenshot()
-    return
+    # task.get_screens_names_and_ids_from_crowdin()
 
-    task.get_screens_names_and_ids_from_crowdin()
-
-    result = task.get_screens_links_and_string_ids_from_crowdin_strings()
+    result = task.import_screens_from_crowdin()
 
     logger.info('')
     logger.info('--- Update source files on Crowdin script end ---')
