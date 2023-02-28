@@ -279,7 +279,35 @@ script-parameters:
 
       - - 'msgctxt'  # Based on context (namespace,key)
         - 'some_namespace,some_key_pattern_you_want_to_delete'
+
+  # Import screens from links in strings context
+  # Defaults:
+  # - expects Doogle Drive links
+  # - .png screenshots
+  # - converts Google Drive view links to DL links
+  # - Google doesn't like scripts downloading things, so you might have to
+  #   download screens in a few tries using VPNs...
+  import-screens:
+
+    # Link filter for Croql
+    # (part of the link common to all screenshots
+    # used to fetch strings with screenshot links from Crowdin)
+    link_croql_filter: 'https://drive.google.com/file/d/'
     
+    # Link regex to extract link from comment
+    # Group 0 will be used as link
+    # Group 1 will be used as filename on Crowdin
+    # and as {name} to create a download link if dl_link is set
+    link_regex: '(https://drive.google.com/file/d/([^/]+)/view)'
+
+    # If set, it will be formatted with {name} and used to download the file
+    dl_link: 'https://drive.google.com/uc?id={name}&export=download'
+
+    # Default file extension
+    def_ext: '.png'
+
+    content_dir: '../'
+    temp_dir: 'Localization/~Temp/Screenshots'
 
 #
 # -------------------------------------------------------------
