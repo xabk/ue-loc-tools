@@ -56,7 +56,8 @@ class MTPseudo(LocTask):
             self.token, logger, self.organization, self.project_id
         )
 
-    def add_source_file(self, fpath: Path) -> int or dict:
+    def add_source_file(self, target: str) -> int or dict:
+        fpath = self._content_path / self._fname.format(target=target)
         logger.info(f'Uploading file: {fpath}. Format: {self.file_format}')
         r = self._crowdin.add_file(
             fpath,
@@ -71,8 +72,7 @@ class MTPseudo(LocTask):
         targets_processed = {}
 
         for target in self.loc_targets:
-            fpath = self._content_path / self._fname.format(target=target)
-            r = self.add_source_file(fpath)
+            r = self.add_source_file(target)
 
             if isinstance(r, int):
                 targets_processed[target] = r
@@ -95,6 +95,7 @@ class MTPseudo(LocTask):
             projectId=self.project_id,
             languageIds=self.languages,
             fileIds=[file_id],
+            autoApproveOption='all',
         )
 
         if not 'data' in response:
@@ -179,7 +180,7 @@ class MTPseudo(LocTask):
         files_processed = {}
 
         for target, id in files.items():
-            logger.info(f'Pretranslating {target} / {id}')
+            logger.info(f'Applying MT for {target} / {id}...')
             r = self.mt_file(id)
             if r == 0:
                 files_processed[target] = id
@@ -198,11 +199,48 @@ class MTPseudo(LocTask):
 
         return files_processed
 
-    def approve_file(self, file_id: int):
-        pass
+    def approve_language(self, lang_id: str):
+        r = self._crowdin.string_translations.with_fetch_all().list_language_translations(
+            self.project_id,
+            lang_id,
+            croql='count of approvals = 0 and provider is mt',
+        )
 
-    def approve_files(self, files: dict[str:int]):
-        pass
+        if not 'data' in r:
+            return r
+
+        translations = [s['data']['translationId'] for s in r['data']]
+
+        logger.info(f'Approving {len(translations)} translations...')
+
+        for i, id in enumerate(translations):
+            self._crowdin.string_translations.add_approval(self.project_id, id)
+            if (i + 1) % 50 == 0:
+                logger.info('Approved 50 translations...')
+
+    def approve_languages(self, languages: list[str]):
+        logger.info(f'Approving {len(languages)} languages...')
+        lang_processed = {}
+
+        for lang in languages.items():
+            logger.info(f'Approving {lang}...')
+            r = self.mt_file(id)
+            if r == 0:
+                lang_processed[lang] = id
+                logger.info(f'Language {lang} approved.')
+            else:
+                logger.error(
+                    f'Something went wrong with {lang}. '
+                    f'Here\'s the last response from Crowdin: {r}'
+                )
+
+        if len(lang_processed) == len(languages):
+            logger.info(
+                f'SUCCESS: Languages approved ({len(lang_processed)}): {lang_processed}'
+            )
+            return lang_processed
+
+        return lang_processed
 
     def download_transalted_files(self):
         pass
@@ -211,9 +249,6 @@ class MTPseudo(LocTask):
         pass
 
     def create_monster_language(self):
-        pass
-
-    def add_to_TM(self, file_id: int):
         pass
 
 
@@ -253,6 +288,8 @@ def main():
     task.pretranslate_files({'MTTest': 948})
 
     task.mt_files({'MTTest': 948})
+
+    task.approve_language('ru')
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
