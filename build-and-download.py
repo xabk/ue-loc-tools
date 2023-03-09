@@ -20,7 +20,7 @@ class BuildAndDownloadTranslations(LocTask):
 
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to list to process all loc targets when implemented
-    loc_targets: list = field(
+    loc_targets: list[str] = field(
         default_factory=lambda: ['Game']
     )  # Localization targets, empty = process all targets
 
@@ -30,9 +30,19 @@ class BuildAndDownloadTranslations(LocTask):
     temp_dir: str = 'Localization/~Temp/LocFilesTemp'
     dest_dir: str = 'Localization/{target}/'
 
-    locales_to_delete: list = field(
+    locales_to_delete: list[str] = field(
         default_factory=lambda: ['en-US-POSIX']
     )  # Delete from downloaded locales (and not import them into the game)
+
+    # { Crowdin locale: Unreal locale }
+    # You can either set it up on Crowdin, or here, or both
+    culture_mappings: dict[str:str] = field(
+        default_factory=lambda: {
+            'zh-CN': 'zh-Hans',
+            'zh-TW': 'zh-Hant',
+            'es-US': 'es-419',
+        }
+    )
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
@@ -126,7 +136,10 @@ class BuildAndDownloadTranslations(LocTask):
         directories = [f for f in (self._temp_path / target).glob('*') if f.is_dir()]
         for dir in directories:
             src_path = dir / f'{target}.po'
-            dst_path = dest_path / dir.name / f'{target}.po'
+            locale = dir.name
+            if dir.name in self.culture_mappings:
+                locale = self.culture_mappings[locale]
+            dst_path = dest_path / locale / f'{target}.po'
             if src_path.exists() and dst_path.exists():
                 logger.info(f'Moving {src_path} to {dst_path}')
                 shutil.move(src_path, dst_path)
