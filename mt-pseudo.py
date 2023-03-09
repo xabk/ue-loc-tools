@@ -2,6 +2,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from time import sleep
 from loguru import logger
+import polib
 import sys
 
 from libraries.crowdin import UECrowdinClient
@@ -32,7 +33,7 @@ class MTPseudo(LocTask):
     # E.g., { zh-CN : zh-Hans }
     languages: dict = field(
         default_factory=lambda: {
-            'ru': '',
+            'ru-RU': 'ru',
         }
     )
 
@@ -109,7 +110,7 @@ class MTPseudo(LocTask):
     def pretranslate_file(self, file_id: int):
         response = self._crowdin.translations.apply_pre_translation(
             projectId=self.project_id,
-            languageIds=list(self._languages.keys()),
+            languageIds=[key.partition('-')[0] for key in self._languages.keys()],
             fileIds=[file_id],
             autoApproveOption='all',
         )
@@ -164,7 +165,7 @@ class MTPseudo(LocTask):
 
         response = self._crowdin.translations.apply_pre_translation(
             projectId=self.project_id,
-            languageIds=list(self._languages.keys()),
+            languageIds=[key.partition('-')[0] for key in self._languages.keys()],
             fileIds=[file_id],
             method='mt',
             engineId=self.engine_id,
@@ -267,6 +268,7 @@ class MTPseudo(LocTask):
             loc_targets=self.loc_targets,
         )
         task.post_update()
+        task.culture_mappings.update(self.languages)
         print(task)
 
         task.build_and_download()
@@ -275,10 +277,19 @@ class MTPseudo(LocTask):
 
         return task.process_loc_targets()
 
-    def pseudo(self):
+    def pseudo_file(self, file_path: Path):
         pass
 
-    def create_monster_language(self):
+    def pseudo_target(self, file_path: Path):
+        pass
+
+    def pseudo_targets(self, file_path: Path):
+        pass
+
+    def create_monster_target(self):
+        pass
+
+    def create_monster_target(self):
         pass
 
 
@@ -311,13 +322,15 @@ def main():
 
     # files = task.add_source_files()
 
-    # task.pretranslate_files(files)
+    files = {'MTTest': 1064}
 
-    # task.mt_files(files)
+    task.pretranslate_files(files)
 
-    # task.approve_language('ru')
+    task.mt_files(files)
 
-    task.download_transalted_files()
+    task.approve_language('ru')
+
+    # task.download_transalted_files()
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
