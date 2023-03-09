@@ -7,9 +7,14 @@ import sys
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask
 
+import importlib
+
+build_and_download = importlib.import_module("build-and-download")
+
 
 @dataclass
 class MTPseudo(LocTask):
+    # TODO: Function to set up MT project on Crowdin
 
     # Declare Crowdin parameters to load them from config
     token: str = None
@@ -23,8 +28,13 @@ class MTPseudo(LocTask):
     )  # Localization targets, empty = process all targets
 
     # TODO: Empty = all languages for project on Crowdin
-    # TODO: Add missing Crowdin languages if specified here?
-    languages = ['ru']
+    # { Crowdin language : Unreal culture }
+    # E.g., { zh-CN : zh-Hans }
+    languages: dict = field(
+        default_factory=lambda: {
+            'ru': '',
+        }
+    )
 
     engine_id: int or None = 1
 
@@ -42,6 +52,8 @@ class MTPseudo(LocTask):
 
     _fname: str = 'Localization/{target}/{locale}/{target}.po'
 
+    _languages: dict[str:str] = None
+
     _content_path: Path = None
     _temp_path: Path = None
 
@@ -52,6 +64,9 @@ class MTPseudo(LocTask):
         self._content_path = Path(self.content_dir).resolve()
         self._fname = self._fname.format(locale=self.src_locale, target='{target}')
         self._temp_path = Path(self.temp_dir).resolve()
+        self._languages = {}
+        for crowd_l, ue_l in self.languages.items():
+            self._languages[crowd_l] = ue_l if ue_l else crowd_l
         self._crowdin = UECrowdinClient(
             self.token, logger, self.organization, self.project_id
         )
@@ -66,7 +81,8 @@ class MTPseudo(LocTask):
         )
         return r
 
-    def add_source_files(self) -> dict:
+    def add_source_files(self) -> dict[str:int]:
+        # TODO: Check the files on Crowdin, update existing files?
         logger.info(f'Content path: {self._content_path}')
 
         targets_processed = {}
@@ -93,7 +109,7 @@ class MTPseudo(LocTask):
     def pretranslate_file(self, file_id: int):
         response = self._crowdin.translations.apply_pre_translation(
             projectId=self.project_id,
-            languageIds=self.languages,
+            languageIds=list(self._languages.keys()),
             fileIds=[file_id],
             autoApproveOption='all',
         )
@@ -148,7 +164,7 @@ class MTPseudo(LocTask):
 
         response = self._crowdin.translations.apply_pre_translation(
             projectId=self.project_id,
-            languageIds=self.languages,
+            languageIds=list(self._languages.keys()),
             fileIds=[file_id],
             method='mt',
             engineId=self.engine_id,
@@ -218,7 +234,8 @@ class MTPseudo(LocTask):
             if (i + 1) % 50 == 0:
                 logger.info('Approved 50 translations...')
 
-    def approve_languages(self, languages: list[str]):
+    def approve_languages(self):
+        languages = self._languages.keys()
         logger.info(f'Approving {len(languages)} languages...')
         lang_processed = {}
 
@@ -243,7 +260,20 @@ class MTPseudo(LocTask):
         return lang_processed
 
     def download_transalted_files(self):
-        pass
+        task = build_and_download.BuildAndDownloadTranslations(
+            token=self.token,
+            organization=self.organization,
+            project_id=self.project_id,
+            loc_targets=self.loc_targets,
+        )
+        task.post_update()
+        print(task)
+
+        task.build_and_download()
+
+        task.unzip_file()
+
+        return task.process_loc_targets()
 
     def pseudo(self):
         pass
@@ -279,17 +309,15 @@ def main():
 
     task.read_config(Path(__file__).name, logger)
 
-    # result = task.add_source_files()
+    # files = task.add_source_files()
 
-    # task.pretranslate_file(948)
+    # task.pretranslate_files(files)
 
-    # task.mt_file(948)
+    # task.mt_files(files)
 
-    task.pretranslate_files({'MTTest': 948})
+    # task.approve_language('ru')
 
-    task.mt_files({'MTTest': 948})
-
-    task.approve_language('ru')
+    task.download_transalted_files()
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
