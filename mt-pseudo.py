@@ -47,6 +47,13 @@ class MTPseudo(LocTask):
 
     export_pattern: str = '/{target}/%locale%/{target}.po'
 
+    po_encoding: str = 'utf-8-sig'
+
+    prefix: str = '‹'
+    suffix: str = '›'
+
+    filler: str = '~'
+
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
     temp_dir: str = 'Localization/~Temp/FilesToUpload'
@@ -277,16 +284,22 @@ class MTPseudo(LocTask):
 
         return task.process_loc_targets()
 
-    def pseudo_file(self, file_path: Path):
+    def pseudo_mark_file(self, file_path: Path):
+        po = polib.pofile(file_path, encoding=self.po_encoding, wrapwidth=0)
+        for entry in po:
+            if not entry.msgstr.startswith(self.prefix):
+                entry.msgstr = self.prefix + entry.msgstr
+            if not entry.msgstr.endswith(self.suffix):
+                entry.msgstr = entry.msgstr + self.suffix
+        po.save()
+
+    def pseudo_mark_target(self, target: str):
         pass
 
-    def pseudo_target(self, file_path: Path):
+    def pseudo_mark_targets(self, file_path: Path):
         pass
 
-    def pseudo_targets(self, file_path: Path):
-        pass
-
-    def create_monster_target(self):
+    def create_longest_locale(self, target: str):
         pass
 
     def create_monster_target(self):
