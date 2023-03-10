@@ -6,11 +6,11 @@ import polib
 import sys
 
 from libraries.crowdin import UECrowdinClient
-from libraries.utilities import LocTask
+from libraries.utilities import LocTask, init_logging
 
 import importlib
 
-build_and_download = importlib.import_module("build-and-download")
+dl_task = importlib.import_module("build-and-download")
 
 
 @dataclass
@@ -70,7 +70,6 @@ class MTPseudo(LocTask):
     def post_update(self):
         super().post_update()
         self._content_path = Path(self.content_dir).resolve()
-        self._fname = self._fname.format(locale=self.src_locale, target='{target}')
         self._temp_path = Path(self.temp_dir).resolve()
         self._languages = {}
         for crowd_l, ue_l in self.languages.items():
@@ -80,7 +79,9 @@ class MTPseudo(LocTask):
         )
 
     def add_source_file(self, target: str) -> int or dict:
-        fpath = self._content_path / self._fname.format(target=target)
+        fpath = self._content_path / self._fname.format(
+            target=target, locale=self.src_locale
+        )
         logger.info(f'Uploading file: {fpath}. Format: {self.file_format}')
         r = self._crowdin.add_file(
             fpath,
@@ -245,13 +246,13 @@ class MTPseudo(LocTask):
     def approve_languages(self):
         languages = self._languages.keys()
         logger.info(f'Approving {len(languages)} languages...')
-        lang_processed = {}
+        langs_processed = {}
 
         for lang in languages.items():
             logger.info(f'Approving {lang}...')
             r = self.mt_file(id)
             if r == 0:
-                lang_processed[lang] = id
+                langs_processed[lang] = id
                 logger.info(f'Language {lang} approved.')
             else:
                 logger.error(
@@ -259,20 +260,21 @@ class MTPseudo(LocTask):
                     f'Here\'s the last response from Crowdin: {r}'
                 )
 
-        if len(lang_processed) == len(languages):
+        if len(langs_processed) == len(languages):
             logger.info(
-                f'SUCCESS: Languages approved ({len(lang_processed)}): {lang_processed}'
+                f'SUCCESS: Languages approved ({len(langs_processed)}): {langs_processed}'
             )
-            return lang_processed
+            return langs_processed
 
-        return lang_processed
+        return langs_processed
 
     def download_transalted_files(self):
-        task = build_and_download.BuildAndDownloadTranslations(
+        task = dl_task.BuildAndDownloadTranslations(
             token=self.token,
             organization=self.organization,
             project_id=self.project_id,
             loc_targets=self.loc_targets,
+            content_dir=self.content_dir,
         )
         task.post_update()
         task.culture_mappings.update(self.languages)
@@ -293,11 +295,73 @@ class MTPseudo(LocTask):
                 entry.msgstr = entry.msgstr + self.suffix
         po.save()
 
-    def pseudo_mark_target(self, target: str):
-        pass
+    def pseudo_mark_target(self, target: str, cultures: list[str] = None):
+        logger.info(f'Adding pseudo markers to target: {target}')
+        if not cultures:
+            cultures = [
+                f.name
+                for f in (self._content_path / 'Localization' / target).glob('*')
+                if f.is_dir() and f.name != self.src_locale
+            ]
 
-    def pseudo_mark_targets(self, file_path: Path):
-        pass
+        logger.info(f'Cultures to process: {cultures}')
+
+        cultures_processed = []
+
+        for culture in cultures:
+            file_path = self._content_path / self._fname.format(
+                target=target, locale=culture
+            )
+
+            if not file_path.exists():
+                logger.error(f'Missing PO files for {target}/{culture}: {file_path}')
+                continue
+
+            self.pseudo_mark_file(file_path=file_path)
+
+            cultures_processed.append(culture)
+
+        if len(cultures_processed) == len(cultures):
+            logger.info('Processed all cultures.')
+            return True
+
+        if len(cultures_processed) != 0:
+            logger.error(
+                f'Processed {len(cultures_processed)}/{len(cultures)} cultures:\n'
+                f'{cultures_processed}'
+            )
+        else:
+            logger.error('No cultures were processed.')
+
+        return False
+
+    def pseudo_mark_targets(
+        self, targets: list[str] = None, cultures: list[str] = None
+    ):
+        if not targets:
+            targets = self.loc_targets
+
+        logger.info(f'Adding pseudo markers to targets: {targets}')
+
+        targets_processed = []
+
+        for target in targets:
+            if self.pseudo_mark_target(target, cultures):
+                targets_processed.append(target)
+
+        if len(targets_processed) == len(cultures):
+            logger.info('Processed all targets.')
+            return True
+
+        if len(targets_processed) != 0:
+            logger.error(
+                f'Processed {len(targets_processed)}/{len(targets)} targets:\n'
+                f'{targets_processed}'
+            )
+        else:
+            logger.error('No targets were processed.')
+
+        return False
 
     def create_longest_locale(self, target: str):
         pass
@@ -307,23 +371,8 @@ class MTPseudo(LocTask):
 
 
 def main():
-    logger.remove()
-    logger.add(
-        sys.stdout,
-        format='<green>{time:HH:mm:ss.SSS}</green> | '
-        '<level>{level: <8}</level> | '
-        '<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>',
-        level='INFO',
-    )
-    logger.add(
-        'logs/locsync.log',
-        rotation='10MB',
-        retention='1 month',
-        enqueue=True,
-        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
-        encoding='utf-8',
-    )
+
+    init_logging(logger)
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script start ---')
@@ -335,15 +384,17 @@ def main():
 
     # files = task.add_source_files()
 
-    files = {'MTTest': 1064}
+    # files = {'MTTest': 1064}
 
-    task.pretranslate_files(files)
+    # task.pretranslate_files(files)
 
-    task.mt_files(files)
+    # task.mt_files(files)
 
-    task.approve_language('ru')
+    # task.approve_language('ru')
 
     # task.download_transalted_files()
+
+    task.pseudo_mark_target(target='MTTest')
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
