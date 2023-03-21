@@ -1,6 +1,7 @@
 import sys
 import argparse
 import subprocess as subp
+from libraries.utilities import init_logging
 
 missing_modules = False
 # Run with -setup to install required modules
@@ -20,6 +21,9 @@ BASE_CFG = 'base.config.yaml'
 SECRET_CFG = 'crowdin.config.yaml'
 
 CFG_SECTIONS = ['crowdin', 'parameters', 'script-parameters']
+
+LOG_TO_SKIP = ['LogLinker: ']
+
 
 def read_config_files():
     with open(BASE_CFG) as f:
@@ -120,14 +124,7 @@ def main():
         input('Press Enter to quit...')
         return
 
-    logger.add(
-        'logs/locsync.log',
-        rotation='10MB',
-        retention='1 month',
-        enqueue=True,
-        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
-    )
+    init_logging(logger)
 
     logger.opt(raw=True).info(
         '\n'
@@ -248,6 +245,14 @@ def main():
             ) as process:
                 while True:
                     for line in process.stdout:
+                        skip = False
+                        for item in LOG_TO_SKIP:
+                            if item in line:
+                                skip = True
+
+                        if skip:
+                            continue
+
                         if 'Error: ' in line:
                             logger.error(f'| UE | {line.strip()}')
                         elif 'Warning: ' in line:

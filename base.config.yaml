@@ -240,6 +240,9 @@ script-parameters:
     # This seems to be needed if the project and engine
     # are in completely separate directories
 
+    log_to_skip: ['LogLinker: ']
+    # Logs to skip (to avoid irrelevant spam)
+
     content_dir: '../'
     # project_dir: ''  # Will try to find it if empty
     # engine_dir: ''  # Will try to find it if empty

@@ -38,7 +38,7 @@ from loguru import logger
 
 from dataclasses import dataclass, field
 
-from libraries.utilities import LocTask
+from libraries.utilities import LocTask, init_logging
 
 
 @dataclass
@@ -69,6 +69,9 @@ class UnrealLocGatherCommandlet(LocTask):
     # Should we patch dependencies in *_Gather.ini files?
     # This seems to be needed if the project and engine
     # are in completely separate directories
+
+    log_to_skip: list = None
+    # Skip irrelevant Unreal spam (e.g., 'LogLinker: ' if you have lots of warnings)
 
     _unreal_binary: str = 'Engine/Binaries/Win64/UE4Editor-cmd.exe'
     _config_pattern: str = 'Config/Localization/{loc_target}_{task}.ini'
@@ -225,6 +228,13 @@ class UnrealLocGatherCommandlet(LocTask):
         ) as process:
             while True:
                 for line in process.stdout:
+                    skip = False
+                    for item in self.log_to_skip:
+                        if item in line:
+                            skip = True
+                    if skip:
+                        continue
+
                     line = re.sub(r"^\[[^]]+]", "", line.strip())
                     if 'Error: ' in line:
                         logger.error(f'| UE | {line.strip()}')
@@ -241,14 +251,7 @@ class UnrealLocGatherCommandlet(LocTask):
 
 def main():
 
-    logger.add(
-        'logs/locsync.log',
-        rotation='10MB',
-        retention='1 month',
-        enqueue=True,
-        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
-    )
+    init_logging(logger)
 
     logger.info('')
     logger.info('--- Unreal gather text commandlet script ---')
