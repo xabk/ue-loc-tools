@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from time import sleep
 from loguru import logger
 import polib
-import sys
 
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask, init_logging
@@ -15,7 +14,7 @@ dl_task = importlib.import_module("build-and-download")
 
 @dataclass
 class MTPseudo(LocTask):
-    # TODO: Function to set up MT project on Crowdin
+    # TODO: Function to set up MT project on Crowdin or a separate script for this?
 
     # Declare Crowdin parameters to load them from config
     token: str = None
@@ -37,6 +36,14 @@ class MTPseudo(LocTask):
         }
     )
 
+    locales_to_skip: list = field(
+        default_factory=lambda: [
+            'ia-001',
+            'en-SG',
+            'en-ZA',
+        ]
+    )
+
     engine_id: int or None = 1
 
     file_format: str = (
@@ -44,6 +51,8 @@ class MTPseudo(LocTask):
     )
 
     src_locale: str = 'io'
+    longest_locale: str = 'en-SA'
+    monster_locale: str = 'en-AR'
 
     export_pattern: str = '/{target}/%locale%/{target}.po'
 
@@ -298,10 +307,15 @@ class MTPseudo(LocTask):
     def pseudo_mark_target(self, target: str, cultures: list[str] = None):
         logger.info(f'Adding pseudo markers to target: {target}')
         if not cultures:
+            # Find all eligible locales in the target folder
             cultures = [
                 f.name
                 for f in (self._content_path / 'Localization' / target).glob('*')
-                if f.is_dir() and f.name != self.src_locale
+                if f.is_dir()
+                and f.name != self.src_locale
+                and f.name != self.monster_locale
+                and f.name != self.longest_locale
+                and f.name not in self.locales_to_skip
             ]
 
         logger.info(f'Cultures to process: {cultures}')
@@ -364,6 +378,13 @@ class MTPseudo(LocTask):
         return False
 
     def create_longest_locale(self, target: str):
+        # Go over the PO files in target
+        # Convert them to a dict and pick the longest translation
+        # Load debug ID locale PO
+        # Extend English text with something to match the length of the longest translation
+        #  - filler, various locale symbols, debug IDs, etc.?
+        #  - take into account spaces in longest translation (to avoid single-word filler)
+        # Save as new 'longest' locale
         pass
 
     def create_monster_target(self):
