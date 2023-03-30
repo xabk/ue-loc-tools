@@ -339,7 +339,7 @@ class ProcessTestAndHashLocales(LocTask):
                 if self.hash_not_used_marker in entry.comment
                 else self.hash_prefix
             )
-            entry.msgstr = self.hash_prefix + entry.msgid + self.hash_suffix
+            entry.msgstr = prefix + entry.msgid + self.hash_suffix
 
         po.save(po_file)
         logger.info(f'Saved target hash locale file: {po_file}')
