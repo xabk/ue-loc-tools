@@ -98,7 +98,9 @@ script-parameters:
 
     loc_targets: ['Game']
 
-    hash_locale: ia-001  # Set to '' (empty) to disable hash locale generation
+    hash_locale: ia-001  # Set to '' (empty) to disable hash locale generation\
+    hash_locale: en-SG  # Set to '' (empty) to disable hash locale generation
+    hash_not_used_marker: 'NOT USED'  # If this is in comment, use not_used_prefix
     hash_prefix: '# '
     hash_suffix: ' ~'
     

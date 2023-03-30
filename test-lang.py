@@ -30,6 +30,8 @@ class ProcessTestAndHashLocales(LocTask):
     hash_locale: str = 'ia-001'
 
     # Hash locale parameters
+    hash_not_used_marker: str = 'NOT USED'  # If this is in comment, use not_used_prefix
+    hash_prefix_not_used: str = '? '  # Prefix for strings with `not_used` in comment
     hash_prefix: str = '# '  # Prefix for each string in hash locale
     hash_suffix: str = ' ~'  # Suffix for each string in hash locale
 
@@ -332,6 +334,11 @@ class ProcessTestAndHashLocales(LocTask):
         logger.info(f'Opened hash locale file: {po_file}')
 
         for entry in po:
+            prefix = (
+                self.hash_prefix_not_used
+                if self.hash_not_used_marker in entry.comment
+                else self.hash_prefix
+            )
             entry.msgstr = self.hash_prefix + entry.msgid + self.hash_suffix
 
         po.save(po_file)
