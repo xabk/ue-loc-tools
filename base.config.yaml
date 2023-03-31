@@ -106,6 +106,7 @@ script-parameters:
     
     debug_ID_locale: io  # Set to '' (empty) to disable debug ID locale generation
     clear_translations: No
+    debug_prefix: '#' # Start over (clear_translations = True) if you change debug prefix
     id_length: 4  # Start over (clear_translations = True) if you change id length
     encoding: utf-8-sig
     sort_po: Yes
