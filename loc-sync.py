@@ -26,6 +26,13 @@ LOG_TO_SKIP = ['LogLinker: ']
 
 
 def read_config_files():
+    '''
+    Reads the base config file and the secret config file.
+    Returns a dict with the config data.
+
+    Always overwrites the base config with the secret config,
+    to discourage storing secrets in the base config file.
+    '''
     with open(BASE_CFG) as f:
         config = yaml.safe_load(f)
     with open(SECRET_CFG) as f:
