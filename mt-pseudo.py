@@ -28,11 +28,23 @@ class MTPseudo(LocTask):
     )  # Localization targets, empty = process all targets
 
     # TODO: Empty = all languages for project on Crowdin
-    # { Crowdin language : Unreal culture }
+    # { Crowdin locale : Unreal culture }
     # E.g., { zh-CN : zh-Hans }
     languages: dict = field(
         default_factory=lambda: {
-            'ru-RU': 'ru',
+            # convert this to a dict with empty values
+            'fr': 'fr',
+            'it': 'it',
+            'de': 'de',
+            'es': 'es',
+            'zh-CN': 'zh-Hans',
+            'zh-TW': 'zh-Hant',
+            'ja': 'ja',
+            'ko': 'ko',
+            'pl': 'pl',
+            'pt-BR': 'pt-BR',
+            'ru': 'ru',
+            'tr': 'tr',
         }
     )
 
@@ -65,9 +77,10 @@ class MTPseudo(LocTask):
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
-    temp_dir: str = 'Localization/~Temp/FilesToUpload'
+    temp_dir: str = 'Localization/~Temp/MT+Pseudo/'
 
     _fname: str = 'Localization/{target}/{locale}/{target}.po'
+    _temp_fname: str = '{target}/{locale}/{target}.po'
 
     _languages: dict[str:str] = None
 
@@ -79,7 +92,7 @@ class MTPseudo(LocTask):
     def post_update(self):
         super().post_update()
         self._content_path = Path(self.content_dir).resolve()
-        self._temp_path = Path(self.temp_dir).resolve()
+        self._temp_path = (self._content_path / self.temp_dir).resolve()
         self._languages = {}
         for crowd_l, ue_l in self.languages.items():
             self._languages[crowd_l] = ue_l if ue_l else crowd_l
@@ -127,7 +140,7 @@ class MTPseudo(LocTask):
     def pretranslate_file(self, file_id: int):
         response = self._crowdin.translations.apply_pre_translation(
             projectId=self.project_id,
-            languageIds=[key.partition('-')[0] for key in self._languages.keys()],
+            languageIds=list(self._languages.keys()),
             fileIds=[file_id],
             autoApproveOption='all',
         )
@@ -179,10 +192,23 @@ class MTPseudo(LocTask):
 
     def mt_file(self, file_id: int):
         # logger.info(crowdin.machine_translations.list_mts())
+        supported_languages = [
+            mt['data']['supportedLanguageIds']
+            for mt in self._crowdin.machine_translations.list_mts()['data']
+            if mt['data']['id'] == self.engine_id
+        ][0]
+
+        languageIds = [id for id in self._languages.keys() if id in supported_languages]
+
+        if len(languageIds) < len(self._languages):
+            logger.warning(
+                f'Not all configured languages are supported by the MT engine. '
+                f'Supported: {languageIds}'
+            )
 
         response = self._crowdin.translations.apply_pre_translation(
             projectId=self.project_id,
-            languageIds=[key.partition('-')[0] for key in self._languages.keys()],
+            languageIds=languageIds,
             fileIds=[file_id],
             method='mt',
             engineId=self.engine_id,
@@ -284,6 +310,7 @@ class MTPseudo(LocTask):
             project_id=self.project_id,
             loc_targets=self.loc_targets,
             content_dir=self.content_dir,
+            temp_dir=self.temp_dir,
         )
         task.post_update()
         task.culture_mappings.update(self.languages)
@@ -292,6 +319,20 @@ class MTPseudo(LocTask):
         task.build_and_download()
 
         task.unzip_file()
+
+        return task._temp_path
+
+    def copy_downloaded_files_to_content(self):
+        task = dl_task.BuildAndDownloadTranslations(
+            token=self.token,
+            organization=self.organization,
+            project_id=self.project_id,
+            loc_targets=self.loc_targets,
+            content_dir=self.content_dir,
+        )
+        task.post_update()
+        task.culture_mappings.update(self.languages)
+        print(task)
 
         return task.process_loc_targets()
 
@@ -306,6 +347,101 @@ class MTPseudo(LocTask):
 
     def pseudo_mark_target(self, target: str, cultures: list[str] = None):
         logger.info(f'Adding pseudo markers to target: {target}')
+        if not cultures:
+            # Find all eligible locales in the target folder
+            cultures = [
+                f.name
+                for f in (self._temp_path / target).glob('*')
+                if f.is_dir()
+                and f.name != self.src_locale
+                and f.name != self.monster_locale
+                and f.name != self.longest_locale
+                and f.name not in self.locales_to_skip
+            ]
+
+        logger.info(f'Cultures to process: {cultures}')
+
+        cultures_processed = []
+
+        for culture in cultures:
+            file_path = self._temp_path / self._temp_fname.format(
+                target=target, locale=culture
+            )
+
+            if not file_path.exists():
+                logger.error(f'Missing PO files for {target}/{culture}: {file_path}')
+                continue
+
+            self.pseudo_mark_file(file_path=file_path)
+
+            cultures_processed.append(culture)
+
+        if len(cultures_processed) == len(cultures):
+            logger.success('Processed all cultures.')
+            return True
+
+        if len(cultures_processed) != 0:
+            logger.info(
+                f'Processed {len(cultures_processed)}/{len(cultures)} cultures:\n'
+                f'{cultures_processed}'
+            )
+        else:
+            logger.error('No cultures were processed.')
+
+        return False
+
+    def pseudo_mark_targets(
+        self, targets: list[str] = None, cultures: list[str] = None
+    ):
+        if not targets:
+            targets = self.loc_targets
+
+        logger.info(f'Adding pseudo markers to targets: {targets}')
+
+        targets_processed = []
+
+        for target in targets:
+            if not cultures:
+                # Find all eligible locales in the target folder
+                cultures = [
+                    f.name
+                    for f in (self._temp_path / target).glob('*')
+                    if f.is_dir()
+                    and f.name != self.src_locale
+                    and f.name != self.monster_locale
+                    and f.name != self.longest_locale
+                    and f.name not in self.locales_to_skip
+                ]
+
+            if self.pseudo_mark_target(target, cultures):
+                targets_processed.append(target)
+
+        if len(targets_processed) == len(targets):
+            logger.success('Processed all targets.')
+            return True
+
+        if len(targets_processed) != 0:
+            logger.info(
+                f'Processed {len(targets_processed)}/{len(targets)} targets:\n'
+                f'{targets_processed}'
+            )
+        else:
+            logger.error('No targets were processed.')
+
+        return False
+
+    def create_longest_locale(self, target: str, cultures: list[str] = None):
+        # Load longest locale PO in `Content/Localization/Target/`
+        # Populate translations and lengths dicts
+        # Go over the other locale PO files in `Temp/Target`
+        # If translation longer than current, add to the translations dict, update length
+        # Load debug ID locale PO
+        # Extend English text with something to match the length of the longest translation
+        #  - filler, various locale symbols, debug IDs, etc.?
+        #  - take into account spaces in longest translation (to avoid single-word filler)
+        # Save as new 'longest' locale
+        logger.info(f'Creating longest locale: {target}')
+
         if not cultures:
             # Find all eligible locales in the target folder
             cultures = [
@@ -336,11 +472,11 @@ class MTPseudo(LocTask):
             cultures_processed.append(culture)
 
         if len(cultures_processed) == len(cultures):
-            logger.info('Processed all cultures.')
+            logger.success('Processed all cultures.')
             return True
 
         if len(cultures_processed) != 0:
-            logger.error(
+            logger.info(
                 f'Processed {len(cultures_processed)}/{len(cultures)} cultures:\n'
                 f'{cultures_processed}'
             )
@@ -348,43 +484,6 @@ class MTPseudo(LocTask):
             logger.error('No cultures were processed.')
 
         return False
-
-    def pseudo_mark_targets(
-        self, targets: list[str] = None, cultures: list[str] = None
-    ):
-        if not targets:
-            targets = self.loc_targets
-
-        logger.info(f'Adding pseudo markers to targets: {targets}')
-
-        targets_processed = []
-
-        for target in targets:
-            if self.pseudo_mark_target(target, cultures):
-                targets_processed.append(target)
-
-        if len(targets_processed) == len(cultures):
-            logger.info('Processed all targets.')
-            return True
-
-        if len(targets_processed) != 0:
-            logger.error(
-                f'Processed {len(targets_processed)}/{len(targets)} targets:\n'
-                f'{targets_processed}'
-            )
-        else:
-            logger.error('No targets were processed.')
-
-        return False
-
-    def create_longest_locale(self, target: str):
-        # Go over the PO files in target
-        # Convert them to a dict and pick the longest translation
-        # Load debug ID locale PO
-        # Extend English text with something to match the length of the longest translation
-        #  - filler, various locale symbols, debug IDs, etc.?
-        #  - take into account spaces in longest translation (to avoid single-word filler)
-        # Save as new 'longest' locale
         pass
 
     def create_monster_target(self):
@@ -405,7 +504,9 @@ def main():
 
     # files = task.add_source_files()
 
-    # files = {'MTTest': 1064}
+    # print(files)
+
+    # files = {'MTTest': 1318}
 
     # task.pretranslate_files(files)
 
@@ -415,7 +516,9 @@ def main():
 
     # task.download_transalted_files()
 
-    task.pseudo_mark_target(target='MTTest')
+    task.pseudo_mark_targets()
+
+    # task.copy_downloaded_files_to_content()
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
