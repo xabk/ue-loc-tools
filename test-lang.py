@@ -305,7 +305,9 @@ class ProcessTestAndHashLocales(LocTask):
 
             new_comments += self.get_additional_comments(entry)
 
-            entry.comment = '\n'.join(new_comments)
+            entry.comment = (
+                '\n'.join(new_comments).replace('\\n', '\n').replace('\\r', '')
+            )
 
             if self.delete_occurrences:
                 entry.occurrences = []
