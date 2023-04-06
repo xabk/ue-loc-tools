@@ -431,6 +431,9 @@ class MTPseudo(LocTask):
         return False
 
     def create_longest_locale(self, target: str, cultures: list[str] = None):
+        #
+        # en-SA by default
+        #
         # Load longest locale PO in `Content/Localization/Target/`
         # Populate translations and lengths dicts
         # Go over the other locale PO files in `Temp/Target`
@@ -446,7 +449,7 @@ class MTPseudo(LocTask):
             # Find all eligible locales in the target folder
             cultures = [
                 f.name
-                for f in (self._content_path / 'Localization' / target).glob('*')
+                for f in (self._temp_path / target).glob('*')
                 if f.is_dir()
                 and f.name != self.src_locale
                 and f.name != self.monster_locale
@@ -455,6 +458,13 @@ class MTPseudo(LocTask):
             ]
 
         logger.info(f'Cultures to process: {cultures}')
+
+        longest_po = polib.pofile(
+            self._temp_path
+            / self._temp_fname.format(target=target, locale=self.longest_locale),
+            encoding=self.po_encoding,
+            wrapwidth=0,
+        )
 
         cultures_processed = []
 
@@ -516,9 +526,11 @@ def main():
 
     # task.download_transalted_files()
 
-    task.pseudo_mark_targets()
+    # task.pseudo_mark_targets()
 
     # task.copy_downloaded_files_to_content()
+
+    task.create_longest_locale('MTTest')
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
