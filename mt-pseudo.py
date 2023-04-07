@@ -25,6 +25,7 @@ class MTPseudo(LocTask):
 
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to empty list to process all loc targets when implemented
+
     loc_targets: list = field(
         default_factory=lambda: ['MTTest']
     )  # Localization targets, empty = process all targets
@@ -52,6 +53,7 @@ class MTPseudo(LocTask):
 
     locales_to_skip: list = field(
         default_factory=lambda: [
+            'io',
             'ia-001',
             'en-SG',
             'en-ZA',
@@ -64,9 +66,8 @@ class MTPseudo(LocTask):
         'gettext_unreal'  # gettext_unreal to use the Unreal PO parser on Crowdin
     )
 
-    src_locale: str = 'io'
-    longest_locale: str = 'en-SA'
-    monster_locale: str = 'en-AR'
+    src_locale: str = 'en-ZA'
+    longest_locale: str = 'en-AE'
 
     export_pattern: str = '/{target}/%locale%/{target}.po'
 
@@ -288,9 +289,9 @@ class MTPseudo(LocTask):
         logger.info(f'Approving {len(languages)} languages...')
         langs_processed = {}
 
-        for lang in languages.items():
+        for lang in languages:
             logger.info(f'Approving {lang}...')
-            r = self.mt_file(id)
+            r = self.approve_language(lang)
             if r == 0:
                 langs_processed[lang] = id
                 logger.info(f'Language {lang} approved.')
@@ -301,8 +302,8 @@ class MTPseudo(LocTask):
                 )
 
         if len(langs_processed) == len(languages):
-            logger.info(
-                f'SUCCESS: Languages approved ({len(langs_processed)}): {langs_processed}'
+            logger.success(
+                f'Languages approved ({len(langs_processed)}): {langs_processed}'
             )
             return langs_processed
 
@@ -498,7 +499,7 @@ class MTPseudo(LocTask):
         cultures_processed = []
 
         for culture in cultures:
-            print(f'Processing {culture}...')
+            logger.info(f'Processing {culture}...')
             file_path = self._temp_path / self._temp_fname.format(
                 target=target, locale=culture
             )
@@ -521,9 +522,6 @@ class MTPseudo(LocTask):
             for key, entry in longest_dict.items():
                 if key in po_dict:
                     if len(po_dict[key].msgstr) > len(entry.msgstr):
-                        print(
-                            f'{entry.msgctxt}: {entry.msgstr} -> {po_dict[key].msgstr}'
-                        )
                         entry.msgstr = po_dict[key].msgstr
 
             # self.pseudo_mark_file(file_path=file_path)
@@ -541,17 +539,7 @@ class MTPseudo(LocTask):
             logger.error('No cultures were processed.')
 
         for entry in longest_dict.values():
-            print(
-                f'{entry.msgctxt} - {len(entry.msgid)} → {len(entry.msgstr)}: {entry.msgstr}'
-            )
-
-        for entry in longest_dict.values():
             entry.msgstr = self.create_longest(entry.msgid, entry.msgstr)
-
-        for entry in longest_dict.values():
-            print(
-                f'{entry.msgctxt} - {len(entry.msgid)} → {len(entry.msgstr)}: {entry.msgstr}'
-            )
 
         if not longest_path.parent.exists():
             longest_path.parent.mkdir(parents=True)
@@ -578,7 +566,6 @@ class MTPseudo(LocTask):
                     for f in (self._temp_path / target).glob('*')
                     if f.is_dir()
                     and f.name != self.src_locale
-                    and f.name != self.monster_locale
                     and f.name != self.longest_locale
                     and f.name not in self.locales_to_skip
                 ]
@@ -600,7 +587,7 @@ class MTPseudo(LocTask):
 
         return False
 
-    def create_longest_pack(self, targets: list[str] = None):
+    def create_longest_locale_pack(self, targets: list[str] = None):
         if not targets:
             targets = self.loc_targets
 
@@ -615,10 +602,10 @@ class MTPseudo(LocTask):
             dst = path / self._temp_fname.format(
                 target=target, locale=self.longest_locale
             )
-            if not dst.exists():
-                dst.mkdir(parents=True)
+            if not dst.parent.exists():
+                dst.parent.mkdir(parents=True)
 
-            shutil.copy(src, dst)
+            shutil.copy(src, dst.parent)
 
         return path
 
@@ -648,17 +635,17 @@ def main():
 
     # task.mt_files(files)
 
-    # task.approve_language('ru')
+    # task.approve_languages()
 
-    # task.download_transalted_files()
+    task.download_transalted_files()
 
     # task.pseudo_mark_targets()
 
     # task.copy_downloaded_files_to_content()
 
-    task.create_longest_locale_for_targets(['MTTest'])
+    task.create_longest_locale_for_targets()
 
-    task.create_longest_pack(['MTTest'])
+    task.create_longest_locale_pack()
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
