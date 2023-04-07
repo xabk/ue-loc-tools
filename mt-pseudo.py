@@ -2,8 +2,10 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from time import sleep
 from loguru import logger
-import polib
+import re
+import shutil
 
+from libraries import polib
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask, init_logging
 
@@ -74,6 +76,9 @@ class MTPseudo(LocTask):
     suffix: str = '›'
 
     filler: str = '~'
+
+    var_regex: str = r'{[^}]*}'
+    tags_regex: str = r'<[^>]*>'
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
@@ -430,7 +435,31 @@ class MTPseudo(LocTask):
 
         return False
 
-    def create_longest_locale(self, target: str, cultures: list[str] = None):
+    def create_longest(self, base: str, target: str):
+        if len(base) >= len(target):
+            result = base
+            if not result.startswith(self.prefix):
+                result = self.prefix + result
+            if not result.endswith(self.suffix):
+                result = result + self.suffix
+            return result
+
+        length = len(target)
+
+        result, _ = re.subn(self.var_regex, '*', target)
+        result, _ = re.subn(self.tags_regex, '=', result)
+
+        length = length - len(result) - 2
+
+        result = base + '| ' + result[len(base) - length :].strip()
+        if not result.startswith(self.prefix):
+            result = self.prefix + result
+        if not result.endswith(self.suffix):
+            result = result + self.suffix
+
+        return result
+
+    def create_longest_locale_for_target(self, target: str, cultures: list[str] = None):
         #
         # en-SA by default
         #
@@ -459,17 +488,18 @@ class MTPseudo(LocTask):
 
         logger.info(f'Cultures to process: {cultures}')
 
-        longest_po = polib.pofile(
-            self._temp_path
-            / self._temp_fname.format(target=target, locale=self.longest_locale),
-            encoding=self.po_encoding,
-            wrapwidth=0,
+        longest_path = self._temp_path / self._temp_fname.format(
+            target=target, locale=self.longest_locale
         )
+
+        longest_po = None
+        longest_dict = {}
 
         cultures_processed = []
 
         for culture in cultures:
-            file_path = self._content_path / self._fname.format(
+            print(f'Processing {culture}...')
+            file_path = self._temp_path / self._temp_fname.format(
                 target=target, locale=culture
             )
 
@@ -477,15 +507,32 @@ class MTPseudo(LocTask):
                 logger.error(f'Missing PO files for {target}/{culture}: {file_path}')
                 continue
 
-            self.pseudo_mark_file(file_path=file_path)
+            po = polib.pofile(file_path, encoding=self.po_encoding, wrapwidth=0)
+
+            if not longest_dict:
+                longest_po = polib.pofile(
+                    file_path, encoding=self.po_encoding, wrapwidth=0
+                )
+                longest_dict = {e.msgctxt: e for e in longest_po}
+                continue
+
+            po_dict = {e.msgctxt: e for e in po}
+
+            for key, entry in longest_dict.items():
+                if key in po_dict:
+                    if len(po_dict[key].msgstr) > len(entry.msgstr):
+                        print(
+                            f'{entry.msgctxt}: {entry.msgstr} -> {po_dict[key].msgstr}'
+                        )
+                        entry.msgstr = po_dict[key].msgstr
+
+            # self.pseudo_mark_file(file_path=file_path)
 
             cultures_processed.append(culture)
 
         if len(cultures_processed) == len(cultures):
             logger.success('Processed all cultures.')
-            return True
-
-        if len(cultures_processed) != 0:
+        elif len(cultures_processed) != 0:
             logger.info(
                 f'Processed {len(cultures_processed)}/{len(cultures)} cultures:\n'
                 f'{cultures_processed}'
@@ -493,8 +540,87 @@ class MTPseudo(LocTask):
         else:
             logger.error('No cultures were processed.')
 
+        for entry in longest_dict.values():
+            print(
+                f'{entry.msgctxt} - {len(entry.msgid)} → {len(entry.msgstr)}: {entry.msgstr}'
+            )
+
+        for entry in longest_dict.values():
+            entry.msgstr = self.create_longest(entry.msgid, entry.msgstr)
+
+        for entry in longest_dict.values():
+            print(
+                f'{entry.msgctxt} - {len(entry.msgid)} → {len(entry.msgstr)}: {entry.msgstr}'
+            )
+
+        if not longest_path.parent.exists():
+            longest_path.parent.mkdir(parents=True)
+
+        longest_po.save(longest_path)
+
+        return True
+
+    def create_longest_locale_for_targets(
+        self, targets: list[str] = None, cultures: list[str] = None
+    ):
+        if not targets:
+            targets = self.loc_targets
+
+        logger.info(f'Adding pseudo markers to targets: {targets}')
+
+        targets_processed = []
+
+        for target in targets:
+            if not cultures:
+                # Find all eligible locales in the target folder
+                cultures = [
+                    f.name
+                    for f in (self._temp_path / target).glob('*')
+                    if f.is_dir()
+                    and f.name != self.src_locale
+                    and f.name != self.monster_locale
+                    and f.name != self.longest_locale
+                    and f.name not in self.locales_to_skip
+                ]
+
+            if self.create_longest_locale_for_target(target, cultures):
+                targets_processed.append(target)
+
+        if len(targets_processed) == len(targets):
+            logger.success('Processed all targets.')
+            return True
+
+        if len(targets_processed) != 0:
+            logger.info(
+                f'Processed {len(targets_processed)}/{len(targets)} targets:\n'
+                f'{targets_processed}'
+            )
+        else:
+            logger.error('No targets were processed.')
+
         return False
-        pass
+
+    def create_longest_pack(self, targets: list[str] = None):
+        if not targets:
+            targets = self.loc_targets
+
+        path = self._temp_path / 'Longest_Pack'
+        if not path.exists():
+            path.mkdir(parents=True)
+
+        for target in targets:
+            src = self._temp_path / self._temp_fname.format(
+                target=target, locale=self.longest_locale
+            )
+            dst = path / self._temp_fname.format(
+                target=target, locale=self.longest_locale
+            )
+            if not dst.exists():
+                dst.mkdir(parents=True)
+
+            shutil.copy(src, dst)
+
+        return path
 
     def create_monster_target(self):
         pass
@@ -530,7 +656,9 @@ def main():
 
     # task.copy_downloaded_files_to_content()
 
-    task.create_longest_locale('MTTest')
+    task.create_longest_locale_for_targets(['MTTest'])
+
+    task.create_longest_pack(['MTTest'])
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script end ---')
