@@ -56,8 +56,7 @@ class UECrowdinClient(CrowdinClient):
 
     def get_file_ID(self, file_name='Game.po') -> int:
         if not self.file_list:
-            self.error('File list not initialized.')
-            return None
+            self.update_file_list_and_project_data()
 
         for entry in self.file_list:
             if entry['data']['name'] == file_name:
@@ -225,7 +224,7 @@ class UECrowdinClient(CrowdinClient):
                 f'Revision: {file_data["data"]["revisionId"]} → '
                 f'{response["data"]["revisionId"]}'
             )
-            return True
+            return response['data']['id']
 
         self.warning(
             f'{file_name} ({file_id}) updated but revision number hasn\'t changed. '
@@ -233,7 +232,7 @@ class UECrowdinClient(CrowdinClient):
             f'{response["data"]["revisionId"]}'
         )
 
-        return True
+        return response['data']['id']
 
     def get_top_translators(self):
 
