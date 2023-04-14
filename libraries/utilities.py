@@ -26,7 +26,7 @@ def init_logging(logger):
         sys.stdout,
         format='<green>{time:HH:mm:ss}</green> '
         '<level>{level:1.1}</level> '
-        '<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> <level>{message}</level>',
+        '<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line:3d}</cyan> <level>{message}</level>',
         level='INFO',
     )
     logger.add(
