@@ -1,6 +1,7 @@
 import sys
 import argparse
 import subprocess as subp
+
 from libraries.utilities import init_logging
 
 missing_modules = False
@@ -121,7 +122,7 @@ def main():
         print('Tried to install required modules.')
         input('Press Enter to quit...')
         return
-    if missing_modules and not params['setup']:
+    if missing_modules and not params['setup'] and err:
         print(
             'Exception during module import. Try running locsync.py -setup '
             'to install the needed modules.\n'
@@ -208,6 +209,7 @@ def main():
         )
 
         skip_task = False
+        reason = '(This should not appear in the logs)'
 
         if 'unreal' in task and not config['parameters']['use-unreal']:
             skip_task = True
@@ -251,6 +253,8 @@ def main():
                 universal_newlines=True,
             ) as process:
                 while True:
+                    if not process.stdout:
+                        break
                     for line in process.stdout:
                         skip = False
                         for item in LOG_TO_SKIP:
