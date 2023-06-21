@@ -315,6 +315,9 @@ script-parameters:
     content_dir: '../'
     temp_dir: 'Localization/~Temp/Screenshots'
 
+  mt-pseudo:
+    project_id: 26
+
 #
 # -------------------------------------------------------------
 # ------------------------ TASK LISTS -------------------------
@@ -380,6 +383,7 @@ update-source:
 # Upload new source file from test/io locale to Crowdin
   - description: 'Upload the updated source file to Crowdin'
     script: update-source-files
+    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
 
 # end of upload-source
 
@@ -417,6 +421,7 @@ full-sync:
 
   - description: 'Upload the updated source file to Crowdin'
     script: update-source-files
+    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
 
   - description: 'Build the project on Crowdin and download all targets to Content/Localization'
     script: build-and-download
