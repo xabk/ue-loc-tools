@@ -137,8 +137,8 @@ class MTPseudo(LocTask):
                 )
 
         if len(targets_processed) == len(self.loc_targets):
-            logger.info(
-                f'SUCCESS: Targets processed ({len(targets_processed)}): {targets_processed}'
+            logger.success(
+                f'Targets processed ({len(targets_processed)}): {targets_processed}'
             )
             return targets_processed
 
@@ -170,12 +170,43 @@ class MTPseudo(LocTask):
                 )
 
         if len(targets_processed) == len(self.loc_targets):
-            logger.info(
-                f'SUCCESS: Targets processed ({len(targets_processed)}): {targets_processed}'
+            logger.success(
+                f'Targets processed ({len(targets_processed)}): {targets_processed}'
             )
             return targets_processed
 
         return targets_processed
+    
+    def add_or_update_files(self) -> dict[str, int]:
+        logger.info(f'Content path: {self._content_path}')
+
+        targets_processed = {}
+        self._crowdin.update_file_list_and_project_data()
+        files = {f['data']['name'].rpartition('.')[0]: f['data']['id'] for f in self._crowdin.file_list}
+
+        for target in self.loc_targets:
+            if target in files:
+                logger.info(f'Updating file for target: {target}')
+                r = self.update_source_file(target)
+            else:
+                logger.info(f'Adding file for target: {target}')
+                r = self.add_source_file(target)
+
+            if isinstance(r, int):
+                targets_processed[target] = r
+                logger.info(f'File for {target} updated.')
+            else:
+                logger.error(
+                    f'Something went wrong. Here\'s the last response from Crowdin: {r}'
+                )
+
+        if len(targets_processed) == len(self.loc_targets):
+            logger.success(
+                f'Targets processed ({len(targets_processed)}): {targets_processed}'
+            )
+            return targets_processed
+
+        return targets_processed                
 
     def pretranslate_file(self, file_id: int):
         response = self._crowdin.translations.apply_pre_translation(
@@ -223,8 +254,8 @@ class MTPseudo(LocTask):
                 )
 
         if len(files_processed) == len(files):
-            logger.info(
-                f'SUCCESS: Targets pretranslated ({len(files_processed)}): {files_processed}'
+            logger.success(
+                f'Targets pretranslated ({len(files_processed)}): {files_processed}'
             )
             return files_processed
 
@@ -292,8 +323,8 @@ class MTPseudo(LocTask):
                 )
 
         if len(files_processed) == len(files):
-            logger.info(
-                f'SUCCESS: Targets pretranslated ({len(files_processed)}): {files_processed}'
+            logger.success(
+                f'Targets pretranslated ({len(files_processed)}): {files_processed}'
             )
             return files_processed
 
@@ -369,6 +400,7 @@ class MTPseudo(LocTask):
             project_id=self.project_id,
             loc_targets=self.loc_targets,
             content_dir=self.content_dir,
+            temp_dir=self.temp_dir,
         )
         task.post_update()
         task.culture_mappings.update(self.languages)
@@ -546,6 +578,7 @@ class MTPseudo(LocTask):
                     file_path, encoding=self.po_encoding, wrapwidth=0
                 )
                 longest_dict = {e.msgctxt: e for e in longest_po}
+                cultures_processed.append(culture)
                 continue
 
             po_dict = {e.msgctxt: e for e in po}
@@ -640,8 +673,20 @@ class MTPseudo(LocTask):
 
         return path
 
-    def create_monster_target(self):
-        pass
+    def copy_longest_to_content(self):
+        task = dl_task.BuildAndDownloadTranslations(
+            token=self.token,
+            organization=self.organization,
+            project_id=self.project_id,
+            loc_targets=self.loc_targets,
+            content_dir=self.content_dir,
+            temp_dir=self.temp_dir + 'Longest_Pack',
+        )
+        task.post_update()
+        task.culture_mappings.update(self.languages)
+        print(task)
+
+        return task.process_loc_targets()
 
 
 def main():
@@ -658,13 +703,9 @@ def main():
 
     task.read_config(Path(__file__).name, logger)
 
-    files = task.add_source_files()
-
-    # files = task.update_source_files()
+    files = task.add_or_update_files()
 
     print(files)
-
-    # files = {'MTTest': 1318}
 
     task.pretranslate_files(files)
 
@@ -681,6 +722,8 @@ def main():
     task.create_longest_locale_for_targets()
 
     task.create_longest_locale_pack()
+    
+    task.copy_longest_to_content()
 
     elapsed = timer() - all_tasks_start
 
