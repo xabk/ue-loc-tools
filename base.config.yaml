@@ -316,8 +316,48 @@ script-parameters:
     temp_dir: 'Localization/~Temp/Screenshots'
 
   mt-pseudo:
-    project_id: 26
+    project_id: 37
+    loc_targets: [Game]
 
+    languages:
+      'fr': 'fr'
+      'it': 'it'
+      'de': 'de'
+      'es': 'es'
+      'zh-CN': 'zh-Hans'
+      'zh-TW': 'zh-Hant'
+      'ja': 'ja'
+      'ko': 'ko'
+      'pl': 'pl'
+      'pt-BR': 'pt-BR'
+      'ru': 'ru'
+      'tr': 'tr'
+
+    locales_to_skip: [io, vo, ia-001]
+
+    engine_id: 1
+
+    file_format: gettext_unreal
+
+    src_locale: io
+
+    longest_locale: en-AE
+
+    export_pattern: '/{target}/%locale%/{target}.po'
+
+    po_encoding: 'utf-8-sig'
+
+    prefix: '‹'
+    suffix: '›'
+
+    filler: '~'
+
+    var_regex: '{[^}]*}'
+    tags_regex: '<[^>]*>'
+
+    # TODO: Do I need this here? Or rather in smth from uetools lib?
+    content_dir: '../'
+    temp_dir: 'Localization/~Temp/MT+Pseudo/'
 #
 # -------------------------------------------------------------
 # ------------------------ TASK LISTS -------------------------
@@ -337,6 +377,24 @@ script-parameters:
 #   script-parameters: can contain any script specific parameters 
 #                      that will override the defaults above
 # All scripts use this config and crowdin.config.yaml for configuration.
+
+mt-test:
+  - description: 'Test MT pseudo localization'
+    script: mt-pseudo
+    script-parameters:
+      languages:
+        'fr': 'fr'
+        'it': 'it'
+        'de': 'de'
+        'es': 'es'
+        'zh-CN': 'zh-Hans'
+        'zh-TW': 'zh-Hant'
+        'ja': 'ja'
+        'ko': 'ko'
+        'pl': 'pl'
+        'pt-BR': 'pt-BR'
+        'ru': 'ru'
+        'tr': 'tr'
 
 no-source-upload:
 
