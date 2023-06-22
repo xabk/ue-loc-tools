@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from loguru import logger
 import re
 import os
+import shutil
 
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask
@@ -79,7 +80,6 @@ class UpdateSourceFile(LocTask):
                 continue
             new_po.append(entry)
 
-        self._temp_path.mkdir(parents=True, exist_ok=True)
         new_po.save(self._temp_path / fpath.name)
         return self._temp_path / fpath.name
 
@@ -89,6 +89,8 @@ class UpdateSourceFile(LocTask):
         )
 
         crowdin.update_file_list_and_project_data()
+
+        self._temp_path.mkdir(parents=True, exist_ok=True)
 
         logger.info(f'Content path: {self._content_path}')
 
@@ -106,12 +108,13 @@ class UpdateSourceFile(LocTask):
                     return False
             
             if self.manual_upload:
+                shutil.copy(fpath, self._temp_path / fpath.name)
                 targets_processed.append(target)
                 continue
             
             logger.info(f'Uploading file: {fpath}')
             r = crowdin.update_file(fpath)
-            if r == True:
+            if isinstance(r, int):
                 targets_processed.append(target)
                 logger.info('File updated.')
             else:
