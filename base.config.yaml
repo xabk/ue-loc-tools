@@ -358,6 +358,7 @@ script-parameters:
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: '../'
     temp_dir: 'Localization/~Temp/MT+Pseudo/'
+
 #
 # -------------------------------------------------------------
 # ------------------------ TASK LISTS -------------------------
