@@ -35,9 +35,10 @@ List of available scripts and parameters (coming later):
 - Check out the assets you're about to update from Perforce
 - Gather, export, import, compile text in Unreal using the UE command line executable
 - Generate source/debug ID locale with automated comments and sorting, generate 'hash' locale
-- Add source files to Crowdin project using predefined export settings.
-- Update existing source files in Crowdin project.
+- Add source files to Crowdin project using predefined export settings
+- Update existing source files in Crowdin project
 - Build, download, extract, and move translated files from Crowdin to UE Localization directory
 - Generate user contribution reports on Crowdin and save the data to CSV (to reimport the data table)
 - Generate translation status reports on Crowidn and save the data to CSV (to reimport the data table)
-- Reimport assets (e.g., data tables)
+- Reimport assets (e.g., data tables from CSVs)
+- Create "longest" locale with start and end markers, based on TM and MT, where English text is extended to match the length of the longest translation
