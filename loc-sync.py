@@ -2,6 +2,8 @@ import sys
 import argparse
 import subprocess as subp
 
+from libraries.utilities import init_logging
+
 missing_modules = False
 # Run with -setup to install required modules
 # (based on requirements.txt)
@@ -21,7 +23,17 @@ SECRET_CFG = 'crowdin.config.yaml'
 
 CFG_SECTIONS = ['crowdin', 'parameters', 'script-parameters']
 
+LOG_TO_SKIP = ['LogLinker: ']
+
+
 def read_config_files():
+    '''
+    Reads the base config file and the secret config file.
+    Returns a dict with the config data.
+
+    Always overwrites the base config with the secret config,
+    to discourage storing secrets in the base config file.
+    '''
     with open(BASE_CFG) as f:
         config = yaml.safe_load(f)
     with open(SECRET_CFG) as f:
@@ -91,8 +103,17 @@ def get_task_list_from_user(config):
                 print('Error. Please enter the task list name or its number.')
         if task_list:
             print(f'\nSelected taks list: {task_list}:')
+            update_warning = False
             for task in config[task_list]:
-                print(task)
+                if 'updates-source' in task:
+                    print('\033[93m', task, '\033[0m')
+                    update_warning = True
+                else:
+                    print(task)
+
+            if update_warning:
+                print('\n\033[93mWarning: This task list contains tasks that update the source files.\033[0m')
+                    
             conf = input(
                 f'\nEnter Y to execute task list {task_list}. '
                 'Anything else to go back to task list selection... '
@@ -110,7 +131,7 @@ def main():
         print('Tried to install required modules.')
         input('Press Enter to quit...')
         return
-    if missing_modules and not params['setup']:
+    if missing_modules and not params['setup'] and err:
         print(
             'Exception during module import. Try running locsync.py -setup '
             'to install the needed modules.\n'
@@ -120,14 +141,7 @@ def main():
         input('Press Enter to quit...')
         return
 
-    logger.add(
-        'logs/locsync.log',
-        rotation='10MB',
-        retention='1 month',
-        enqueue=True,
-        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
-    )
+    init_logging(logger)
 
     logger.opt(raw=True).info(
         '\n'
@@ -204,6 +218,7 @@ def main():
         )
 
         skip_task = False
+        reason = '(This should not appear in the logs)'
 
         if 'unreal' in task and not config['parameters']['use-unreal']:
             skip_task = True
@@ -247,7 +262,17 @@ def main():
                 universal_newlines=True,
             ) as process:
                 while True:
+                    if not process.stdout:
+                        break
                     for line in process.stdout:
+                        skip = False
+                        for item in LOG_TO_SKIP:
+                            if item in line:
+                                skip = True
+
+                        if skip:
+                            continue
+
                         if 'Error: ' in line:
                             logger.error(f'| UE | {line.strip()}')
                         elif 'Warning: ' in line:

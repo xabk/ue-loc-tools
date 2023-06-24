@@ -30,10 +30,13 @@ class ProcessTestAndHashLocales(LocTask):
     hash_locale: str = 'ia-001'
 
     # Hash locale parameters
+    hash_not_used_marker: str = 'NOT USED'  # If this is in comment, use not_used_prefix
+    hash_prefix_not_used: str = '? '  # Prefix for strings with `not_used` in comment
     hash_prefix: str = '# '  # Prefix for each string in hash locale
     hash_suffix: str = ' ~'  # Suffix for each string in hash locale
 
     clear_translations: bool = False  # Start over? E.g., if ID length changed
+    debug_prefix: str = '#'  # Prefix to use for debug ID, start over if changed
     id_length: int = 4  # Num of digits in ID (#0001), start over if changed
 
     encoding: str = 'utf-8-sig'  # PO file encoding
@@ -76,7 +79,7 @@ class ProcessTestAndHashLocales(LocTask):
     ind_regex: str = r'([\[\(])([^\]\)]+)([\]\)])'  # Anything in () or []
 
     # Regex pattern to match IDs
-    id_regex_pattern: str = r'#(\d{{{id_length}}})'
+    id_regex_pattern: str = r'{prefix}(\d{{{id_length}}})'
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
@@ -90,7 +93,9 @@ class ProcessTestAndHashLocales(LocTask):
 
     def post_update(self):
         super().post_update()
-        self._id_regex = self.id_regex_pattern.format(id_length=self.id_length)
+        self._id_regex = self.id_regex_pattern.format(
+            prefix=re.escape(self.debug_prefix), id_length=self.id_length
+        )
         self._content_path = Path(self.content_dir)
         if self.debug_ID_locale:
             self._debug_id_file = self._debug_id_file.format(
@@ -101,12 +106,15 @@ class ProcessTestAndHashLocales(LocTask):
                 target='{target}', locale=self.hash_locale
             )
 
-    @staticmethod
-    def id_gen(number: int, id_length: int) -> str:
+    def id_gen(self, number: int, id_length: int = None, prefix: str = None) -> str:
         '''
-        Generate fixed-width #12345 IDs (number to use, and ID width).
+        Generate fixed-width #12345 IDs (number to use, optional ID width and prefix).
         '''
-        return '#' + str(number).zfill(id_length)
+        if not id_length:
+            id_length = self.id_length
+        if not prefix:
+            prefix = self.debug_prefix
+        return prefix + str(number).zfill(id_length)
 
     @staticmethod
     def ind_repl(match: re.Match, width: int = 5) -> str:
@@ -255,7 +263,7 @@ class ProcessTestAndHashLocales(LocTask):
                 ]
 
                 # Generate and save the ID
-                entry.msgstr = self.id_gen(current_id, self.id_length)
+                entry.msgstr = self.id_gen(current_id)
 
                 # Add the variables back
                 if len(variables) > 0:
@@ -297,7 +305,9 @@ class ProcessTestAndHashLocales(LocTask):
 
             new_comments += self.get_additional_comments(entry)
 
-            entry.comment = '\n'.join(new_comments)
+            entry.comment = (
+                '\n'.join(new_comments).replace('\\n', '\n').replace('\\r', '')
+            )
 
             if self.delete_occurrences:
                 entry.occurrences = []
@@ -332,7 +342,12 @@ class ProcessTestAndHashLocales(LocTask):
         logger.info(f'Opened hash locale file: {po_file}')
 
         for entry in po:
-            entry.msgstr = self.hash_prefix + entry.msgid + self.hash_suffix
+            prefix = (
+                self.hash_prefix_not_used
+                if self.hash_not_used_marker in entry.comment
+                else self.hash_prefix
+            )
+            entry.msgstr = prefix + entry.msgid + self.hash_suffix
 
         po.save(po_file)
         logger.info(f'Saved target hash locale file: {po_file}')

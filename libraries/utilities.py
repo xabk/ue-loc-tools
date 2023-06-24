@@ -1,6 +1,7 @@
 # Holds utility functions used across scripts:
 # read and update configs, etc.
 
+import sys
 from pathlib import Path
 import yaml
 from dataclasses import asdict, dataclass, fields
@@ -17,6 +18,26 @@ DEF_PROJECT_PATH = Path('../../')
 DEF_ENGINE_ROOT = Path('../../../../')
 DEF_ENGINE_CMD = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/UE4Editor-cmd.exe'
 DEF_ENGINE_DIR = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/'
+
+
+def init_logging(logger):
+    logger.remove()
+    logger.add(
+        sys.stdout,
+        format='<green>{time:HH:mm:ss}</green> '
+        '<level>{level:1.1}</level> '
+        '<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line:3d}</cyan> <level>{message}</level>',
+        level='INFO',
+    )
+    logger.add(
+        'logs/locsync.log',
+        rotation='10MB',
+        retention='1 month',
+        enqueue=True,
+        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
+        level='INFO',
+        encoding='utf-8',
+    )
 
 
 @dataclass

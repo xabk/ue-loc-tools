@@ -98,12 +98,15 @@ script-parameters:
 
     loc_targets: ['Game']
 
-    hash_locale: ia-001  # Set to '' (empty) to disable hash locale generation
+    hash_locale: ia-001  # Set to '' (empty) to disable hash locale generation\
+    hash_locale: en-SG  # Set to '' (empty) to disable hash locale generation
+    hash_not_used_marker: 'NOT USED'  # If this is in comment, use not_used_prefix
     hash_prefix: '# '
     hash_suffix: ' ~'
     
     debug_ID_locale: io  # Set to '' (empty) to disable debug ID locale generation
     clear_translations: No
+    debug_prefix: '#' # Start over (clear_translations = True) if you change debug prefix
     id_length: 4  # Start over (clear_translations = True) if you change id length
     encoding: utf-8-sig
     sort_po: Yes
@@ -240,6 +243,9 @@ script-parameters:
     # This seems to be needed if the project and engine
     # are in completely separate directories
 
+    log_to_skip: ['LogLinker: ']
+    # Logs to skip (to avoid irrelevant spam)
+
     content_dir: '../'
     # project_dir: ''  # Will try to find it if empty
     # engine_dir: ''  # Will try to find it if empty
@@ -309,6 +315,50 @@ script-parameters:
     content_dir: '../'
     temp_dir: 'Localization/~Temp/Screenshots'
 
+  mt-pseudo:
+    project_id: 37
+    loc_targets: [Game]
+
+    languages:
+      'fr': 'fr'
+      'it': 'it'
+      'de': 'de'
+      'es': 'es'
+      'zh-CN': 'zh-Hans'
+      'zh-TW': 'zh-Hant'
+      'ja': 'ja'
+      'ko': 'ko'
+      'pl': 'pl'
+      'pt-BR': 'pt-BR'
+      'ru': 'ru'
+      'tr': 'tr'
+
+    locales_to_skip: [io, vo, ia-001]
+
+    engine_id: 1
+
+    file_format: gettext_unreal
+
+    src_locale: io
+
+    longest_locale: en-AE
+
+    export_pattern: '/{target}/%locale%/{target}.po'
+
+    po_encoding: 'utf-8-sig'
+
+    prefix: '‹'
+    suffix: '›'
+
+    filler: '~'
+
+    var_regex: '{[^}]*}'
+    tags_regex: '<[^>]*>'
+
+    # TODO: Do I need this here? Or rather in smth from uetools lib?
+    content_dir: '../'
+    temp_dir: 'Localization/~Temp/MT+Pseudo/'
+
 #
 # -------------------------------------------------------------
 # ------------------------ TASK LISTS -------------------------
@@ -328,6 +378,24 @@ script-parameters:
 #   script-parameters: can contain any script specific parameters 
 #                      that will override the defaults above
 # All scripts use this config and crowdin.config.yaml for configuration.
+
+mt-test:
+  - description: 'Test MT pseudo localization'
+    script: mt-pseudo
+    script-parameters:
+      languages:
+        'fr': 'fr'
+        'it': 'it'
+        'de': 'de'
+        'es': 'es'
+        'zh-CN': 'zh-Hans'
+        'zh-TW': 'zh-Hant'
+        'ja': 'ja'
+        'ko': 'ko'
+        'pl': 'pl'
+        'pt-BR': 'pt-BR'
+        'ru': 'ru'
+        'tr': 'tr'
 
 no-source-upload:
 
@@ -374,6 +442,7 @@ update-source:
 # Upload new source file from test/io locale to Crowdin
   - description: 'Upload the updated source file to Crowdin'
     script: update-source-files
+    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
 
 # end of upload-source
 
@@ -411,6 +480,7 @@ full-sync:
 
   - description: 'Upload the updated source file to Crowdin'
     script: update-source-files
+    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
 
   - description: 'Build the project on Crowdin and download all targets to Content/Localization'
     script: build-and-download

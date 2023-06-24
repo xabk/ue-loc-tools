@@ -1,10 +1,9 @@
 from dataclasses import dataclass
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from loguru import logger
 import re
 import requests
-from time import sleep
 
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask
