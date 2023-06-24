@@ -349,6 +349,8 @@ class MTPseudo(LocTask):
             if (i + 1) % 50 == 0:
                 logger.info('Approved 50 translations...')
 
+        return 0
+
     def approve_languages(self):
         languages = self._languages.keys()
         logger.info(f'Approving {len(languages)} languages...')
@@ -385,7 +387,7 @@ class MTPseudo(LocTask):
         )
         task.post_update()
         task.culture_mappings.update(self.languages)
-        print(task)
+        print(task) # Print to avoid logging tokens
 
         task.build_and_download()
 
@@ -404,7 +406,7 @@ class MTPseudo(LocTask):
         )
         task.post_update()
         task.culture_mappings.update(self.languages)
-        print(task)
+        print(task) # Print to avoid logging tokens
 
         return task.process_loc_targets()
 
@@ -711,7 +713,7 @@ def main():
 
     task.mt_files(files)
 
-    # task.approve_languages()
+    task.approve_languages()
 
     task.download_transalted_files()
 
