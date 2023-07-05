@@ -1,8 +1,10 @@
+import re
 from pathlib import Path
 from loguru import logger
-import re
-
+from configparser import ConfigParser
 from dataclasses import dataclass, field
+
+from libraries.utilities import init_logging
 
 
 @dataclass
@@ -537,7 +539,7 @@ class UELocTarget:
         return 0
 
 
-class UnrealProject:
+class UEProject:
     '''
     A class to find and store paths, localization targets,
     and other UE project information, and to manipulate
@@ -547,47 +549,388 @@ class UnrealProject:
     (the script using them should be launched from Unreal editor).
     '''
 
-    def __init__(script_path='Content/Python', uproject_path=None, engine_path=None):
-        '''
-        Parameters
-        ----------
-        script_path : str
-            Script location, absolute or relative to the project directory.
+    version: int = None
 
-        uproject_path : str
-            Project directory path, absolute or relative to the script path.
-            If set to None, the script will try to find the uproject file.
-            See :meth:`UnrealProject.find_uproject`
+    project_path: Path = None
+    engine_path: Path = None
+    script_path: Path = None
 
-        engine_path : str
-            Project directory path, absolute or relative to the script path.
-            If set to None, the script will try to find the engine.
-            See :meth:`UnrealProject.find_engine`
-        '''
+    content_path: Path = None
+
+    config_path: Path = None
+    default_editor_ini_path: Path = None
+
+    localization_path: Path = None
+    localization_config_path: Path = None
+
+    cmd_binary_path: Path = None
+
+    p4_settings: list[dict[str, str]] = []
+
+    loc_targets: dict[str, UELocTarget] = []
+
+    _supported_versions: list[int] = [4, 5]
+
+    _content_dir_name: str = 'Content'
+    _localization_dir_name: str = 'Localization'
+
+    _config_dir_name: str = 'Config'
+    _localization_config_dir_name: str = 'Localization'
+
+    _default_editor_ini_name: str = 'DefaultEditor.ini'
+    _loc_target_regex: str = r'^\+GameTargetsSettings=\(Name="([^"]+)",Guid=.*$'
+
+    _p4_config: dict[int, str] = {
+        4: 'Saved/Config/Windows/SourceControlSettings.ini',
+        5: 'Saved/Config/WindowsEditor/SourceControlSettings.ini',
+    }
+    _p4_config_section: str = 'PerforceSourceControl.PerforceSourceControlSettings'
+    _p4_config_values: dict[str, str] = {
+        'port': 'Port',
+        'user': 'UserName',
+        'client': 'Workspace',
+    }
+
+    _cmd_binary: dict[int, str] = {
+        4: 'Binaries/Win64/UE4Editor-cmd.exe',
+        5: 'Binaries/Win64/UnrealEditor-Cmd.exe',
+    }
+
+    def __init__(
+        self,
+        ue_major_version: int = None,
+        project_path: str or Path = None,  # Absolute/relative to _script_ path
+        script_path: str or Path = None,  # Absolute/relative to project
+        engine_path: str or Path = None,  # Absolute/relative to project
+    ):
+        init_logging(logger)
+
+        # Project path
+        if not project_path:
+            logger.info(
+                'No project path specified. '
+                'Assuming current working directory is Content/Python '
+                'and trying to find the project path...'
+            )
+            project_path = self._find_project_path()
+
+        self.project_path = Path(project_path)
+        if not self.project_path.exists():
+            logger.error(f'Project path {self.project_path} does not exist. Aborting.')
+            raise ValueError(f'Project path {self.project_path} does not exist.')
+
+        if not self.project_path.is_absolute():
+            logger.info(
+                f'Project path {self.project_path} is relative. '
+                'Assuming it\'s relative to the current working directory '
+                '(should be Content/Python):\n'
+                f'{Path.cwd()}'
+            )
+            self.project_path = self.project_path.resolve()
+
+        self.project_path = self.project_path.resolve().absolute()
+
+        logger.success(f'Project path resolved to: {self.project_path}')
+
+        # Engine path
+        if not engine_path:
+            logger.info(
+                'No engine root specified. '
+                'Trying to find it based on the project path...'
+            )
+            self.engine_path = self._find_engine()
+        else:
+            self.engine_path = Path(engine_path)
+            if not self.engine_path.is_absolute():
+                logger.info(
+                    f'Engine root {self.engine_path} is relative.'
+                    'Assuming it\'s relative to project path.'
+                )
+                self.engine_path = (self.project_path / self.engine_path).resolve()
+
+        if not self.engine_path.exists() or not self.engine_path.is_dir():
+            logger.error(
+                f'Engine root {self.engine_path} '
+                'does not exist or is not a directory. Aborting.'
+            )
+            raise ValueError(
+                f'Engine root {self.engine_path} '
+                'does not exist or is not a directory.'
+            )
+
+        self.engine_path = self.engine_path.resolve().absolute()
+
+        logger.success(f'Engine root resolved to:  {self.engine_path}')
+
+        # Script path
+        if not script_path:
+            self.script_path = self._find_script_path()
+        else:
+            self.script_path = Path(script_path)
+            if not self.script_path.is_absolute():
+                self.script_path = (self.project_path / self.script_path).resolve()
+
+        if not self.script_path.exists() or not self.script_path.is_dir():
+            logger.error(
+                f'Script path {self.script_path} '
+                'does not exist or is not a directory. Aborting.'
+            )
+            raise ValueError(
+                f'Script path {self.script_path} '
+                'does not exist or is not a directory.'
+            )
+
+        self.script_path = self.script_path.resolve().absolute()
+
+        # Content path
+        self.content_path = self.project_path / self._content_dir_name
+        if not self.content_path.exists() or not self.content_path.is_dir():
+            logger.error(
+                f'Content path {self.content_path} '
+                'does not exist or is not a directory. Aborting.'
+            )
+            raise ValueError(
+                f'Content path {self.content_path} '
+                'does not exist or is not a directory.'
+            )
+
+        self.content_path = self.content_path.resolve().absolute()
+
+        # Config path
+        self.config_path = self.project_path / self._config_dir_name
+        if not self.config_path.exists() or not self.config_path.is_dir():
+            logger.error(
+                f'Config path {self.config_path} '
+                'does not exist or is not a directory. Aborting.'
+            )
+            raise ValueError(
+                f'Config path {self.config_path} '
+                'does not exist or is not a directory.'
+            )
+
+        self.config_path = self.config_path.resolve().absolute()
+
+        # DefaultEditor.ini path
+        self.default_editor_ini_path = self.config_path / self._default_editor_ini_name
+        if (
+            not self.default_editor_ini_path.exists()
+            or not self.default_editor_ini_path.is_file()
+        ):
+            logger.error(
+                f'DefaultEditor.ini path {self.default_editor_ini_path} '
+                'does not exist or is not a file. Aborting.'
+            )
+            raise ValueError(
+                f'DefaultEditor.ini path {self.default_editor_ini_path} '
+                'does not exist.'
+            )
+
+        self.default_editor_ini_path = self.default_editor_ini_path.resolve().absolute()
+
+        # Localization path
+        self.localization_path = self.content_path / self._localization_dir_name
+        if not self.localization_path.exists() or not self.localization_path.is_dir():
+            logger.error(
+                f'Localization path {self.localization_path} '
+                'does not exist or is not a directory. Aborting.'
+            )
+            raise ValueError(
+                f'Localization path {self.localization_path} '
+                'does not exist or is not a directory.'
+            )
+
+        self.localization_path = self.localization_path.resolve().absolute()
+
+        # Localization config path
+        self.localization_config_path = (
+            self.config_path / self._localization_config_dir_name
+        )
+        if (
+            not self.localization_config_path.exists()
+            or not self.localization_config_path.is_dir()
+        ):
+            logger.error(
+                f'Localization config path {self.localization_config_path} '
+                'does not exist or is not a directory. Aborting.'
+            )
+            raise ValueError(
+                f'Localization config path {self.localization_config_path} '
+                'does not exist or is not a directory.'
+            )
+
+        self.localization_config_path = (
+            self.localization_config_path.resolve().absolute()
+        )
+
+        # UE CMD binary path
+        if not ue_major_version:
+            for version in self._supported_versions:
+                self.cmd_binary_path = self.engine_path / self._cmd_binary[version]
+                if self.cmd_binary_path.exists() and self.cmd_binary_path.is_file():
+                    ue_major_version = version
+                    logger.info(f'Version detected as {ue_major_version}')
+                    break
+
+        elif (
+            type(ue_major_version) is not int
+            or ue_major_version not in self._supported_versions
+        ):
+            logger.error(
+                f'Unsupported major UE version: {ue_major_version}. '
+                f'Supported major versions: {self._supported_versions}. '
+                'Aborting.'
+            )
+            raise ValueError(
+                f'Unsupported major UE version: {ue_major_version}. '
+                f'Supported major versions: {self._supported_versions}.'
+            )
+
+        if self._cmd_binary.get(ue_major_version, None) is None:
+            logger.error(
+                f'No CMD binary path specified for UE version {ue_major_version}. '
+                'Aborting.'
+            )
+            raise ValueError(
+                f'No CMD binary path specified for UE version {ue_major_version}.'
+            )
+
+        self.cmd_binary_path = self.engine_path / self._cmd_binary[ue_major_version]
+        if not self.cmd_binary_path.exists() or not self.cmd_binary_path.is_file():
+            logger.error(
+                f'CMD binary path {self.cmd_binary_path} '
+                'does not exist or is not a file. Aborting.'
+            )
+            raise ValueError(
+                f'CMD binary path {self.cmd_binary_path} '
+                'does not exist or is not a file.'
+            )
+
+        self.cmd_binary_path = self.cmd_binary_path.resolve().absolute()
+
+        # P4 config path and configuration
+        if self._p4_config.get(ue_major_version, None) is None:
+            logger.error(
+                f'No P4 config path specified for UE version {ue_major_version}. '
+                'Aborting.'
+            )
+            raise ValueError(
+                f'No P4 config path specified for UE version {ue_major_version}.'
+            )
+
+        p4_config = self.project_path / self._p4_config[ue_major_version]
+        if not p4_config.exists() or not p4_config.is_file():
+            logger.error(
+                f'P4 config path {p4_config} '
+                'does not exist or is not a file. '
+                'Maybe you haven\'t configured P4 in Unreal Editor? '
+                'Aborting.'
+            )
+            raise ValueError(
+                f'P4 config path {p4_config} '
+                'does not exist or is not a file. '
+                'Check source control settings in Unreal Editor.'
+            )
+
+        p4_config = p4_config.resolve().absolute()
+
+        self.p4_settings = self._load_p4_settings(p4_config)
+
+        # Localization targets
+        self.loc_targets = self._find_loc_targets()
+
+    def _find_script_path(self):
+        print('Looking for the script path... Kind of :)')
+        return Path.cwd()
+
+    def _find_project_path(self):
+        print('Looking for the project path... Kind of :)')
+        return Path.cwd() / '../../'
+
+    def _find_engine(self):
+        print('Looking for the engine... Kind of :)')
+        return self.project_path / '../../Engine'
+
+    def _load_p4_settings(self, p4_config_path: Path):
+        cfg = ConfigParser()
+
+        config: dict[str, str] = {}
+
+        try:
+            cfg.read(p4_config_path)
+        except Exception as err:
+            logger.error(f'Error reading P4 config file: {err}')
+            logger.error(f'Check the file: {p4_config_path}')
+            logger.error('P4 config not loaded.')
+            return None
+
+        for p4name, cfg_name in self._p4_config_values.items():
+            try:
+                config[p4name] = cfg[self._p4_config_section][cfg_name]
+            except Exception as err:
+                logger.error(
+                    f'Error reading section: {self._p4_config_section} / {cfg_name}'
+                )
+                logger.error(f'Error reading P4 config: {err}')
+                logger.error(f'Check the file: {p4_config_path}')
+                logger.error('P4 config not loaded.')
+                return None
+
+        return config
+
+    def update_p4_settings(self):
+        p4_config = self.project_path / self._p4_config[self.version]
+        if not p4_config.exists() or not p4_config.is_file():
+            logger.error(
+                f'P4 config path {p4_config} '
+                'does not exist or is not a file. '
+                'Maybe you haven\'t configured P4 in Unreal Editor? '
+                'Aborting.'
+            )
+            raise ValueError(
+                f'P4 config path {p4_config} '
+                'does not exist or is not a file. '
+                'Check source control settings in Unreal Editor.'
+            )
+
+        p4_config = p4_config.resolve().absolute()
+
+        self.p4_settings = self._load_p4_settings(p4_config)
+
+    def _find_loc_targets(self):
+        targets: dict[str, UELocTarget] = {}
+
+        with open(self.default_editor_ini_path, 'r') as f:
+            strings = f.readlines()
+
+        for s in strings:
+            if not s.startswith('+GameTargetsSettings='):
+                continue
+
+            match = re.search(self._loc_target_regex, s)
+            if not match:
+                continue
+
+            name = match.group(1)
+            targets[name] = UELocTarget(name, self)
+
+        return targets
+
+    def update_loc_targets(self):
+        self.loc_targets = self._find_loc_targets()
+
+    def check_loc_targets(self):
+        # TODO: Check if the ini files exist and match, folders exist, etc.
         pass
 
-    def find_uproject():
+    # TODO: Does this belong to UELocTarget?
+    def patch_manifest_dependencies(self):
         pass
 
-    def find_engine():
-        pass
 
-    def find_loc_targets():
-        pass
+if __name__ == '__main__':
+    project = UEProject(
+        ue_major_version=4,
+    )
 
-    def get_p4_settings():
-        pass
-
-    def patch_manifest_dependencies():
-        pass
-
-    project_path = ''
-    project_file = ''
-
-    content_path = ''
-
-    engine_root = ''
-
-    ue_cmd_file = ''
-
-    loc_targets = []
+    print(project.loc_targets.keys())
+    print(project.cmd_binary_path)

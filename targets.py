@@ -5,7 +5,7 @@ from loguru import logger
 from dataclasses import dataclass, field
 
 from libraries.utilities import LocTask
-from libraries.uetools import UELocTarget
+from libraries.uetools import UELocTarget, UEProject, init_logging
 
 # Run loc target-related actions. Reads config from base.config.yaml and command line.
 #    Examples: targets.py replace source=Game target=Audio
@@ -45,7 +45,10 @@ class LocaleTask(LocTask):
     locales: list[str] = None
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
-    project_dir: str = '../../'
+    project_dir: str = None  # Absolute or relative to cwd
+    engine_dir: str = None  # Absolute or relative to project_dir
+
+    _ue_project: UEProject = None
 
     _source_target: UELocTarget = None
     _loc_targets: list[UELocTarget] = None
@@ -59,24 +62,18 @@ class LocaleTask(LocTask):
     def post_update(self) -> bool:
         super().post_update()
 
-        if self.project_dir:
-            self._project_path = Path(self.project_dir).resolve()
-        else:
-            self._project_path = Path(__file__).parent.parent.parent.resolve()
+        self._ue_project = UEProject(
+            project_path=self.project_dir, engine_path=self.engine_dir
+        )
 
-        if not (
-            (self._project_path / 'Content').exists()
-            and (self._project_path / 'Config').exists()
-        ):
-            logger.error(
-                f'{self._project_path} doesn\'t '
-                'look like an Unreal project directory'
-            )
+        logger.info(f'Project path: {self._ue_project.project_path}.')
 
-        logger.info(f'Project path: {self._project_path}.')
+        logger.info(f'Available targets: {self._ue_project.loc_targets.keys()}.')
 
         if self.source_target is not None:
-            self._source_target = UELocTarget(self._project_path, self.source_target)
+            self._source_target = UELocTarget(
+                self._ue_project.project_path, self.source_target
+            )
             logger.info(f'Source target: {self.source_target}.')
         else:
             logger.info(f'No source target specified.')
@@ -86,7 +83,8 @@ class LocaleTask(LocTask):
 
         if type(self.loc_targets) is list and len(self.loc_targets) > 0:
             self._loc_targets = [
-                UELocTarget(self._project_path, target) for target in self.loc_targets
+                UELocTarget(self._ue_project.project_path, target)
+                for target in self.loc_targets
             ]
             logger.info(f'Loc targets to modify: {self.loc_targets}.')
         else:
@@ -144,11 +142,18 @@ class RenameLocales(LocaleTask):
         return self._perform_tasks('rename', UELocTarget.rename_locale.__name__)
 
 
+@dataclass
+class ListTargets(LocaleTask):
+    def run(self):
+        return 0
+
+
 LOC_TARGET_ACTIONS = {
     'add': AddLocales,
     'replace': ReplaceLocales,
     'delete': DeleteLocales,
     'rename': RenameLocales,
+    'list': ListTargets,
 }
 
 
@@ -196,11 +201,14 @@ def parse_arguments():
         help='Locales to add/replace/delete, a space-separated list of locale names',
     )
 
-    args, unknown = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
     if args.action is None or args.action not in LOC_TARGET_ACTIONS:
         logger.error('Argument error: action not supported')
         return None
+
+    if args.action == 'list':
+        return args
 
     if args.targets is None or type(args.targets) is not list or len(args.targets) == 0:
         print(type(args.targets))
@@ -250,15 +258,7 @@ def parse_arguments():
 
 
 def main():
-
-    logger.add(
-        'logs/locsync.log',
-        rotation='10MB',
-        retention='1 month',
-        enqueue=True,
-        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
-    )
+    init_logging(logger)
 
     logger.info('')
     logger.info('--- Unreal gather text commandlet script ---')
