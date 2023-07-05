@@ -112,8 +112,10 @@ def get_task_list_from_user(config):
                     print(task)
 
             if update_warning:
-                print('\n\033[93mWarning: This task list contains tasks that update the source files.\033[0m')
-                    
+                print(
+                    '\n\033[93mWarning: This task list contains tasks that update the source files.\033[0m'
+                )
+
             conf = input(
                 f'\nEnter Y to execute task list {task_list}. '
                 'Anything else to go back to task list selection... '
