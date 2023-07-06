@@ -925,12 +925,3 @@ class UEProject:
     # TODO: Does this belong to UELocTarget?
     def patch_manifest_dependencies(self):
         pass
-
-
-if __name__ == '__main__':
-    project = UEProject(
-        ue_major_version=4,
-    )
-
-    print(project.loc_targets.keys())
-    print(project.cmd_binary_path)
