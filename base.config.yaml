@@ -14,12 +14,12 @@
 # Never publish or share your API token or crowdin.config.yaml!
 #
 crowdin:
-  organization: ''
+  organization: ""
   # Set to your organization name if the project is on enterprise account.
   # Leave this empty, if the project is on crowdin.com.
 
   # token:      API TOKEN YOU GENERATE ON CROWDIN
-  # You can't set it here, you can only set it in crowdin.config.yaml, 
+  # You can't set it here, you can only set it in crowdin.config.yaml,
   # which you should keep secret.
   #
   # -----------------------------------------------------------
@@ -49,77 +49,72 @@ parameters:
   # You can also specify additional files for checkout in script settings below.
   # UE editor P4 settings are used (Saved/Config/Windows/SourceControlSettings.ini)
 
-  p4-checkin: False  # TODO: implement this
+  p4-checkin: False # TODO: implement this
   # Should we check in the files back to p4?
 
-  p4-cl-desc: |  # TODO: check out the files into a separate CL with this description
+  p4-cl-desc:
+    | # TODO: check out the files into a separate CL with this description
     * Imported latest translations from Crowdin
     * Updated language completion rates in the language selection menu
     * Updated community translators in credits
     * Updated the source file on Crowdin
   # Default CL descripiton to use for check-outs and check-ins
-
-  engine_dir: '../../' # Relative to project path
+  engine_dir: "../../" # Relative to project path
 
 # -------------------------------------------------------------
 # ----- SCRIPT PARAMETERS: SET DEFAULTS FOR SCRIPTS HERE ------
 # -------------------------------------------------------------
 script-parameters:
-
   # Add source files from several loc targets to Crowdin,
   # with specified type and proper export pattern
   # (to simplify built translations processing)
   add-source-files:
-  
-    loc_targets: ['Game']
+    loc_targets: ["Game"]
 
-    file_format: 'auto'  # ...or 'gettext-unreal' (when the full support is there)
+    file_format: "auto" # ...or 'gettext-unreal' (when the full support is there)
 
     src_locale: io
-    # It's a good idea to use the debug ID locale for this 
-    # because it's sorted, features debug IDs, automated comments, 
+    # It's a good idea to use the debug ID locale for this
+    # because it's sorted, features debug IDs, automated comments,
     # repetition markers, and asset names in context
     # (see test-lang script settings below)
 
-    export_pattern: '/{target}/%locale%/{target}.po'
-    # Script will substitute the {target} key, 
+    export_pattern: "/{target}/%locale%/{target}.po"
+    # Script will substitute the {target} key,
     # %keys% are part of Crowdin export settings,
     # see https://support.crowdin.com/files-management/#file-export
     # Also see how to add custom locale codes to match those in Unreal:
     # https://support.crowdin.com/advanced-project-setup/#adding-custom-language-codes
 
-    content_dir: '../'
+    content_dir: "../"
 
-
-  # Create source locale (sorted, with debug IDs in context, with comments), 
+  # Create source locale (sorted, with debug IDs in context, with comments),
   # which also serves as debug ID locale (simple unique debug IDs for all strings).
   # And creating a Hash locale (basic pseudo-localization) if needed.
   test-lang:
+    loc_targets: ["Game"]
 
-    loc_targets: ['Game']
+    hash_locale: ia-001 # Set to '' (empty) to disable hash locale generation\
+    hash_not_used_marker: "NOT USED" # If this is in comment, use not_used_prefix
+    hash_prefix: "# "
+    hash_suffix: " ~"
 
-    hash_locale: ia-001  # Set to '' (empty) to disable hash locale generation\
-    hash_locale: en-SG  # Set to '' (empty) to disable hash locale generation
-    hash_not_used_marker: 'NOT USED'  # If this is in comment, use not_used_prefix
-    hash_prefix: '# '
-    hash_suffix: ' ~'
-    
-    debug_ID_locale: io  # Set to '' (empty) to disable debug ID locale generation
+    debug_ID_locale: io # Set to '' (empty) to disable debug ID locale generation
     clear_translations: No
-    debug_prefix: '#' # Start over (clear_translations = True) if you change debug prefix
-    id_length: 4  # Start over (clear_translations = True) if you change id length
+    debug_prefix: "#" # Start over (clear_translations = True) if you change debug prefix
+    id_length: 4 # Start over (clear_translations = True) if you change id length
     encoding: utf-8-sig
     sort_po: Yes
-    var_regex: '{[^}\[<]+}|<[^/>]+/>'  # Looking for {variables} and <empty tags ... />
+    var_regex: '{[^}\[<]+}|<[^/>]+/>' # Looking for {variables} and <empty tags ... />
     comments_criteria:
-    # Ths will add comments based on criteria (e.g., to explain a feature or syntax)
-    # Format is as follows:
-#     - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
-#       - 'RegEx' = regex to use for checking
-#       - |-
-#         "Multiline comment that requires explicit \n for new lines"
-#         "This comment will be added if `RegEx` is found in the PO entry `field`"
-      - - 'msgid'  # Hint for lines with Unreal inline plurals
+      # Ths will add comments based on criteria (e.g., to explain a feature or syntax)
+      # Format is as follows:
+      #     - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
+      #       - 'RegEx' = regex to use for checking
+      #       - |-
+      #         "Multiline comment that requires explicit \n for new lines"
+      #         "This comment will be added if `RegEx` is found in the PO entry `field`"
+      - - "msgid" # Hint for lines with Unreal inline plurals
         - '}\|plural\('
         - |-
           Please adapt to your language plural rules. We only support keywords: 
@@ -130,87 +125,85 @@ script-parameters:
           Check what keywords stand for here: 
           http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html.
 
-      - - 'msgctxt'  # Example: Hint for abbreviated items, matched by namespace
-        - 'AbbreviatedDisplayName,'
+      - - "msgctxt" # Example: Hint for abbreviated items, matched by namespace
+        - "AbbreviatedDisplayName,"
         - |-
           Abbreviation slot fits 10 i's: iiiiIiiiiI. E.g.,:\n
           iiiiIiiiiI\nSilica (fits)\nСталь (doesn't fit)
 
-      - - 'msgid'  # Example: Hint for lines with 'Zoop' in source (Satisfactory)
+      - - "msgid" # Example: Hint for lines with 'Zoop' in source (Satisfactory)
         - '\b[Zz]oop'
         - |-
           Please keep this one as is or transliterate/change spelling only. 
           Don't come up with funny names: it brings more harm than good.
 
     delete_comments_criteria: [
-      '^Key:.*$',  # Delete 'Key: NNN' comments: we have them in msgctxt
-      'InfoMetaData:\t".*?" : "\s*"' # Empty InfoMetaData fields
-    ]
+        "^Key:.*$", # Delete 'Key: NNN' comments: we have them in msgctxt
+        'InfoMetaData:\t".*?" : "\s*"', # Empty InfoMetaData fields
+      ]
     delete_occurrences: Yes # Delete occurences: we have them in SourceLocation comments
 
-    content_dir: '../'
+    content_dir: "../"
 
   # Build the translation project on Crowdin, download it, unpack,
   # move to the Unreal Localization directory to make it ready for import.
   # Warning: This will overwrite any existing POs in Unreal Localization directory.
   build-and-download:
-
-    loc_targets: ['Game']  # Localization targets, empty = process all targets
+    loc_targets: ["Game"] # Localization targets, empty = process all targets
 
     # Relative to Content directory
-    zip_name: 'Localization/~Temp/LocFilesTemp.zip'
-    temp_dir: 'Localization/~Temp/LocFilesTemp'
-    dest_dir: 'Localization/{target}/'
+    zip_name: "Localization/~Temp/LocFilesTemp.zip"
+    temp_dir: "Localization/~Temp/LocFilesTemp"
+    dest_dir: "Localization/{target}/"
 
-    locales_to_delete: ['en-US-POSIX']
+    locales_to_delete: ["en-US-POSIX"]
 
-    content_dir: '../'
+    content_dir: "../"
 
   # Get top members from Crowdin and update the community credits CSV file,
   # making it ready to be reimported into the data table asset in Unreal
   community-credits:
-
-    csv_name: 'FactoryGame/Interface/UI/DT_Credits_Community.csv'
+    csv_name: "FactoryGame/Interface/UI/DT_Credits_Community.csv"
     # Relative to Content directory
 
-    csv_encoding: 'utf-16-le'
+    csv_encoding: "utf-16-le"
 
     translation_threshold: 2000
     review_threshold: 2000
 
-    users_to_exclude: [ ]  # ['logins', 'you', 'want', 'to', 'exclude']
+    users_to_exclude: [] # ['logins', 'you', 'want', 'to', 'exclude']
 
-    content_dir: '../'
+    content_dir: "../"
 
   # Get completion rates from Crowdin and update the language list CSV file,
   # ready to be reimported into the data table asset in Unreal
   completion-rates:
+    loc_targets: ["Game"] # Localization targets, empty = process all targets
 
-    loc_targets: ['Game']  # Localization targets, empty = process all targets
-
-    cultures_to_skip: ['en-US-POSIX', 'io']
+    cultures_to_skip: ["en-US-POSIX", "io"]
     # Locales to skip (native, debug, hash, etc.)
 
     # Relative to Content directory
-    csv_name: 'Localization/DT_OptionsMenuLanguages.csv'
-    
-    csv_encoding: 'utf-16-le'
+    csv_name: "Localization/DT_OptionsMenuLanguages.csv"
 
-    content_dir: '../'
-    
+    csv_encoding: "utf-16-le"
+
+    content_dir: "../"
+
   # Check out Localization directory and any other assets from p4 server
   p4-checkout:
-    loc_targets: ['Game']  # Localization targets, empty = process all targets
+    loc_targets: ["Game"] # Localization targets, empty = process all targets
 
-    add_assets_to_checkout: [
-      'FactoryGame/Interface/UI/DT_Credits_Community.csv',
-      'FactoryGame/Interface/UI/DT_Credits_Community.uasset',
+    add_assets_to_checkout:
+      [
+        "FactoryGame/Interface/UI/DT_Credits_Community.csv",
+        "FactoryGame/Interface/UI/DT_Credits_Community.uasset",
       ]
-    
-    config_name: '../Saved/Config/Windows/SourceControlSettings.ini'
-    p4_config_section: 'PerforceSourceControl.PerforceSourceControlSettings'
 
-    content_dir: '../'
+    config_name: "../Saved/Config/Windows/SourceControlSettings.ini"
+    p4_config_section: "PerforceSourceControl.PerforceSourceControlSettings"
+
+    content_dir: "../"
 
   # Warning: For now this script only supports one config here, not in task lists.
   # Warning: The ue-reimport-assets section is very sensitive to formatting
@@ -219,20 +212,20 @@ script-parameters:
   # "AssetType'/Game/GameName/Path/To/Asset/Asset_Name.Asset_Name'",
   # don't add any comments and don't change any other lines in this section.
   ue-reimport-assets: # Don't change this line
-    assets_to_reimport: [ # Don't change this line, add assets one per line below
-      "DataTable'/Game/FactoryGame/Interface/UI/DT_Credits_Community.DT_Credits_Community'",
-      "DataTable'/Game/Localization/DT_OptionsMenuLanguages.DT_OptionsMenuLanguages'"
+    assets_to_reimport: # Don't change this line, add assets one per line below
+      [
+        "DataTable'/Game/FactoryGame/Interface/UI/DT_Credits_Community.DT_Credits_Community'",
+        "DataTable'/Game/Localization/DT_OptionsMenuLanguages.DT_OptionsMenuLanguages'",
       ] # Don't change this line
 
   # Run the Unreal gather text commandlet for any number of loc targets
   # with any number of ini files as parameters
   # Set the defaults here, and specify ini files (steps) in task lists
   ue-loc-gather-cmd:
-
-    loc_targets: ['Game']  # Localization targets, empty = process all targets
+    loc_targets: ["Game"] # Localization targets, empty = process all targets
 
     # Relative to Game/Content directory
-    tasks_to_perform: [ ]
+    tasks_to_perform: []
     # Steps to perform. Config/Localization .ini file suffixes:
     # Gather, Export, Import, Сompile, GenerateReports, etc.
     # Specify this in task lists to run specific tasks.
@@ -243,17 +236,16 @@ script-parameters:
     # This seems to be needed if the project and engine
     # are in completely separate directories
 
-    log_to_skip: ['LogLinker: ']
+    log_to_skip: ["LogLinker: "]
     # Logs to skip (to avoid irrelevant spam)
 
-    content_dir: '../'
+    content_dir: "../"
     # project_dir: ''  # Will try to find it if empty
     # engine_dir: ''  # Will try to find it if empty
 
   # Update source files for several loc targets on Crowdin
   update-source-files:
-
-    loc_targets: ['Game']  # Localization targets, empty = process all targets
+    loc_targets: ["Game"] # Localization targets, empty = process all targets
 
     # Set this to Yes if you'd like to update the files manually
     # E.g., to decide which translations to keep and which ones to drop
@@ -272,19 +264,19 @@ script-parameters:
 
     encoding: utf-8-sig
 
-    content_dir: '../'
-    temp_dir: 'Localization/~Temp/FilesToUpload'
+    content_dir: "../"
+    temp_dir: "Localization/~Temp/FilesToUpload"
 
     delete_criteria:
-    # This will delete any entries that match any of the criteria before uploading
-    # Format is as follows:
-#     - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
-#       - 'RegEx' = regex to use for checking
-      - - 'comment'  # Based on source location
-        - 'SourceLocation:	/Any/Path/You/Want/'
+      # This will delete any entries that match any of the criteria before uploading
+      # Format is as follows:
+      #     - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
+      #       - 'RegEx' = regex to use for checking
+      - - "comment" # Based on source location
+        - "SourceLocation:	/Any/Path/You/Want/"
 
-      - - 'msgctxt'  # Based on context (namespace,key)
-        - 'some_namespace,some_key_pattern_you_want_to_delete'
+      - - "msgctxt" # Based on context (namespace,key)
+        - "some_namespace,some_key_pattern_you_want_to_delete"
 
   # Import screens from links in strings context
   # Defaults:
@@ -294,44 +286,43 @@ script-parameters:
   # - Google doesn't like scripts downloading things, so you might have to
   #   download screens in a few tries using VPNs...
   import-screens:
-
     # Link filter for Croql
     # (part of the link common to all screenshots
     # used to fetch strings with screenshot links from Crowdin)
-    link_croql_filter: 'https://drive.google.com/file/d/'
-    
+    link_croql_filter: "https://drive.google.com/file/d/"
+
     # Link regex to extract link from comment
     # Group 0 will be used as link
     # Group 1 will be used as filename on Crowdin
     # and as {name} to create a download link if dl_link is set
-    link_regex: '(https://drive.google.com/file/d/([^/]+)/view)'
+    link_regex: "(https://drive.google.com/file/d/([^/]+)/view)"
 
     # If set, it will be formatted with {name} and used to download the file
-    dl_link: 'https://drive.google.com/uc?id={name}&export=download'
+    dl_link: "https://drive.google.com/uc?id={name}&export=download"
 
     # Default file extension
-    def_ext: '.png'
+    def_ext: ".png"
 
-    content_dir: '../'
-    temp_dir: 'Localization/~Temp/Screenshots'
+    content_dir: "../"
+    temp_dir: "Localization/~Temp/Screenshots"
 
   mt-pseudo:
     project_id: 37
     loc_targets: [Game]
 
     languages:
-      'fr': 'fr'
-      'it': 'it'
-      'de': 'de'
-      'es': 'es'
-      'zh-CN': 'zh-Hans'
-      'zh-TW': 'zh-Hant'
-      'ja': 'ja'
-      'ko': 'ko'
-      'pl': 'pl'
-      'pt-BR': 'pt-BR'
-      'ru': 'ru'
-      'tr': 'tr'
+      "fr": "fr"
+      "it": "it"
+      "de": "de"
+      "es": "es"
+      "zh-CN": "zh-Hans"
+      "zh-TW": "zh-Hant"
+      "ja": "ja"
+      "ko": "ko"
+      "pl": "pl"
+      "pt-BR": "pt-BR"
+      "ru": "ru"
+      "tr": "tr"
 
     locales_to_skip: [io, vo, ia-001]
 
@@ -343,21 +334,21 @@ script-parameters:
 
     longest_locale: en-AE
 
-    export_pattern: '/{target}/%locale%/{target}.po'
+    export_pattern: "/{target}/%locale%/{target}.po"
 
-    po_encoding: 'utf-8-sig'
+    po_encoding: "utf-8-sig"
 
-    prefix: '‹'
-    suffix: '›'
+    prefix: "‹"
+    suffix: "›"
 
-    filler: '~'
+    filler: "~"
 
-    var_regex: '{[^}]*}'
-    tags_regex: '<[^>]*>'
+    var_regex: "{[^}]*}"
+    tags_regex: "<[^>]*>"
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
-    content_dir: '../'
-    temp_dir: 'Localization/~Temp/MT+Pseudo/'
+    content_dir: "../"
+    temp_dir: "Localization/~Temp/MT+Pseudo/"
 
 #
 # -------------------------------------------------------------
@@ -368,124 +359,123 @@ script-parameters:
 # You can add as many task lists as you like.
 # Launch them by running 'locsync.py scenario_name'
 # A list of tasks, each task is a few of key-value pairs like this:
-#   description: required, this will be printed as the task is performed, 
+#   description: required, this will be printed as the task is performed,
 #                and in the summary
 #   script: 'script_filename', required, relative path to the script file
-#   unreal: optional, True/False, 
+#   unreal: optional, True/False,
 #           flags if this script has to be launched via unreal-cmd.exe
-#   p4-checkout/p4-checkin: optional, True/False, 
+#   p4-checkout/p4-checkin: optional, True/False,
 #                           flags if the script is checks out assets or checks them in
-#   script-parameters: can contain any script specific parameters 
+#   script-parameters: can contain any script specific parameters
 #                      that will override the defaults above
 # All scripts use this config and crowdin.config.yaml for configuration.
 
 mt-test:
-  - description: 'Test MT pseudo localization'
+  - description: "Test MT pseudo localization"
     script: mt-pseudo
     script-parameters:
       languages:
-        'fr': 'fr'
-        'it': 'it'
-        'de': 'de'
-        'es': 'es'
-        'zh-CN': 'zh-Hans'
-        'zh-TW': 'zh-Hant'
-        'ja': 'ja'
-        'ko': 'ko'
-        'pl': 'pl'
-        'pt-BR': 'pt-BR'
-        'ru': 'ru'
-        'tr': 'tr'
+        "fr": "fr"
+        "it": "it"
+        "de": "de"
+        "es": "es"
+        "zh-CN": "zh-Hans"
+        "zh-TW": "zh-Hant"
+        "ja": "ja"
+        "ko": "ko"
+        "pl": "pl"
+        "pt-BR": "pt-BR"
+        "ru": "ru"
+        "tr": "tr"
 
 no-source-upload:
+  # Enable p4-checkout to let this work or check out Localization folder
+  # and other assets manually
+  #  - description: 'Checkout Localization folder and community credits files'
+  #    script: p4-checkout
+  #    p4-checkout: True
 
-# Enable p4-checkout to let this work or check out Localization folder 
-# and other assets manually
-#  - description: 'Checkout Localization folder and community credits files'
-#    script: p4-checkout
-#    p4-checkout: True
-
-  - description: 'Gather the text in UE for all targets and export all locales'
+  - description: "Gather the text in UE for all targets and export all locales"
     script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Gather, Export]
 
-  - description: 'Generate hash and test/source locale with comments and debug IDs'
+  - description: "Generate hash and test/source locale with comments and debug IDs"
     script: test-lang
-#   script-parameters:
-#     hash_locale: '' # Disable hash locale generation
+  #   script-parameters:
+  #     hash_locale: '' # Disable hash locale generation
 
-#  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
-#    script: completion-rates
+  #  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
+  #    script: completion-rates
 
-#  - description: 'Pull top members from Crowdin, save the data to a CSV file'
-#    script: community-credits
+  #  - description: 'Pull top members from Crowdin, save the data to a CSV file'
+  #    script: community-credits
 
-#  - description: 'Reimport language list and community credits datatables from CSVs'
-#    script: ue-reimport-assets
-#    unreal: True
+  #  - description: 'Reimport language list and community credits datatables from CSVs'
+  #    script: ue-reimport-assets
+  #    unreal: True
 
-#  - description: 'Upload the updated source file to Crowdin'
-#    script: update-source-files
+  #  - description: 'Upload the updated source file to Crowdin'
+  #    script: update-source-files
 
-  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
+  - description: "Build the project on Crowdin and download all targets to Content/Localization"
     script: build-and-download
 
-  - description: 'Import and compile all targets in UE'
+  - description: "Import and compile all targets in UE"
     script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Import, Compile, GenerateReports]
-  
+
 # end of default
 
 update-source:
-# Upload new source file from test/io locale to Crowdin
-  - description: 'Upload the updated source file to Crowdin'
+  # Upload new source file from test/io locale to Crowdin
+  - description: "Upload the updated source file to Crowdin"
     script: update-source-files
     updates-source: Yes # Marker to warn the user that it updates the source file in CAT
 
 # end of upload-source
 
 add-source:
-  - description: 'Upload the updated source file to Crowdin'
+  - description: "Upload the updated source file to Crowdin"
     script: add-source-files
 
 # end of add source files
 
 full-sync:
-#  - description: 'Checkout Localization folder and community credits files'
-#    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-#    script: p4-checkout
-#    p4-checkout: True
+  #  - description: 'Checkout Localization folder and community credits files'
+  #    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+  #    script: p4-checkout
+  #    p4-checkout: True
 
-  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+  - description: "Gather the text in UE for all targets and export the source/test locale draft"
     script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Gather, Export]
 
-  - description: 'Generate test from draft and source locale with comments and debug IDs'
+  - description: "Generate test from draft and source locale with comments and debug IDs"
     script: test-lang
-#   script-parameters:
-#     hash_locale: '' # Disable hash locale generation
+  #   script-parameters:
+  #     hash_locale: '' # Disable hash locale generation
 
-#  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
-#    script: completion-rates
+  #  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
+  #    script: completion-rates
 
-#  - description: 'Pull top members from Crowdin, save the data to a CSV file'
-#    script: community-credits
+  #  - description: 'Pull top members from Crowdin, save the data to a CSV file'
+  #    script: community-credits
 
-#  - description: 'Reimport language list and community credits datatables from CSVs'
-#    script: ue-reimport-assets
-#    unreal: True
+  #  - description: 'Reimport language list and community credits datatables from CSVs'
+  #    script: ue-reimport-assets
+  #    unreal: True
 
-  - description: 'Upload the updated source file to Crowdin'
+  - description: "Upload the updated source file to Crowdin"
     script: update-source-files
     updates-source: Yes # Marker to warn the user that it updates the source file in CAT
 
-  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
+  - description: "Build the project on Crowdin and download all targets to Content/Localization"
     script: build-and-download
 
-  - description: 'Import and compile all targets in UE'
+  - description: "Import and compile all targets in UE"
     script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Import, Compile, GenerateReports]
@@ -493,31 +483,31 @@ full-sync:
 # end of full-sync
 
 recreate-test-language:
-  - description: 'Generate hash and test/source locale with comments and debug IDs'
+  - description: "Generate hash and test/source locale with comments and debug IDs"
     script: test-lang
     script-parameters:
-      hash_locale: '' # Disable hash locale generation
+      hash_locale: "" # Disable hash locale generation
       clear_translations: Yes
 
 # end of recreate-test-language
 
 local-gather-test-import:
-  - description: 'Checkout Localization folder and community credits files'
+  - description: "Checkout Localization folder and community credits files"
     # Enable p4-checkout to let this work or check out Localization folder and other assets manually
     script: p4-checkout
     p4-checkout: True
 
-  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+  - description: "Gather the text in UE for all targets and export the source/test locale draft"
     script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Gather, Export]
 
-  - description: 'Generate test from draft and source locale with comments and debug IDs'
+  - description: "Generate test from draft and source locale with comments and debug IDs"
     script: test-lang
     script-parameters:
-      hash_locale: '' # Disable hash locale generation
+      hash_locale: "" # Disable hash locale generation
 
-  - description: 'Import and compile all targets in UE'
+  - description: "Import and compile all targets in UE"
     script: ue-loc-gather-cmd-2
     script-parameters:
       tasks: [Import, Compile, GenerateReports]
@@ -525,35 +515,32 @@ local-gather-test-import:
 # end of local-gather-test-import
 
 gather-and-update-source-only:
-  - description: 'Checkout Localization folder and community credits files'
+  - description: "Checkout Localization folder and community credits files"
     # Enable p4-checkout to let this work or check out Localization folder and other assets manually
     script: p4-checkout
     p4-checkout: True
 
-  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+  - description: "Gather the text in UE for all targets and export the source/test locale draft"
     script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Gather, Export]
 
-  - description: 'Generate test from draft and source locale with comments and debug IDs'
+  - description: "Generate test from draft and source locale with comments and debug IDs"
     script: test-lang
     script-parameters:
-      hash_locale: '' # Disable hash locale generation
+      hash_locale: "" # Disable hash locale generation
 
-#  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
-#    script: completion-rates
+  #  - description: 'Pull language completion rates from Crowdin, save them to a CSV file'
+  #    script: completion-rates
 
-#  - description: 'Pull top members from Crowdin, save the data to a CSV file'
-#    script: community-credits
+  #  - description: 'Pull top members from Crowdin, save the data to a CSV file'
+  #    script: community-credits
 
-#  - description: 'Reimport language list and community credits datatables from CSVs'
-#    script: ue-reimport-assets
-#    unreal: True
+  #  - description: 'Reimport language list and community credits datatables from CSVs'
+  #    script: ue-reimport-assets
+  #    unreal: True
 
-  - description: 'Upload the updated source file to Crowdin'
+  - description: "Upload the updated source file to Crowdin"
     script: update-source-files
-
 # end of gather-and-update-source-only
 
-
-...

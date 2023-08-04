@@ -18,6 +18,7 @@ try:
 except Exception as err:
     missing_modules = True
 
+
 BASE_CFG = 'base.config.yaml'
 SECRET_CFG = 'crowdin.config.yaml'
 
@@ -112,8 +113,10 @@ def get_task_list_from_user(config):
                     print(task)
 
             if update_warning:
-                print('\n\033[93mWarning: This task list contains tasks that update the source files.\033[0m')
-                    
+                print(
+                    '\n\033[93mWarning: This task list contains tasks that update the source files.\033[0m'
+                )
+
             conf = input(
                 f'\nEnter Y to execute task list {task_list}. '
                 'Anything else to go back to task list selection... '
@@ -131,7 +134,7 @@ def main():
         print('Tried to install required modules.')
         input('Press Enter to quit...')
         return
-    if missing_modules and not params['setup'] and err:
+    if missing_modules and not params['setup']:
         print(
             'Exception during module import. Try running locsync.py -setup '
             'to install the needed modules.\n'
@@ -154,6 +157,10 @@ def main():
 
     if params['task-list'] is None and not params['unattended']:
         logger.info('Interactive: getting task list from user in console.')
+        logger.info(
+            f'Crowdin organization: {config["crowdin"]["organization"]}. '
+            f'Project: {config["crowdin"]["project_id"]}.'
+        )
         params['task-list'] = get_task_list_from_user(config)
 
     if not params['task-list']:
@@ -279,7 +286,7 @@ def main():
                             logger.warning(f'| UE | {line.strip()}')
                         else:
                             logger.info(f'| UE | {line.strip()}')
-                    if process.poll() != None:
+                    if process.poll() is not None:
                         break
                 returncode = process.returncode
         else:
@@ -306,7 +313,12 @@ def main():
     logger.info('\n---\nTasks performed:')
     for task in tasks_done:
         logger.info(f'- {task[0]["description"]}:')
-        logger.info(f'  {task[0]["script"]}: {task[1]} ({task[2]})')
+        if task[2] == 'Return code: 0':
+            logger.success(f'  Success! {task[0]["script"]}: {task[1]}')
+        else:
+            logger.warning(
+                f'  Something went wrong! {task[0]["script"]}: {task[1]} ({task[2]})'
+            )
     logger.info(f'Total execution time: {elapsed:.2f} sec.')
 
     logger.info('--- Loc Sync Script End ---')
