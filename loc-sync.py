@@ -4,7 +4,7 @@ import subprocess as subp
 
 from libraries.utilities import init_logging
 
-missing_modules = False
+err = None
 # Run with -setup to install required modules
 # (based on requirements.txt)
 # (generated with pipreqs .)
@@ -15,8 +15,8 @@ try:
     from timeit import default_timer as timer
     import re
     from loguru import logger
-except Exception as err:
-    missing_modules = True
+except Exception as error:
+    err = error
 
 
 BASE_CFG = 'base.config.yaml'
@@ -27,7 +27,7 @@ CFG_SECTIONS = ['crowdin', 'parameters', 'script-parameters']
 LOG_TO_SKIP = ['LogLinker: ']
 
 
-def read_config_files():
+def read_config_files(base_cfg=BASE_CFG, secret_cfg=SECRET_CFG):
     '''
     Reads the base config file and the secret config file.
     Returns a dict with the config data.
@@ -35,9 +35,11 @@ def read_config_files():
     Always overwrites the base config with the secret config,
     to discourage storing secrets in the base config file.
     '''
-    with open(BASE_CFG) as f:
+    if not secret_cfg:
+        secret_cfg = SECRET_CFG
+    with open(base_cfg) as f:
         config = yaml.safe_load(f)
-    with open(SECRET_CFG) as f:
+    with open(secret_cfg) as f:
         crowdin_cfg = yaml.safe_load(f)
 
     config['crowdin']['api-token'] = ''
@@ -65,17 +67,27 @@ def parse_arguments():
 
     parser.add_argument(
         '-u',
-        '-unattended',
+        '--unattended',
         dest='unattended',
         action='store_true',
-        help='Use -unattended to run the script without any input from the user',
+        help='Use to run the script without any input from the user',
     )
 
     parser.add_argument(
         '-setup',
         dest='setup',
         action='store_true',
-        help='Use -setup to install required packages',
+        help='Use to install required packages',
+    )
+
+    parser.add_argument(
+        '-c',
+        '-config',
+        dest='config',
+        type=str,
+        nargs='?',
+        help='Use -config to specify a secret config file to use instead '
+        'of crowdin.config.yaml',
     )
 
     parameters = {}
@@ -83,6 +95,7 @@ def parse_arguments():
     parameters['task-list'] = parser.parse_args().tasklist
     parameters['unattended'] = parser.parse_args().unattended
     parameters['setup'] = parser.parse_args().setup
+    parameters['secret'] = parser.parse_args().config
 
     return parameters
 
@@ -100,7 +113,7 @@ def get_task_list_from_user(config):
         else:
             try:
                 task_list = task_lists[int(name_or_num) - 1]
-            except:
+            except ValueError:
                 print('Error. Please enter the task list name or its number.')
         if task_list:
             print(f'\nSelected taks list: {task_list}:')
@@ -114,7 +127,8 @@ def get_task_list_from_user(config):
 
             if update_warning:
                 print(
-                    '\n\033[93mWarning: This task list contains tasks that update the source files.\033[0m'
+                    '\n\033[93mWarning: This task list contains tasks '
+                    'that update the source files.\033[0m'
                 )
 
             conf = input(
@@ -134,7 +148,7 @@ def main():
         print('Tried to install required modules.')
         input('Press Enter to quit...')
         return
-    if missing_modules and not params['setup']:
+    if err is not None and not params['setup']:
         print(
             'Exception during module import. Try running locsync.py -setup '
             'to install the needed modules.\n'
@@ -153,7 +167,7 @@ def main():
         '==========================================\n'
     )
 
-    config = read_config_files()
+    config = read_config_files(secret_cfg=params['secret'])
 
     if params['task-list'] is None and not params['unattended']:
         logger.info('Interactive: getting task list from user in console.')
@@ -276,6 +290,7 @@ def main():
                         for item in LOG_TO_SKIP:
                             if item in line:
                                 skip = True
+                                break
 
                         if skip:
                             continue
