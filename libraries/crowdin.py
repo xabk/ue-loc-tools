@@ -1,5 +1,5 @@
 from crowdin_api import CrowdinClient
-from time import sleep
+from time import sleep, time
 import urllib.request
 import json
 import re
@@ -42,17 +42,17 @@ class UECrowdinClient(CrowdinClient):
     def info(self, message: str, *args, **kwargs):
         if self.silent:
             return
-        print('INFO     | ', message, args, kwargs)
+        print('I | ', message, args, kwargs)
 
     def warning(self, message: str, *args, **kwargs):
         if self.silent:
             return
-        print('WARNING  | ', message, args, kwargs)
+        print('W | ', message, args, kwargs)
 
     def error(self, message: str, *args, **kwargs):
         if self.silent:
             return
-        print('ERROR    | ', message, *args, kwargs)
+        print('E | ', message, *args, kwargs)
 
     def get_file_ID(self, file_name='Game.po') -> int:
         if not self.file_list:
@@ -68,7 +68,6 @@ class UECrowdinClient(CrowdinClient):
         return None
 
     def update_file_list_and_project_data(self):
-
         self.file_list = self.source_files.list_files(self.project_id).get('data', None)
 
         self.data['project_data'] = self.projects.get_project(self.project_id).get(
@@ -100,7 +99,7 @@ class UECrowdinClient(CrowdinClient):
             return self.translations.build_crowdin_project_translation(self.project_id)[
                 'data'
             ]
-        if not 'id' in build_data:
+        if 'id' not in build_data:
             self.error(f'No build ID in build data. Build data:\n{build_data}')
             return None
 
@@ -169,7 +168,7 @@ class UECrowdinClient(CrowdinClient):
                 exportOptions={'exportPattern': export_pattern},
             )
 
-        if not 'data' in response:
+        if 'data' not in response:
             self.error(f'No data in response. Response:\n{response}')
             return response
 
@@ -188,7 +187,7 @@ class UECrowdinClient(CrowdinClient):
 
         file_data = self.source_files.get_file(self.project_id, file_id)
 
-        if not 'revisionId' in file_data['data']:
+        if 'revisionId' not in file_data['data']:
             self.error(
                 f'No revision ID for {file_name} ({file_id}) found. File data:\n',
                 file_data,
@@ -212,7 +211,7 @@ class UECrowdinClient(CrowdinClient):
             self.project_id, file_id, storage['data']['id']
         )
 
-        if not 'data' in response or not 'revisionId' in response['data']:
+        if 'data' not in response or 'revisionId' not in response['data']:
             self.error(
                 f'No data or revision ID in updated file data. Response:\n{response}'
             )
@@ -235,7 +234,6 @@ class UECrowdinClient(CrowdinClient):
         return response['data']['id']
 
     def get_top_translators(self):
-
         self.update_file_list_and_project_data()
 
         language_ids = self.data['project_data']['targetLanguageIds']
@@ -244,74 +242,61 @@ class UECrowdinClient(CrowdinClient):
         # TODO: make this a parameter instead of hardcoded EN locale
         reports.pop('en', None)
 
-        reports_count = 0
-
         self.info('Creating per-language reports on Crowdin...')
 
         for report in reports:
-
             reports[report] = {}
 
-            reports[report]['report_id'] = self.reports.generate_top_members_report(
+            self.info(f'Creating report for language: {report}')
+
+            resp = self.reports.generate_top_members_report(
                 self.project_id, languageId=report, format='json'
-            )['data']['identifier']
-            reports_count += 1
+            )
 
-        self.info(
-            f'Reports created: {str(reports_count)}. Pulling statuses and downloading...'
-        )
+            if 'data' not in resp:
+                self.error(f'No data in report generation response. Response: {resp}')
+                return resp
 
-        reports_count = 0
+            reports[report]['report_id'] = resp['data']['identifier']
 
-        while reports_count < len(reports):
-            for report in reports:
-                if 'data' in reports[report]:
-                    continue
+            last_poll = time()
+            report_status = ''
+            while report_status != 'finished':
+                # check if last poll was more than a minute ago
+                if (time() - last_poll) > 29:
+                    self.info(f'Checking report status... Language: {report}')
+                    last_poll = time()
 
                 report_status = self.reports.check_report_generation_status(
                     self.project_id, reports[report]['report_id']
-                )['data']
+                )['data']['status']
 
-                if report_status['status'] != 'finished':
-                    continue
+                sleep(10)
 
-                reports_count += 1
+            self.info(f'Report for language {report} ready. Downloading...')
 
-                self.info(f'Report ready. Downloading... Language: {report}')
-
-                with urllib.request.urlopen(
-                    self.reports.download_report(
-                        self.project_id, reports[report]['report_id']
-                    )['data']['url']
-                ) as data:
-                    rep = json.loads(data.read().decode())
-                    self.info(
-                        f'Downloaded report for culture: {rep["language"]["name"]}'
-                    )
-                    reports[report]['language_id'] = 'CreditsLang' + re.sub(
-                        r'[^\w]', '', rep['language']['name']
-                    )
-                    reports[report]['language_name'] = re.sub(
-                        r',', '', re.sub(r', (.*)$', r' (\1)', rep['language']['name'])
-                    )
-                    if 'data' in rep:
-                        reports[report]['data'] = rep['data']
-                    else:
-                        reports[report]['data'] = None
-                        self.warning(
-                            f'*** No data for culture: {rep["language"]["name"]}'
-                        )
-
-            if reports_count < len(reports):
-                self.info(
-                    f'Waiting for more reports to be ready... {len(reports) - reports_count}'
+            with urllib.request.urlopen(
+                self.reports.download_report(
+                    self.project_id, reports[report]['report_id']
+                )['data']['url']
+            ) as data:
+                rep = json.loads(data.read().decode())
+                self.info(f'Downloaded report for culture: {rep["language"]["name"]}')
+                reports[report]['language_id'] = 'CreditsLang' + re.sub(
+                    r'[^\w]', '', rep['language']['name']
                 )
-                sleep(5)
+                reports[report]['language_name'] = re.sub(
+                    r',', '', re.sub(r', (.*)$', r' (\1)', rep['language']['name'])
+                )
+                if 'data' in rep:
+                    reports[report]['data'] = rep['data']
+                else:
+                    reports[report]['data'] = None
+                    self.warning(f'*** No data for culture: {rep["language"]["name"]}')
 
         return reports
 
     def get_completion_rates(self, filename='Game.po'):
-
         if not self.data:
             self.update_file_list_and_project_data()
 

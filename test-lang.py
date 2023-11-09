@@ -2,11 +2,13 @@ import re
 from loguru import logger
 from pathlib import Path
 from dataclasses import dataclass, field
+import csv
 
 from libraries import (
     polib,  # Modified polib: _POFileParser.handle_oc only splits references by ', '
 )
 from libraries.utilities import LocTask
+
 
 # -------------------------------------------------------------------------------------
 # Defaults - These can be edited, only used if not overridden in configs
@@ -23,6 +25,9 @@ class ProcessTestAndHashLocales(LocTask):
     loc_targets: list = field(
         default_factory=lambda: ['Game']
     )  # Localization targets, empty = process all targets
+
+    # Localization targets from which to load string table references
+    string_table_refs_targets: list = None
 
     # Debug ID/test locale is also a good source locale:
     # it's sorted, with debug IDs, repetition markers, asset names, and comments
@@ -90,6 +95,9 @@ class ProcessTestAndHashLocales(LocTask):
     # PO files, relative to Content directory
     _debug_id_file = 'Localization/{target}/{locale}/{target}.po'
     _hash_file = 'Localization/{target}/{locale}/{target}.po'
+    # String table refs, relative to Content directory
+    _source_ref_file = 'Localization/{target}/StringTableReferences.csv'
+    _string_table_refs: dict[str:list[str]] = None
 
     def post_update(self):
         super().post_update()
@@ -105,6 +113,8 @@ class ProcessTestAndHashLocales(LocTask):
             self._hash_file = self._hash_file.format(
                 target='{target}', locale=self.hash_locale
             )
+        if not self.string_table_refs_targets:
+            self.string_table_refs_targets = self.loc_targets
 
     def id_gen(self, number: int, id_length: int = None, prefix: str = None) -> str:
         '''
@@ -139,6 +149,59 @@ class ProcessTestAndHashLocales(LocTask):
             if re.match(expr, comment):
                 return True
         return False
+    
+    def load_string_table_refs_for_target(self, target: str) -> dict[str:list[str]]:
+        '''
+        Load string table references from CSV file for a single target
+        
+        Return a dict of StrTableName,Key : List of all references'''
+
+        f_path = self._content_path / self._source_ref_file.format(target=target)
+        if not f_path.exists():
+            return {}
+        
+        with open(f_path, mode='r', encoding='utf-8') as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=',')
+            next(csv_reader)
+            string_table_refs = {}
+            for row in csv_reader:
+                (table_path, _, key) = row[0].rpartition(',')
+                table_name = table_path.rpartition('/')[2]
+                table_namespace = table_name.rpartition('.')[2]
+                identity = f'{table_namespace},{key}'
+                if identity not in string_table_refs:
+                    string_table_refs[identity] = [row[1]]
+                else:
+                    string_table_refs[identity].append(row[1])
+        
+        return string_table_refs
+
+    def load_string_table_refs(self) -> dict[str:str]:
+        '''
+        Load string table references from CSV files for all targets
+
+        Return a dict of StrTableName,Key : String with all references, one per line
+        '''
+        
+        for target in self.string_table_refs_targets:
+            if not self._string_table_refs:
+                self._string_table_refs = self.load_string_table_refs_for_target(target)
+                continue
+
+            for key, value in self.load_string_table_refs_for_target(target).items():
+                if key not in self._string_table_refs:
+                    self._string_table_refs[key] = value
+                else:
+                    self._string_table_refs[key].extend(value)
+                    self._string_table_refs[key] = list(set(self._string_table_refs[key]))
+
+
+    def get_references_for_key(self, key: str) -> list[str]:
+        '''
+        Get all references for a key from a string tables
+        '''
+        return self._string_table_refs.get(key, [])
+
 
     def find_max_ID(self) -> int:
         '''
@@ -273,9 +336,12 @@ class ProcessTestAndHashLocales(LocTask):
 
             debug_ID = 'Debug ID:\t' + entry.msgstr
 
-            asset_name = re.search(
-                r'[^.]*(\.cpp|\.h)?', entry.occurrences[0][0].rpartition('/')[2]
-            )
+            asset_name = ''
+
+            if entry.occurrences:
+                asset_name = re.search(
+                    r'[^.]*(\.cpp|\.h)?', entry.occurrences[0][0].rpartition('/')[2]
+                )
 
             if asset_name:
                 asset_name = asset_name[0]
@@ -304,6 +370,12 @@ class ProcessTestAndHashLocales(LocTask):
                 new_comments.append(debug_ID)
 
             new_comments += self.get_additional_comments(entry)
+
+            usage_references = self.get_references_for_key(entry.msgctxt)
+
+            if usage_references:
+                new_comments += ['Used in:']
+                new_comments += usage_references
 
             entry.comment = (
                 '\n'.join(new_comments).replace('\\n', '\n').replace('\\r', '')
@@ -355,8 +427,15 @@ class ProcessTestAndHashLocales(LocTask):
         return True
 
     def process_locales(self):
-
         logger.info(f'Content path: {Path(self._content_path).absolute()}')
+
+        logger.info(f'Loading string table references for targets: {self.loc_targets}')
+
+        self.load_string_table_refs()
+
+        logger.info('String table references loaded: '
+                    f'{sum([len(r) for r in self._string_table_refs.values()])} '
+                    f'for {len(self._string_table_refs)} entries')
 
         starting_id = 1
         if not self.clear_translations and self.debug_ID_locale:
