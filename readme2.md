@@ -34,7 +34,9 @@ See other installation options: https://crowdin.github.io/crowdin-cli/installati
 
 # Usage
 
-`uv run loc-sync.py` or `!loc-sync.bat` will launch the script and present you with the list of tasks. It also accepts task names as command-line parameters.
+`uv run loc-sync.py` or `!loc-sync.bat` will launch the script and present you with the list of tasks. It also accepts task names as command-line parameters for automation.
+
+Note that _uv_ should take care of everything automatically, from Python to all the required packages.
 
 ## Updating the files on Crowdin: automatic vs manual
 
@@ -62,6 +64,5 @@ When the script pauses and tells you to update the files:
 3. Hint: Open Perforce and see which files in `Content/Localization/~Temp/#Sources/CSVs/` have been modified: you can upload only these files to Crowdin. <details><summary>Perforce screenshot</summary>![image](https://github.com/user-attachments/assets/e3589b6c-0719-4f46-a135-44518386132a)</details>
 4. Drag and drop the files, one by one, to their respective folders on Crowdin:
    - Keep translations for minor typo fixes only. <details><summary>Crowdin typo screenshot</summary>...Couldn't find an example during the last update...</details>
-   - _Do not keep translations_ for meaningful changes, changes in variables, and even formatting changes that need to be reflected in translation, which includes adding or removing full stops, adding or removing spacing, etc. <details><summary>Crowdin drop translations screenshot</summary>![image](https://github.com/user-attachments/assets/8b9c3100-6a11-4ce5-90fa-f350162d60e1)
-</details>
+   - _Do not keep translations_ for meaningful changes, changes in variables, and even formatting changes that need to be reflected in translation, which includes adding or removing full stops, adding or removing spacing, etc. <details><summary>Crowdin drop translations screenshot</summary>!image](https://github.com/user-attachments/assets/8b9c3100-6a11-4ce5-90fa-f350162d60e1)</details>
 5. Revert unchanged files and submit at least the `#Sources` folder to keep track of what we upload to Crowdin. That enables the hint under #3 to save time.
