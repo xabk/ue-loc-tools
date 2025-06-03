@@ -34,7 +34,9 @@ See other installation options: https://crowdin.github.io/crowdin-cli/installati
 
 # Usage
 
-`uv run loc-sync.py` or `!loc-sync.bat` will launch the script and present you with the list of tasks. It also accepts task names as command-line parameters for automation.
+`uv run loc-sync.py` or `!loc-sync.bat` will launch the script and present you with the list of tasks.
+
+It also accepts task names as command-line parameters for automation, for example, `uv run loc-sync.py "[X, ALL] #5 Import Translations"`.
 
 Note that _uv_ should take care of everything automatically, from Python to all the required packages.
 
@@ -45,19 +47,18 @@ There are two ways of updating the files on Crowdin.
 One is automatic, where a script just updates all the files for you and drops any translations for existing strings if the source has changed, even if it was just a minor typo fix. 
 This is the default method, since it's faster and easier.
 
-Another one is manual, where the script preps the files for you and opens the folder with the files, and then you have to update them manually one by one. 
+The other is manual, where the script preps the files for you and opens the folder with the files, and then you have to update them manually one by one. 
 This gives you a chance to see the diffs for each file and preserve some translations. 
 This is a nice option if you know you've been fixing a lot of minor typos in the repo but not on Crowdin, and you don't want to lose translations because of that.
 
 ### Updating the files automatically
 
-`!all-targets.bat` will ask you if you want to import translations and if you want to update the files. If you say `Yes` to updating the files, it will update them automatically.
+`!all-targets.bat` will ask you if you want to import translations and if you want to update the files. 
+If you say `Yes` to updating the files, it will update them automatically.
 
 ### Updating the files manually
 
-`!all-targets-manual.bat` will ask you if you want to import translations, and it will prepare the files for you to update manually.
-
-When the script pauses and tells you to update the files:
+Use `!all-targets-manual.bat`. When the script pauses and tells you to update the files:
 
 1. Open the Files section on Crowdin: https://csp.crowdin.com/u/projects/87/files.
 2. Open the folder with the files to upload: `Content/Localization/~Temp/#Sources/CSVs/`. The script should open it for you.
@@ -73,3 +74,7 @@ If something goes wrong during the update, e.g., if you spot a lot of dropped/ad
 
 ![image](https://github.com/user-attachments/assets/87ee8fd9-5053-4948-9239-d5fbc26b599c)
 
+### Importing translations from Crowdin
+
+Use either `!all-targets.bat` or `!all-targets-manual.bat`: both will ask you if you want to import translations, 
+and if you answer `Yes`, they'll compile and download translations from Crowdin, then import and compile them in Unreal.
