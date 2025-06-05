@@ -74,7 +74,18 @@ If something goes wrong during the update, e.g., if you spot a lot of dropped/ad
 
 ![image](https://github.com/user-attachments/assets/87ee8fd9-5053-4948-9239-d5fbc26b599c)
 
-### Importing translations from Crowdin
+## Importing translations from Crowdin
 
 Use either `!all-targets.bat` or `!all-targets-manual.bat`: both will ask you if you want to import translations, 
 and if you answer `Yes`, they'll compile and download translations from Crowdin, then import and compile them in Unreal.
+
+# Ordering Loc
+
+1. Sync the files up to Crowdin.
+2. Open All Strings in one of the languages (say, Japanese).
+3. Filter for Untranslated strings.
+4. Label the new strings, following the pattern: `TASK-Batch-NN`, e.g., `TASK-Batch-15`. Check the last batch number in `#loc-announce`.
+5. Optional: Create tasks based on this label. Create pending proofreading tasks, filter by label, and _do not exclude_ strings that are part of other tasks.
+6. Optional: If Tasks have been created, run `tasks.py` to assign them to the primary team members.
+7. Check the volume under Reports → Cost Estimate. Use the Volume Estimate template. Filter either via any of the newly created Tasks, or by Label.
+8. Post in `#loc-announce`. Title, some intro/task description, Scope (label, tasks, if created), Volume, Deadline, any additional comments. Use any of the older in-game batches as a template.
