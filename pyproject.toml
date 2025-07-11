@@ -1,0 +1,18 @@
+[project]
+name = "loc-tools"
+version = "1.0.0"
+description = "Loc tools for Unreal Engine and Crowdin"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "crowdin-api-client>=1.24.0",
+    "loguru>=0.7.3",
+    "openpyxl>=3.1.5",
+    "p4python>=2025.1.2767466",
+    "pandas>=2.3.1",
+    "pyyaml==6.0.2",              # TODO Remove this once we switch to TOML
+    "requests>=2.32.3",
+    "rich>=14.0.0",
+    "typer>=0.16.0",
+    "xlsxwriter==3.2.0",          # TODO Unify to use openPyXL for all Excel files
+]
