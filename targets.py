@@ -1,8 +1,11 @@
-import argparse
 from pathlib import Path
 from loguru import logger
 
-from dataclasses import dataclass, field
+import typer
+from typing_extensions import Annotated as A
+from typing import Callable, Union
+
+from dataclasses import dataclass
 
 from libraries.utilities import LocTask
 from libraries.uetools import UELocTarget, UEProject, init_logging
@@ -13,16 +16,11 @@ from libraries.uetools import UELocTarget, UEProject, init_logging
 #              targets.py delete target=Audio locale=io
 #              targets.py add target=Audio locale=io
 
-# TODO: Create debug/hash locale-only ini files to speed up export/import for big projects
-# TODO: Statistics?
-
 
 @dataclass
 class LocaleTask(LocTask):
-    '''
+    """
     Class to represent loc target related tasks
-
-    ...
 
     Attributes
     ----------
@@ -36,24 +34,41 @@ class LocaleTask(LocTask):
     project_dir
         Project directory
         Defaults to ../../ based on the scripts being in Content/Python
-    '''
+    """
 
-    source_target: str = None
+    source_target: str | None = None
 
-    loc_targets: list[str] or str = None
+    loc_targets: list[str] | str | None = None
 
-    locales: list[str] = None
+    locales: list[str] | None = None
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
-    project_dir: str = None  # Absolute or relative to cwd
-    engine_dir: str = None  # Absolute or relative to project_dir
+    project_dir: str = '../../../'  # Absolute or relative to cwd
+    engine_dir: str | None = None  # Absolute or relative to project_dir
 
-    _ue_project: UEProject = None
+    _ue_project: UEProject | None = None
 
-    _source_target: UELocTarget = None
-    _loc_targets: list[UELocTarget] = None
+    _source_target: UELocTarget | None = None
+    _loc_targets: list[UELocTarget] | None = None
 
-    _project_path: Path = None
+    _project_path: Path | None = None
+
+    def available_targets(self) -> list[str]:
+        if self._ue_project is None:
+            logger.error('UEProject is not initialized.')
+            return []
+
+        return list(self._ue_project.loc_targets.keys())
+
+    def available_locales(self, target: str) -> list[str]:
+        if self._loc_targets is None:
+            logger.error('UELocTargets are not initialized.')
+            return []
+
+        for t in self._loc_targets:
+            if t.name == target:
+                return sorted(t.get_current_locales())
+        return []
 
     # This is not intended to be launched from loc-sync.py
     def get_task_list_from_arguments(self):
@@ -62,33 +77,25 @@ class LocaleTask(LocTask):
     def post_update(self) -> bool:
         super().post_update()
 
-        self._ue_project = UEProject(
-            project_path=self.project_dir, engine_path=self.engine_dir
-        )
-
-        logger.info(f'Project path: {self._ue_project.project_path}.')
-
-        logger.info(f'Available targets: {self._ue_project.loc_targets.keys()}.')
+        if not self._ue_project:
+            self._ue_project = UEProject(
+                project_path=self.project_dir, engine_path=self.engine_dir
+            )
 
         if self.source_target is not None:
             self._source_target = UELocTarget(
                 self._ue_project.project_path, self.source_target
             )
-            logger.info(f'Source target: {self.source_target}.')
-        else:
-            logger.info(f'No source target specified.')
 
-        if type(self.loc_targets) is str:
+        if isinstance(self.loc_targets, str):
             self.loc_targets = [self.loc_targets]
 
-        if type(self.loc_targets) is list and len(self.loc_targets) > 0:
+        if isinstance(self.loc_targets, list) and len(self.loc_targets) > 0:
             self._loc_targets = [
                 UELocTarget(self._ue_project.project_path, target)
                 for target in self.loc_targets
+                if target in self.available_targets()
             ]
-            logger.info(f'Loc targets to modify: {self.loc_targets}.')
-        else:
-            logger.error(f'No loc targets to modify specified.')
 
         return True
 
@@ -105,7 +112,7 @@ class LocaleTask(LocTask):
         if self._source_target is not None:
             self.locales = self._source_target.get_current_locales()
 
-        if type(self.locales) is not list or len(self.locales) == 0:
+        if not isinstance(self.locales, list) or len(self.locales) == 0:
             logger.error('No locales specified.')
 
         logger.info(f'Targets to modify: {self.loc_targets}')
@@ -145,148 +152,228 @@ class RenameLocales(LocaleTask):
 @dataclass
 class ListTargets(LocaleTask):
     def run(self):
-        return 0
-
-
-LOC_TARGET_ACTIONS = {
-    'add': AddLocales,
-    'replace': ReplaceLocales,
-    'delete': DeleteLocales,
-    'rename': RenameLocales,
-    'list': ListTargets,
-}
-
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(
-        description='''
-    Run loc target-related actions. Reads config from base.config.yaml and command line.
-    Examples: targets.py replace source=Game target=Audio
-              targets.py add source=Game target=Audio
-              targets.py delete target=Audio locale=io
-              targets.py add target=Audio locale=io'''
-    )
-
-    parser.add_argument(
-        'action',
-        nargs='?',
-        choices=LOC_TARGET_ACTIONS,
-        help='''Action to perform: `replace`, `add`, `delete`, `rename`\n
-        `replace` and `add` require either -source and -targets or -targets and -locales\n
-        `delete` requires -targets and -locales\n
-        `rename` requires -targets and exactly 2 locales in -locales: old and new name''',
-    )
-
-    parser.add_argument(
-        '-source',
-        '-s',
-        default=None,
-        type=str,
-        help='Source target to use for `replace` and `add` tasks. Defaults to `Game`',
-    )
-
-    parser.add_argument(
-        '-targets',
-        '-t',
-        default=None,
-        nargs='*',
-        help='Loc targets to modify, a space-separated list of target names',
-    )
-
-    parser.add_argument(
-        '-locales',
-        '-l',
-        default=None,
-        nargs='*',
-        help='Locales to add/replace/delete, a space-separated list of locale names',
-    )
-
-    args, _ = parser.parse_known_args()
-
-    if args.action is None or args.action not in LOC_TARGET_ACTIONS:
-        logger.error('Argument error: action not supported')
-        return None
-
-    if args.action == 'list':
-        return args
-
-    if args.targets is None or type(args.targets) is not list or len(args.targets) == 0:
-        print(type(args.targets))
-        logger.error('Argument error: targets not specified')
-        return None
-
-    if args.action == 'delete':
-        if (
-            args.locales is None
-            or type(args.locales) is not list
-            or len(args.locales) == 0
-        ):
-            logger.error('Argument error: no locales for delete action')
-            return None
-
-    if args.action == 'rename':
-        if (
-            args.locales is None
-            or type(args.locales) is not list
-            or len(args.locales) != 2
-        ):
-            logger.error(
-                'Argument error: no or wrong number of locales for rename action'
+        if self.loc_targets is not None and len(self.loc_targets) > 0:
+            logger.success(
+                f'Locales for {self.loc_targets[0]}: {self.available_locales(self.loc_targets[0])}'
             )
-            return None
+            return True
 
-    if args.source is None:
-        if (
-            args.locales is None
-            or type(args.locales) is not list
-            or len(args.locales) == 0
-        ):
-            logger.error(
-                'Argument error: no locales and no source for add or replace action'
+        available_targets = self.available_targets()
+        logger.success(f'Available targets: {", ".join(available_targets)}')
+        return True
+
+
+###############################################################
+############################# CLI #############################
+###############################################################
+
+app = typer.Typer(
+    rich_markup_mode='rich',
+    add_completion=False,
+    help="""
+    Tool to manipulate locales across multiple localization targets in an Unreal project.
+    Reads config from [blue]base.config.yaml[/] and overrides with command line parameters.
+
+    [red]Notes:[/red]
+    - If you [green]rename[/] a locale, import in UE first to preserve translations.
+    - The tool does [blue]not[/] modify the [green].locmeta[/] files and does [blue]not[/] create or delete locale folders or files.
+    - Remember to add and delete the relevant locale directories in Perforce as needed.
+    """,
+)
+
+
+def check_and_split_comma_separated_list(
+    number: int = 0,
+) -> Callable[[str], list[str]]:
+    """
+    Parse the locales string into a tuple of (from_locale, to_locale).
+    """
+
+    def f(locales: str) -> list[str]:
+        """
+        Callback function to validate and parse the locales string.
+        """
+        parts: list[str] = [s.strip() for s in locales.split(',')]
+        if number > 0 and len(parts) != number:
+            raise typer.BadParameter(
+                'Invalid locales format or quantity. '
+                'Expected a comma-separated list (e.g., `en,de,...`) '
+                f'of exactly {number} locales.',
             )
-            return None
+        return parts
 
-    if args.locales is not None and args.source is not None and args.action != 'delete':
-        logger.error(
-            'Argument error: both source and locales specified, specify only one'
-        )
-        return None
-
-    logger.info(args)
-
-    return args
+    return f
 
 
-def main():
-    init_logging(logger)
+@app.command('list')
+def list_targets(
+    target: A[
+        Union[str, None],
+        typer.Argument(
+            help='Specify a target to list its locales, omit to list available targets instead.',
+        ),
+    ] = None,
+):
+    """
+    List available localization targets or list locales for a specific target with [bold turquoise2]list <target>[/].
+    """
 
-    logger.info('')
-    logger.info('--- Unreal gather text commandlet script ---')
-    logger.info('')
-
-    params = parse_arguments()
-    if params == None:
-        logger.error('No parameters parsed. Aborting.')
-        return 1
-
-    task = LOC_TARGET_ACTIONS[params.action](
-        params.source, params.targets, params.locales
-    )
-
-    task.read_config(Path(__file__).name, logger)
-
-    returncode = task.run()
-
-    if returncode == 0:
-        logger.info('')
-        logger.info('--- Unreal gather text commandlet script end ---')
-        logger.info('')
-        return 0
-
-    logger.error('Error occured, please see the Content/Python/Logs/locsync.log')
-    return 1
+    task = ListTargets()
+    task.read_config(script=Path(__file__).name, logger=logger)
+    task.loc_targets = target
+    task.post_update()
+    task.run()
 
 
-# Run the script if the isn't imported
-if __name__ == "__main__":
-    main()
+@app.command()
+def add(
+    targets: A[
+        str,
+        typer.Option(
+            '--targets',
+            '-t',
+            help='Target(s) to modify. Comma-separated list, e.g.: [green]Game,Data,Subtitles[/green]',
+            show_default=False,
+            callback=check_and_split_comma_separated_list(),
+        ),
+    ],
+    locales: A[
+        str,
+        typer.Option(
+            '--locales',
+            '-l',
+            help='Locale(s) to add. Comma-separated list, e.g.: [green]es,de,pt-BR[/green]',
+            show_default=False,
+            callback=check_and_split_comma_separated_list(),
+        ),
+    ],
+):
+    """
+    Add locales to the specified targets.
+    Note: Does [blue italic]not[/blue italic] create any locale directories.
+    """
+    task = AddLocales()
+    task.read_config(script=Path(__file__).name, logger=logger)
+    task.loc_targets = list(targets)
+    task.locales = list(locales)
+    task.post_update()
+    task.run()
+
+    logger.success('Locales added successfully.')
+
+
+@app.command()
+def delete(
+    targets: A[
+        str,
+        typer.Option(
+            '--targets',
+            '-t',
+            help='Target(s) to modify. Comma-separated list, e.g.: [green]Game,Data,Subtitles[/green]',
+            show_default=False,
+            callback=check_and_split_comma_separated_list(),
+        ),
+    ],
+    locales: A[
+        str,
+        typer.Option(
+            '--locales',
+            '-l',
+            help='Locale(s) to delete. Comma-separated list, e.g.: [green]es,de,pt-BR[/green]',
+            show_default=False,
+            callback=check_and_split_comma_separated_list(),
+        ),
+    ],
+):
+    """
+    Delete locales from the specified targets.
+    Note: Does [blue italic]not[/blue italic] delete any locale directories.
+    """
+
+    task = DeleteLocales()
+    task.read_config(script=Path(__file__).name, logger=logger)
+    task.loc_targets = list(targets)
+    task.locales = list(locales)
+    task.post_update()
+    task.run()
+
+    logger.success('Locales deleted successfully.')
+
+
+@app.command()
+def replace(
+    source: A[
+        str,
+        typer.Option(
+            '--source',
+            '-s',
+            help='Source target to copy locales from, e.g. [green]Game[/green]',
+            show_default=False,
+        ),
+    ],
+    targets: A[
+        str,
+        typer.Option(
+            '--targets',
+            '-t',
+            help='Target(s) to replace the locales. Comma-separated list, e.g.: [green]Game,Data,Subtitles[/green]',
+            show_default=False,
+            callback=check_and_split_comma_separated_list(),
+        ),
+    ],
+):
+    """
+    Replace locales in the specified target(s) with the locales from the source target.
+    Note: Does [blue italic]not[/blue italic] create or delete any locale directories.
+    """
+
+    task = ReplaceLocales(loc_targets=targets)
+    task.read_config(script=Path(__file__).name, logger=logger)
+    task.source_target = source
+    task.loc_targets = list(targets)
+    task.post_update()
+    task.run()
+
+
+@app.command()
+def rename(
+    targets: A[
+        str,
+        typer.Option(
+            '--targets',
+            '-t',
+            help='Target(s) to modify. Comma-separated list, e.g.: [green]Game,Data,Subtitles[/green]',
+            show_default=False,
+            callback=check_and_split_comma_separated_list(),
+        ),
+    ],
+    locales: A[
+        str,
+        typer.Option(
+            '--locales',
+            '-l',
+            help='Locale to rename and its new name, separated by a comma, e.g.: '
+            '[green]pt-PT,pt-BR[/green] or [green]en-US,en[/green]',
+            show_default=False,
+            callback=check_and_split_comma_separated_list(2),
+        ),
+    ],
+):
+    """
+    Rename a locale in the specified targets.
+    Also renames the locale directory in the target folder(s) to preserve translations.
+    [red]Important:[/red] Import translations in UE to preserve translations. Do not export or gather before that.
+    """
+
+    task = RenameLocales()
+    task.read_config(script=Path(__file__).name, logger=logger)
+    task.loc_targets = list(targets)
+    task.locales = list(locales)
+    task.post_update()
+    task.run()
+
+    logger.success('Locales renamed successfully.')
+
+
+if __name__ == '__main__':
+    app()
