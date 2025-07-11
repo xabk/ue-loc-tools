@@ -2,14 +2,13 @@ import re
 from pathlib import Path
 from loguru import logger
 from configparser import ConfigParser
-from dataclasses import dataclass, field
-
+from dataclasses import dataclass
 from libraries.utilities import init_logging
 
 
 @dataclass
 class UELocTarget:
-    '''
+    """
     A class to represent an Unreal localization target.
 
     ...
@@ -20,7 +19,7 @@ class UELocTarget:
         Project directory
     name : str
         Localization target name
-    '''
+    """
 
     # DefaulEditor.ini entry format:
     # +GameTargetsSettings=(Name="Audio",Guid=3E1B21FF40BD014967DDD2B65DD58E1A,TargetDependencies=,AdditionalManifestDependencies=,RequiredModuleNames=,GatherFromTextFiles=(IsEnabled=False,SearchDirectories=,ExcludePathWildcards=,FileExtensions=((Pattern="h"),(Pattern="cpp"),(Pattern="ini")),ShouldGatherFromEditorOnlyData=False),GatherFromPackages=(IsEnabled=True,IncludePathWildcards=((Pattern="Content/Audio/*")),ExcludePathWildcards=((Pattern="Content/L10N/*")),FileExtensions=((Pattern="umap"),(Pattern="uasset")),Collections=,ExcludeClasses=,ShouldExcludeDerivedClasses=False,ShouldGatherFromEditorOnlyData=False,SkipGatherCache=False),GatherFromMetaData=(IsEnabled=False,IncludePathWildcards=,ExcludePathWildcards=,KeySpecifications=,ShouldGatherFromEditorOnlyData=False),ExportSettings=(CollapseMode=IdenticalTextIdAndSource,POFormat=Unreal,ShouldPersistCommentsOnExport=True,ShouldAddSourceLocationsAsComments=True),CompileSettings=(SkipSourceCheck=False,ValidateFormatPatterns=True,ValidateSafeWhitespace=False),ImportDialogueSettings=(RawAudioPath=(Path=""),ImportedDialogueFolder="ImportedDialogue",bImportNativeAsSource=False),NativeCultureIndex=0,SupportedCulturesStatistics=((CultureName="en"),(CultureName="io")))
@@ -93,12 +92,12 @@ class UELocTarget:
     )
     _culture_entry_format: str = '(CultureName="{culture}")'
 
-    def get_current_locales(self) -> list[str] or None:
-        '''
+    def get_current_locales(self) -> list[str] | None:
+        """
         Returns a list of current locales configured for target.
         Taken from DefaultEditor.ini.
         Returns None is target configuration line not found in the ini.
-        '''
+        """
         with open(self.project_path / self._default_game_ini, 'r') as f:
             strings = f.readlines()
             for s in strings[::-1]:
@@ -110,12 +109,12 @@ class UELocTarget:
 
         return None
 
-    def get_native_locale(self) -> tuple[int, str] or None:
-        '''
+    def get_native_locale(self) -> tuple[int, str] | None:
+        """
         Returns a tuple (native locale index, native locale name) configured for target.
         Taken from DefaultEditor.ini.
         Returns None is target configuration line not found in the ini.
-        '''
+        """
         with open(self.project_path / self._default_game_ini, 'r') as f:
             strings = f.readlines()
             for s in strings[::-1]:
@@ -136,7 +135,7 @@ class UELocTarget:
         self,
         new_locales: list[str],
     ) -> int:
-        '''
+        """
         Add new locales without producing duplicates.
         Keep any existing locales and any any new locales from the supplied list.
         Changes DefaultEditor.ini and ini files in Config/Localization.
@@ -144,7 +143,7 @@ class UELocTarget:
 
         Args:
             new_locales: list of locales to add, duplicates will be ignored
-        '''
+        """
         if len(list(dict.fromkeys(new_locales))) != len(new_locales):
             raise ValueError('Supplied new_locales list contains duplicates.')
 
@@ -159,20 +158,20 @@ class UELocTarget:
     # TODO: better logging
     def remove_locales(
         self,
-        locales_to_remove: list[str] or str,
+        locales_to_remove: list[str] | str,
         *,
         delete_obsolete_loc_folders: bool = False,
     ) -> int:
-        '''
+        """
         Remove locales from existing locale list for target.
         Changes DefaultEditor.ini and ini files in Config/Localization.
         By default, does NOT delete locale folders in Content/Localization.
 
         Args:
             locales_to_remove: list of locales to add, duplicates will be ignored
-        '''
+        """
 
-        if type(locales_to_remove) is str:
+        if isinstance(locales_to_remove, str):
             locales_to_remove = [locales_to_remove]
 
         if len(list(dict.fromkeys(locales_to_remove))) != len(locales_to_remove):
@@ -195,8 +194,8 @@ class UELocTarget:
         locales = [loc for loc in locales if loc not in locales_to_remove]
 
         if number_of_locales - number_of_locales_to_remove != len(locales):
-            print(
-                'Not all locales from locales_to_remove were found and removed '
+            logger.warning(
+                'Not all locales from `locales_to_remove` were found and removed '
                 'from the existing locales list.'
             )
 
@@ -209,9 +208,9 @@ class UELocTarget:
         native_locale_index: int,
         locales: list[str],
     ) -> int:
-        '''
+        """
         Internal: updates the DefaultEditor.ini file
-        '''
+        """
         with open(self.project_path / self._default_game_ini, 'r') as f:
             strings = f.readlines()
 
@@ -255,10 +254,10 @@ class UELocTarget:
         ini: str,
         native_locale: str,
         locales: list[str],
-    ) -> int or None:
-        '''
+    ) -> int | None:
+        """
         Internal: updates any specified {loc_target}_{loc_task}.ini file
-        '''
+        """
         with open(self.project_path / ini.format(loc_target=self.name), 'r') as f:
             strings = f.readlines()
 
@@ -296,10 +295,10 @@ class UELocTarget:
         ini: str,
         native_locale: str,
         locales: list[str],
-    ) -> int or None:
-        '''
+    ) -> int | None:
+        """
         Internal: updates any specified {loc_target}_{loc_task}.ini file
-        '''
+        """
         with open(self.project_path / ini.format(loc_target=self.name), 'r') as f:
             strings = f.readlines()
 
@@ -324,14 +323,15 @@ class UELocTarget:
             f.writelines(new_config_lines)
         pass
 
+    # TODO Also change the locale in the PO file
     def _rename_loc_folder(
         self,
         old_name: str,
         new_name: str,
     ) -> int:
-        '''
+        """
         Internal: renames folder in Content/Localization
-        '''
+        """
         folder_path = self.project_path / self._locale_folder_pattern.format(
             loc_target=self.name, locale=old_name
         )
@@ -360,9 +360,9 @@ class UELocTarget:
         self,
         name: str,
     ) -> int:
-        '''
+        """
         Internal: deletes folder in Content/Localization
-        '''
+        """
         folder_path = self.project_path / self._locale_folder_pattern.format(
             loc_target=self.name, locale=name
         )
@@ -382,11 +382,11 @@ class UELocTarget:
         new_locales: list[str],
         *,
         keep_native_locale: bool = True,
-        new_native_locale: str = None,
-        new_native_locale_index: int = None,
+        new_native_locale: str | None = None,
+        new_native_locale_index: int | None = None,
         delete_obsolete_loc_folders: bool = False,
     ) -> int:
-        '''
+        """
         Replace existing locales with new ones.
         Changes DefaultEditor.ini and ini files in Config/Localization.
         By default, does NOT delete obsolete locale folders in Content/Localization.
@@ -395,7 +395,7 @@ class UELocTarget:
             new_locales: list of new locales, will replace existing locales
             delete_obsolete_loc_folders: controls whether to delete
                 obsolete locale folders in Content/Localization
-        '''
+        """
 
         if len(list(dict.fromkeys(new_locales))) != len(new_locales):
             raise ValueError('Supplied new_locales list contains duplicates.')
@@ -463,7 +463,7 @@ class UELocTarget:
             new_native_locale = native_locale
 
         if new_native_locale_index is None:
-            new_native_locale_index = new_locales.index(new_native_locale)
+            new_native_locale_index = new_locales.index(new_native_locale)  # type: ignore
         else:
             new_native_locale = new_locales[new_native_locale_index]
 
@@ -490,8 +490,8 @@ class UELocTarget:
         old_and_new_locale_names: list,
         *,
         rename_loc_folder: bool = True,
-    ) -> int or None:
-        '''
+    ) -> int | None:
+        """
         Renames the locale and keeps the translations by default.
         Changes DefaultEditor.ini and ini files in Config/Localization.
         By default, WILL also rename the locale folder in Content/Localization.
@@ -501,7 +501,7 @@ class UELocTarget:
             new_name: new locale name
             rename_loc_folder: controls whether to rename
                 locale folder in Content/Localization
-        '''
+        """
 
         if len(old_and_new_locale_names) != 2:
             raise ValueError(
@@ -540,34 +540,34 @@ class UELocTarget:
 
 
 class UEProject:
-    '''
+    """
     A class to find and store paths, localization targets,
     and other UE project information, and to manipulate
     files and within Unreal.
 
     Some of the functions require `unreal` module to be available
     (the script using them should be launched from Unreal editor).
-    '''
+    """
 
-    version: int = None
+    version: int | None = None
 
-    project_path: Path = None
-    engine_path: Path = None
-    script_path: Path = None
+    project_path: Path | None = None
+    engine_path: Path | None = None
+    script_path: Path | None = None
 
-    content_path: Path = None
+    content_path: Path | None = None
 
-    config_path: Path = None
-    default_editor_ini_path: Path = None
+    config_path: Path | None = None
+    default_editor_ini_path: Path | None = None
 
-    localization_path: Path = None
-    localization_config_path: Path = None
+    localization_path: Path | None = None
+    localization_config_path: Path | None = None
 
-    cmd_binary_path: Path = None
+    cmd_binary_path: Path | None = None
 
     p4_settings: list[dict[str, str]] = []
 
-    loc_targets: dict[str, UELocTarget] = []
+    loc_targets: dict[str, UELocTarget] = {}
 
     _supported_versions: list[int] = [4, 5]
 
@@ -598,18 +598,16 @@ class UEProject:
 
     def __init__(
         self,
-        ue_major_version: int = None,
-        project_path: str or Path = None,  # Absolute/relative to _script_ path
-        script_path: str or Path = None,  # Absolute/relative to project
-        engine_path: str or Path = None,  # Absolute/relative to project
+        ue_major_version: int | None = None,
+        project_path: str | Path | None = None,  # Absolute/relative to _script_ path
+        script_path: str | Path | None = None,  # Absolute/relative to project
+        engine_path: str | Path | None = None,  # Absolute/relative to project
     ):
-        init_logging(logger)
-
         # Project path
         if not project_path:
             logger.info(
                 'No project path specified. '
-                'Assuming current working directory is Content/Python '
+                'Assuming current working directory is Content/Python/loctools '
                 'and trying to find the project path...'
             )
             project_path = self._find_project_path()
@@ -622,8 +620,8 @@ class UEProject:
         if not self.project_path.is_absolute():
             logger.info(
                 f'Project path {self.project_path} is relative. '
-                'Assuming it\'s relative to the current working directory '
-                '(should be Content/Python):\n'
+                "Assuming it's relative to the current working directory "
+                '(should be Content/Python/loctools):\n'
                 f'{Path.cwd()}'
             )
             self.project_path = self.project_path.resolve()
@@ -644,7 +642,7 @@ class UEProject:
             if not self.engine_path.is_absolute():
                 logger.info(
                     f'Engine root {self.engine_path} is relative.'
-                    'Assuming it\'s relative to project path.'
+                    "Assuming it's relative to project path."
                 )
                 self.engine_path = (self.project_path / self.engine_path).resolve()
 
@@ -654,8 +652,7 @@ class UEProject:
                 'does not exist or is not a directory. Aborting.'
             )
             raise ValueError(
-                f'Engine root {self.engine_path} '
-                'does not exist or is not a directory.'
+                f'Engine root {self.engine_path} does not exist or is not a directory.'
             )
 
         self.engine_path = self.engine_path.resolve().absolute()
@@ -676,8 +673,7 @@ class UEProject:
                 'does not exist or is not a directory. Aborting.'
             )
             raise ValueError(
-                f'Script path {self.script_path} '
-                'does not exist or is not a directory.'
+                f'Script path {self.script_path} does not exist or is not a directory.'
             )
 
         self.script_path = self.script_path.resolve().absolute()
@@ -704,8 +700,7 @@ class UEProject:
                 'does not exist or is not a directory. Aborting.'
             )
             raise ValueError(
-                f'Config path {self.config_path} '
-                'does not exist or is not a directory.'
+                f'Config path {self.config_path} does not exist or is not a directory.'
             )
 
         self.config_path = self.config_path.resolve().absolute()
@@ -721,8 +716,7 @@ class UEProject:
                 'does not exist or is not a file. Aborting.'
             )
             raise ValueError(
-                f'DefaultEditor.ini path {self.default_editor_ini_path} '
-                'does not exist.'
+                f'DefaultEditor.ini path {self.default_editor_ini_path} does not exist.'
             )
 
         self.default_editor_ini_path = self.default_editor_ini_path.resolve().absolute()
@@ -768,11 +762,12 @@ class UEProject:
                 self.cmd_binary_path = self.engine_path / self._cmd_binary[version]
                 if self.cmd_binary_path.exists() and self.cmd_binary_path.is_file():
                     ue_major_version = version
+                    self.version = ue_major_version
                     logger.info(f'Version detected as {ue_major_version}')
                     break
 
         elif (
-            type(ue_major_version) is not int
+            not isinstance(ue_major_version, int)
             or ue_major_version not in self._supported_versions
         ):
             logger.error(
@@ -808,47 +803,26 @@ class UEProject:
         self.cmd_binary_path = self.cmd_binary_path.resolve().absolute()
 
         # P4 config path and configuration
-        if self._p4_config.get(ue_major_version, None) is None:
-            logger.error(
-                f'No P4 config path specified for UE version {ue_major_version}. '
-                'Aborting.'
-            )
-            raise ValueError(
-                f'No P4 config path specified for UE version {ue_major_version}.'
-            )
-
-        p4_config = self.project_path / self._p4_config[ue_major_version]
-        if not p4_config.exists() or not p4_config.is_file():
-            logger.error(
-                f'P4 config path {p4_config} '
-                'does not exist or is not a file. '
-                'Maybe you haven\'t configured P4 in Unreal Editor? '
-                'Aborting.'
-            )
-            raise ValueError(
-                f'P4 config path {p4_config} '
-                'does not exist or is not a file. '
-                'Check source control settings in Unreal Editor.'
-            )
-
-        p4_config = p4_config.resolve().absolute()
-
-        self.p4_settings = self._load_p4_settings(p4_config)
+        self.update_p4_settings()
 
         # Localization targets
         self.loc_targets = self._find_loc_targets()
 
     def _find_script_path(self):
-        print('Looking for the script path... Kind of :)')
+        logger.info(
+            'Not implemented: Defaulting script path to current working directory.'
+        )
         return Path.cwd()
 
     def _find_project_path(self):
-        print('Looking for the project path... Kind of :)')
+        logger.info('Not implemented: Defaulting project path to <cwd>/../../')
         return Path.cwd() / '../../'
 
     def _find_engine(self):
-        print('Looking for the engine... Kind of :)')
-        return self.project_path / '../../Engine'
+        logger.info(
+            'Not implemented: Defaulting engine path to ../Engine/ relative to project path.'
+        )
+        return self.project_path / '../Engine/'
 
     def _load_p4_settings(self, p4_config_path: Path):
         cfg = ConfigParser()
@@ -883,7 +857,7 @@ class UEProject:
             logger.error(
                 f'P4 config path {p4_config} '
                 'does not exist or is not a file. '
-                'Maybe you haven\'t configured P4 in Unreal Editor? '
+                "Maybe you haven't configured P4 in Unreal Editor? "
                 'Aborting.'
             )
             raise ValueError(
@@ -911,7 +885,7 @@ class UEProject:
                 continue
 
             name = match.group(1)
-            targets[name] = UELocTarget(name, self)
+            targets[name] = UELocTarget(project_path=self.project_path, name=name)
 
         return targets
 
@@ -925,3 +899,7 @@ class UEProject:
     # TODO: Does this belong to UELocTarget?
     def patch_manifest_dependencies(self):
         pass
+
+
+if __name__ == '__main__':
+    ...
