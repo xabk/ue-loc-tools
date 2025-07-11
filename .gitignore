@@ -1,11 +1,9 @@
 # Project-specific
 crowdin.config.yaml
-~test.py
-~mgh/
-~satis/
 unreal.py
 unreal.py.stub
 logs/
+*.code-workspace
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
