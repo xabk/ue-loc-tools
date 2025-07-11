@@ -1,5 +1,0 @@
-crowdin_api_client>=1.0.5
-loguru>=0.5.3
-p4python>=2021.1.2128019
-PyYAML>=6.0
-requests>=2.25.1
