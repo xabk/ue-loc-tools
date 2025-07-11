@@ -33,7 +33,7 @@ class LocaleTask(LocTask):
         List of locales to use
     project_dir
         Project directory
-        Defaults to ../../ based on the scripts being in Content/Python
+        Defaults to ../../../ based on the scripts being in Content/Python/loctools
     """
 
     source_target: str | None = None
