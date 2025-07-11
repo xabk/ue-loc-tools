@@ -6,37 +6,42 @@ from pathlib import Path
 import yaml
 from dataclasses import asdict, dataclass, fields
 import argparse
+from loguru import logger
 
 BASE_CFG = 'base.config.yaml'
 SECRET_CFG = 'crowdin.config.yaml'
 
+BASE_SECTION = 'parameters'
+SCRIPT_SECTION = 'script-parameters'
+
 # Paths for default UE folder structure:
-# (Engine Root)/Games/(GameName)/Content/Python/...
-# Assuming the scripts are in Python directory where they should be
-DEF_CONTENT_PATH = Path('../')
-DEF_PROJECT_PATH = Path('../../')
-DEF_ENGINE_ROOT = Path('../../../../')
-DEF_ENGINE_CMD = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/UE4Editor-cmd.exe'
+# (Engine Root)/[Games]/(GameName)/Content/Python/loc-tools...
+# Assuming the scripts are in Python/loc-tools directory where they should be
+DEF_CONTENT_PATH = Path('../../')
+DEF_PROJECT_PATH = Path('../../../')
+DEF_ENGINE_ROOT = Path('../../../../../')
+DEF_ENGINE_CMD = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/UnrealEditor-Cmd.exe'  # UE5
 DEF_ENGINE_DIR = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/'
 
 
-def init_logging(logger):
+def init_logging(verbose: bool = False) -> None:
     logger.remove()
+    level = 'TRACE' if verbose else 'INFO'
     logger.add(
         sys.stdout,
         format='<green>{time:HH:mm:ss}</green> '
         '<level>{level:1.1}</level> '
         '<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line:3d}</cyan> '
         '<level>{message}</level>',
-        level='INFO',
+        level=level,
     )
     logger.add(
         'logs/locsync.log',
-        rotation='10MB',
+        rotation='30MB',
         retention='1 month',
         enqueue=True,
         format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
+        level='TRACE',
         encoding='utf-8',
     )
 
@@ -49,24 +54,24 @@ class LocTask:
     base_cfg: str = BASE_CFG
     secret_cfg: str = SECRET_CFG
 
-    def post_update(self):
-        '''
+    def post_update(self) -> None:
+        """
         Called after you initiate or update the paramaters from config files.
 
         Override this to recalculate any config values
         that depend on other config values. E.g., if you want
         to format a path based on a base path or
         create regex based on a pattern and other value.
-        '''
+        """
         pass
 
-    def get_task_list_from_arguments(self):
+    # TODO Remove when we switch to imports
+    def get_task_list_from_arguments(self) -> str:
         parser = argparse.ArgumentParser(
-            description='''
-            Create a debug ID locale using settings in base.config.yaml
-            For defaults: test_lang.py
-            For task-specific settings: test_lang.py task_list_name
-            '''
+            description="""
+            For defaults: <task_file>.py
+            For task-specific settings: <task_file>.py task_list_name
+            """
         )
 
         parser.add_argument(
@@ -76,17 +81,25 @@ class LocTask:
             help='Task list to run from base.config.yaml',
         )
 
-        return parser.parse_known_args()[0].tasklist
+        tasklist = ''
+        try:
+            tasklist = parser.parse_known_args()[0].tasklist
+        except Exception:
+            ...
 
+        return tasklist
+
+    # TODO Modify to accept config as dict when we switch to imports
     def read_config(
         self,
         script: str,
-        logger,
-        base_config: str = None,
-        secret_config: str = None,
-    ):
+        base_config: str | None = None,
+        secret_config: str | None = None,
+        update: bool = True,
+    ) -> None:
         if not base_config:
             base_config = self.base_cfg
+            logger.info(f'Using default base config: {base_config}')
         if script.endswith('.py'):
             script = script.rpartition('.')[0]
 
@@ -94,16 +107,16 @@ class LocTask:
 
         # Use defaults and return if base config does not exist
         if not base_config or not Path(base_config).exists():
-            logger.error('No config found!')
-            raise ValueError('No config found!')
+            logger.warning('No config found! Working with defaults.')
+            return
 
         with open(base_config, mode='r', encoding='utf-8') as f:
             yaml_config = yaml.safe_load(f)
 
-        # Update config from the defaults section of base config
+        # Update config from the base section
         updated = False
-        if script in yaml_config['script-parameters']:
-            for key, value in yaml_config['script-parameters'][script].items():
+        if BASE_SECTION in yaml_config:
+            for key, value in yaml_config[BASE_SECTION].items():
                 if not key.startswith('_') and key in [
                     field.name for field in fields(self)
                 ]:
@@ -111,7 +124,23 @@ class LocTask:
                     self.__setattr__(key, value)
             if updated:
                 logger.info(
-                    'Updated parameters from global section of base.config.yaml.'
+                    f'Updated parameters from the `{BASE_SECTION}` '
+                    'section of base.config.yaml.'
+                )
+
+        # Update config from the defaults section of base config
+        updated = False
+        if script in yaml_config[SCRIPT_SECTION]:
+            for key, value in yaml_config[SCRIPT_SECTION][script].items():
+                if not key.startswith('_') and key in [
+                    field.name for field in fields(self)
+                ]:
+                    updated = True
+                    self.__setattr__(key, value)
+            if updated:
+                logger.info(
+                    f'Updated parameters from the global `{SCRIPT_SECTION}` '
+                    'section of base.config.yaml.'
                 )
 
         # Update config with overrides from the 'task list' section of base config
@@ -122,12 +151,9 @@ class LocTask:
                 for i, val in enumerate(yaml_config[task_list])
                 if val['script'] == script
             ]
-            if task_id and 'script-parameters' in yaml_config[task_list][task_id[0]]:
-                logger.info(
-                    'Updated parameters from tasklist section of base.config.yaml.'
-                )
+            if task_id and SCRIPT_SECTION in yaml_config[task_list][task_id[0]]:
                 for key, value in yaml_config[task_list][task_id[0]][
-                    'script-parameters'
+                    SCRIPT_SECTION
                 ].items():
                     if not key.startswith('_') and key in [
                         field.name for field in fields(self)
@@ -136,7 +162,7 @@ class LocTask:
                         self.__setattr__(key, value)
                 if updated:
                     logger.info(
-                        f'Updated parameters from {task_list} '
+                        f'Updated parameters from {task_list} / `{SCRIPT_SECTION}` '
                         'section of base.config.yaml.'
                     )
 
@@ -158,10 +184,11 @@ class LocTask:
             logger.error('API token parameter exists but not set!')
 
         # Run post_update to compute derivative parameters, if any
-        self.post_update()
+        if update:
+            self.post_update()
 
         cfg_info = asdict(self)
         cfg_info.pop('token', None)
-        logger.info(f'{cfg_info}')
+        logger.info(f'Config: {cfg_info}')
 
         return

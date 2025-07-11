@@ -43,8 +43,8 @@ class LocaleTask(LocTask):
     locales: list[str] | None = None
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
-    project_dir: str = '../../../'  # Absolute or relative to cwd
-    engine_dir: str | None = None  # Absolute or relative to project_dir
+    project_dir: str | Path | None = '../../../'  # Absolute or relative to cwd
+    engine_dir: str | Path | None = None  # Absolute or relative to project_dir
 
     _ue_project: UEProject | None = None
 
@@ -69,10 +69,6 @@ class LocaleTask(LocTask):
             if t.name == target:
                 return sorted(t.get_current_locales())
         return []
-
-    # This is not intended to be launched from loc-sync.py
-    def get_task_list_from_arguments(self):
-        return None
 
     def post_update(self) -> bool:
         super().post_update()
@@ -182,7 +178,7 @@ app = typer.Typer(
 )
 
 
-def check_and_split_comma_separated_list(
+def _check_and_split_comma_separated_list(
     number: int = 0,
 ) -> Callable[[str], list[str]]:
     """
@@ -205,8 +201,40 @@ def check_and_split_comma_separated_list(
     return f
 
 
+def _create_and_update_task(
+    task_class: type[LocaleTask],
+    source_target: str | None = None,
+    targets: list[str] | None = None,
+    locales: list[str] | None = None,
+    context: dict[str, str] | None = None,
+) -> LocaleTask:
+    """
+    Create and update a task instance with the provided parameters.
+    """
+    task = task_class()
+
+    task.read_config(script=Path(__file__).name, update=False)
+
+    if targets is not None:
+        task.loc_targets = targets
+    if locales is not None:
+        task.locales = locales
+    if source_target is not None:
+        task.source_target = source_target
+    if context is not None:
+        if context['project_path'] is not None:
+            task.project_dir = context['project_path']
+        if context['engine_path'] is not None:
+            task.engine_dir = context['engine_path']
+
+    task.post_update()
+
+    return task
+
+
 @app.command('list')
 def list_targets(
+    ctx: typer.Context,
     target: A[
         Union[str, None],
         typer.Argument(
@@ -218,15 +246,17 @@ def list_targets(
     List available localization targets or list locales for a specific target with [bold turquoise2]list <target>[/].
     """
 
-    task = ListTargets()
-    task.read_config(script=Path(__file__).name, logger=logger)
-    task.loc_targets = target
-    task.post_update()
+    task = _create_and_update_task(
+        ListTargets,
+        targets=[target] if target else None,
+        context=ctx.obj,
+    )
     task.run()
 
 
-@app.command()
-def add(
+@app.command('add')
+def add_locales(
+    ctx: typer.Context,
     targets: A[
         str,
         typer.Option(
@@ -234,7 +264,7 @@ def add(
             '-t',
             help='Target(s) to modify. Comma-separated list, e.g.: [green]Game,Data,Subtitles[/green]',
             show_default=False,
-            callback=check_and_split_comma_separated_list(),
+            callback=_check_and_split_comma_separated_list(),
         ),
     ],
     locales: A[
@@ -244,7 +274,7 @@ def add(
             '-l',
             help='Locale(s) to add. Comma-separated list, e.g.: [green]es,de,pt-BR[/green]',
             show_default=False,
-            callback=check_and_split_comma_separated_list(),
+            callback=_check_and_split_comma_separated_list(),
         ),
     ],
 ):
@@ -252,18 +282,20 @@ def add(
     Add locales to the specified targets.
     Note: Does [blue italic]not[/blue italic] create any locale directories.
     """
-    task = AddLocales()
-    task.read_config(script=Path(__file__).name, logger=logger)
-    task.loc_targets = list(targets)
-    task.locales = list(locales)
-    task.post_update()
+    task = _create_and_update_task(
+        AddLocales,
+        targets=list(targets),
+        locales=list(locales),
+        context=ctx.obj,
+    )
     task.run()
 
     logger.success('Locales added successfully.')
 
 
-@app.command()
-def delete(
+@app.command('delete')
+def delete_locales(
+    ctx: typer.Context,
     targets: A[
         str,
         typer.Option(
@@ -271,7 +303,7 @@ def delete(
             '-t',
             help='Target(s) to modify. Comma-separated list, e.g.: [green]Game,Data,Subtitles[/green]',
             show_default=False,
-            callback=check_and_split_comma_separated_list(),
+            callback=_check_and_split_comma_separated_list(),
         ),
     ],
     locales: A[
@@ -281,7 +313,7 @@ def delete(
             '-l',
             help='Locale(s) to delete. Comma-separated list, e.g.: [green]es,de,pt-BR[/green]',
             show_default=False,
-            callback=check_and_split_comma_separated_list(),
+            callback=_check_and_split_comma_separated_list(),
         ),
     ],
 ):
@@ -290,18 +322,20 @@ def delete(
     Note: Does [blue italic]not[/blue italic] delete any locale directories.
     """
 
-    task = DeleteLocales()
-    task.read_config(script=Path(__file__).name, logger=logger)
-    task.loc_targets = list(targets)
-    task.locales = list(locales)
-    task.post_update()
+    task = _create_and_update_task(
+        DeleteLocales,
+        targets=list(targets),
+        locales=list(locales),
+        context=ctx.obj,
+    )
     task.run()
 
     logger.success('Locales deleted successfully.')
 
 
-@app.command()
-def replace(
+@app.command('replace')
+def replace_locales(
+    ctx: typer.Context,
     source: A[
         str,
         typer.Option(
@@ -318,7 +352,7 @@ def replace(
             '-t',
             help='Target(s) to replace the locales. Comma-separated list, e.g.: [green]Game,Data,Subtitles[/green]',
             show_default=False,
-            callback=check_and_split_comma_separated_list(),
+            callback=_check_and_split_comma_separated_list(),
         ),
     ],
 ):
@@ -327,16 +361,18 @@ def replace(
     Note: Does [blue italic]not[/blue italic] create or delete any locale directories.
     """
 
-    task = ReplaceLocales(loc_targets=targets)
-    task.read_config(script=Path(__file__).name, logger=logger)
-    task.source_target = source
-    task.loc_targets = list(targets)
-    task.post_update()
+    task = _create_and_update_task(
+        ReplaceLocales,
+        source_target=source,
+        targets=list(targets),
+        context=ctx.obj,
+    )
     task.run()
 
 
-@app.command()
-def rename(
+@app.command('rename')
+def rename_locales(
+    ctx: typer.Context,
     targets: A[
         str,
         typer.Option(
@@ -344,7 +380,7 @@ def rename(
             '-t',
             help='Target(s) to modify. Comma-separated list, e.g.: [green]Game,Data,Subtitles[/green]',
             show_default=False,
-            callback=check_and_split_comma_separated_list(),
+            callback=_check_and_split_comma_separated_list(),
         ),
     ],
     locales: A[
@@ -355,7 +391,7 @@ def rename(
             help='Locale to rename and its new name, separated by a comma, e.g.: '
             '[green]pt-PT,pt-BR[/green] or [green]en-US,en[/green]',
             show_default=False,
-            callback=check_and_split_comma_separated_list(2),
+            callback=_check_and_split_comma_separated_list(2),
         ),
     ],
 ):
@@ -365,14 +401,52 @@ def rename(
     [red]Important:[/red] Import translations in UE to preserve translations. Do not export or gather before that.
     """
 
-    task = RenameLocales()
-    task.read_config(script=Path(__file__).name, logger=logger)
-    task.loc_targets = list(targets)
-    task.locales = list(locales)
-    task.post_update()
+    task = _create_and_update_task(
+        RenameLocales,
+        targets=list(targets),
+        locales=list(locales),
+        context=ctx.obj,
+    )
     task.run()
 
-    logger.success('Locales renamed successfully.')
+
+@app.callback()
+def main_callback(
+    ctx: typer.Context,
+    project_path: A[
+        Union[Path, None],
+        typer.Option(
+            '--project-path',
+            '-p',
+            help='Path to the project directory, where the Content folder is located.',
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+            resolve_path=True,
+        ),
+    ] = None,
+    engine_path: A[
+        Union[Path, None],
+        typer.Option(
+            '--engine-path',
+            '-e',
+            help='Path to the engine directory, where the Binaries folder is located.',
+            exists=True,
+            file_okay=False,
+            dir_okay=True,
+        ),
+    ] = None,
+    verbose: A[
+        bool,
+        typer.Option('--verbose', '-v', help='Enable verbose logging.', is_flag=True),
+    ] = False,
+):
+    init_logging(verbose)
+    if ctx.obj is None:
+        ctx.obj = {}
+
+    ctx.obj['project_path'] = project_path
+    ctx.obj['engine_path'] = engine_path
 
 
 if __name__ == '__main__':
