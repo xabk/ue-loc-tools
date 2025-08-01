@@ -42,9 +42,9 @@ class UnrealLocGatherCommandlet(LocTask):
     # Assume we're in Content/Python/loctools/
     content_dir: str = '../../'
     project_dir: str = '../../../'
-    engine_dir: str = '../../../../Engine/'
-    unreal_binary: str = 'Binaries/Win64/UE4Editor-Cmd.exe'  # UE4
-    # unreal_binary: str = 'Binaries/Win64/UnrealEditor-Cmd.exe'  # UE5
+    engine_dir: str = '../../../../'
+    unreal_binary: str = 'Engine/Binaries/Win64/UE4Editor-Cmd.exe'  # UE4
+    # unreal_binary: str = 'Engine/Binaries/Win64/UnrealEditor-Cmd.exe'  # UE5
     # TODO: Use uetools to find the directories?
 
     try_patch_dependencies: bool = True
