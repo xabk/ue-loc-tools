@@ -28,33 +28,53 @@ LOG_TO_SKIP = ['LogLinker: ']
 
 
 def read_config_files(base_cfg=BASE_CFG, secret_cfg=SECRET_CFG):
-    '''
+    """
     Reads the base config file and the secret config file.
     Returns a dict with the config data.
 
     Always overwrites the base config with the secret config,
     to discourage storing secrets in the base config file.
-    '''
+    """
+
+    if not base_cfg:
+        base_cfg = BASE_CFG
+
     if not secret_cfg:
         secret_cfg = SECRET_CFG
+
+    if not Path(base_cfg).exists():
+        logger.error(f'Base config file {base_cfg} not found.')
+        raise FileNotFoundError(
+            f'Base config file {base_cfg} not found. '
+            'Please provide a valid path to the base config file.'
+        )
+    if not Path(secret_cfg).exists():
+        logger.error(f'Secret config file {secret_cfg} not found.')
+        raise FileNotFoundError(
+            f'Secret config file {secret_cfg} not found. '
+            'Please provide a valid path to the secret config file.'
+        )
+
     with open(base_cfg) as f:
         config = yaml.safe_load(f)
     with open(secret_cfg) as f:
         crowdin_cfg = yaml.safe_load(f)
 
+    if 'crowdin' not in config:
+        config['crowdin'] = {}
+
     config['crowdin']['api-token'] = ''
-    for key in config['crowdin']:
-        if key in crowdin_cfg['crowdin']:
-            config['crowdin'][key] = crowdin_cfg['crowdin'][key]
+    for key in crowdin_cfg['crowdin']:
+        config['crowdin'][key] = crowdin_cfg['crowdin'][key]
 
     return config
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description='''
+        description="""
     Run a loc sync based on the task list from base.config.yaml
-    Example: locsync.py -u'''
+    Example: locsync.py -u"""
     )
 
     parser.add_argument(
@@ -70,23 +90,33 @@ def parse_arguments():
         '--unattended',
         dest='unattended',
         action='store_true',
-        help='Use to run the script without any input from the user',
+        help='Use --unattended to run the script without any input from the user',
     )
 
     parser.add_argument(
-        '-setup',
+        '--setup',
         dest='setup',
         action='store_true',
-        help='Use to install required packages',
+        help='Use --setup to install required packages',
     )
 
     parser.add_argument(
         '-c',
-        '-config',
+        '--config',
         dest='config',
         type=str,
         nargs='?',
-        help='Use -config to specify a secret config file to use instead '
+        help='Use -c / --config to specify a secret config file to use instead '
+        'of crowdin.config.yaml',
+    )
+
+    parser.add_argument(
+        '-s',
+        '--secret',
+        dest='secret',
+        type=str,
+        nargs='?',
+        help='Use -s / --secret to specify a secret config file to use instead '
         'of crowdin.config.yaml',
     )
 
@@ -94,8 +124,9 @@ def parse_arguments():
 
     parameters['task-list'] = parser.parse_args().tasklist
     parameters['unattended'] = parser.parse_args().unattended
+    parameters['config'] = parser.parse_args().config or BASE_CFG
     parameters['setup'] = parser.parse_args().setup
-    parameters['secret'] = parser.parse_args().config
+    parameters['secret'] = parser.parse_args().config or SECRET_CFG
 
     return parameters
 
@@ -150,7 +181,7 @@ def main():
         return
     if err is not None and not params['setup']:
         print(
-            'Exception during module import. Try running locsync.py -setup '
+            'Exception during module import. Try running locsync.py --setup '
             'to install the needed modules.\n'
             'Exception message:',
             err,
@@ -158,7 +189,7 @@ def main():
         input('Press Enter to quit...')
         return
 
-    init_logging(logger)
+    init_logging()
 
     logger.opt(raw=True).info(
         '\n'
@@ -167,7 +198,7 @@ def main():
         '==========================================\n'
     )
 
-    config = read_config_files(secret_cfg=params['secret'])
+    config = read_config_files(base_cfg=params['config'], secret_cfg=params['secret'])
 
     if params['task-list'] is None and not params['unattended']:
         logger.info('Interactive: getting task list from user in console.')
@@ -192,36 +223,61 @@ def main():
 
     # TODO: Extract project path and engine path search to a module
 
-    project_path = Path(__file__).parent.parent.parent.absolute()
+    project_path = None
+    if 'project_dir' in config['parameters']:
+        project_path = Path(config['parameters']['project_dir']).resolve().absolute()
+
+    if project_path is None or not project_path.exists():
+        logger.info(
+            'No project_dir specified in parameters. Trying default: {script_dir}/../../../../'
+        )
+        project_path = (Path(__file__).parent.parent.parent.parent).resolve().absolute()
 
     logger.info(f'Project directory: {project_path}')
 
-    engine_path = config['parameters'].get('engine_dir', None)
+    if 'engine_dir' in config['parameters']:
+        ue_cwd = Path(config['parameters']['engine_dir']).resolve().absolute()
 
-    if engine_path is None:
-        # Trying to find the path to Unreal Build Tool in the .sln file
-        with open(next(project_path.glob('*.sln')), mode='r') as f:
-            s = f.read()
-            engine_path = re.findall(
-                r'"UnrealBuildTool", "(.*?)Engine\\Source\\Programs\\'
-                r'UnrealBuildTool\\UnrealBuildTool.csproj"',
-                s,
-            )
-            if len(engine_path) == 0:
-                logger.error(
-                    'Couldn\'t find Engine path in the project solution file. Aborting.'
-                )
-                return
-            engine_path = engine_path[0]
+    if ue_cwd is None or not ue_cwd.exists():
+        logger.info(
+            'No engine_dir specified in parameters, trying default: {project_dir}/../).'
+        )
+        ue_cwd = (project_path / '../').resolve()
 
-    ue_cwd = (project_path / engine_path).resolve()
+    logger.info(f'Engine directory: {ue_cwd}')
 
-    fpath = (ue_cwd / 'Engine/Binaries/Win64/UE4Editor-cmd.exe').absolute()
+    fname = config['parameters'].get('unreal_binary', None)
+    if fname is None:
+        logger.info('No engine_executable specified in parameters, using default.')
+        # Default Unreal Engine executable name
+        fname = 'Engine/Binaries/Win64/UnrealEditor-Cmd.exe'  # UE5
+        # fname = 'Engine/Binaries/Win64/UE4Editor-Cmd.exe'  # UE4
+
+    fpath = (ue_cwd / fname).absolute()
 
     logger.info(f'Engine executable: {fpath}')
 
+    if not fpath.exists():
+        logger.error(
+            f'Engine executable {fpath} does not exist. '
+            'Please configure the engine directory in base.config.yaml.\n'
+            'For now, Unreal Engine tasks will be skipped.'
+        )
+        fpath = None
+
     # Finding the .uproject file path
-    uproject = next(project_path.glob('*.uproject')).absolute()
+    uproject = None
+    project_files = list(project_path.glob('*.uproject'))
+    if not project_files or len(project_files) != 1:
+        logger.error(
+            'None or more than one .uproject file found in the project directory. '
+            'Please configure the project directory in base.config.yamL\n'
+            f'Found: {project_files if project_files else "None"}\n'
+            'For now, Unreal Engine tasks will be skipped.'
+        )
+        uproject = None
+    else:
+        uproject = project_files[0]
 
     py_cwd = Path(__file__).parent.absolute()
 
@@ -247,6 +303,20 @@ def main():
                 'Skipped, unreal is turned off in parameters (see base.config.yaml)'
             )
 
+        if 'unreal' in task and fpath is None:
+            skip_task = True
+            reason = (
+                'Skipped, Unreal executable not found. '
+                'Please configure the paths in base.config.yaml.'
+            )
+
+        if 'unreal' in task and uproject is None:
+            skip_task = True
+            reason = (
+                'Skipped, uproject file not found. '
+                'Please configure the paths in base.config.yaml.'
+            )
+
         if 'p4-checkout' in task and not config['parameters']['p4-checkout']:
             skip_task = True
             reason = (
@@ -257,8 +327,7 @@ def main():
         if 'p4-checkin' in task and not config['parameters']['p4-checkin']:
             skip_task = True
             reason = (
-                'Skipped, P4 checkin is turned off in parameters '
-                '(see base.config.yaml)'
+                'Skipped, P4 checkin is turned off in parameters (see base.config.yaml)'
             )
 
         if skip_task:
