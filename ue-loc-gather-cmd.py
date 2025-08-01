@@ -3,33 +3,13 @@
 # -run=GatherText
 # -config="Config\Localization\Game_Gather.ini;Config\Localization\Game_Export.ini"
 # -SCCProvider=None
+# Ashwin: -DisableSCC
 # -Unattended
 # -LogLocalizationConflict
 # -Log="PyCmdLocGatherAndExport.log"
-
-# Engine\Binaries\Win64\UE4Editor-cmd.exe Games\FactoryGame\FactoryGame.uproject
-# -run=GatherText
-# -config="Config\Localization\Game_Gather.ini;Config\Localization\Game_ExportIO.ini"
-# -SCCProvider=None
-# -Unattended
-# -LogLocalizationConflict
-# -Log="PyCmdLocGatherAndExport.log"
-
-# Engine\Binaries\Win64\UE4Editor-cmd.exe Games\FactoryGame\FactoryGame.uproject
-# -run=GatherText
-# -config="Config\Localization\Game_Import.ini;Config\Localization\Game_Compile.ini"
-# -SCCProvider=None
-# -Unattended
-# -LogLocalizationConflicts
-# -Log="PyCmdLocGatherAndImport.log"
-
-#
-# add "capture_output=True, text=True" to make it silent and catch output into result
-#
+# -NullRHI
 
 # TODO: Use all loc targets by default
-# TODO: Add config file support
-# TODO: Move parameters to config file
 
 import subprocess as subp
 import re
@@ -43,7 +23,6 @@ from libraries.utilities import LocTask, init_logging
 
 @dataclass
 class UnrealLocGatherCommandlet(LocTask):
-
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to None to process all loc targets when implemented
     loc_targets: list = field(
@@ -60,9 +39,12 @@ class UnrealLocGatherCommandlet(LocTask):
     # ['Gather', 'Import', 'Compile', 'GenerateReports']
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
-    content_dir: str = '../'
-    project_dir: str = None  # Will try to find it if None or empty
-    engine_dir: str = None  # Will try to find it if None or empty
+    # Assume we're in Content/Python/loctools/
+    content_dir: str = '../../'
+    project_dir: str = '../../../'
+    engine_dir: str = '../../../../Engine/'
+    unreal_binary: str = 'Binaries/Win64/UE4Editor-Cmd.exe'  # UE4
+    # unreal_binary: str = 'Binaries/Win64/UnrealEditor-Cmd.exe'  # UE5
     # TODO: Use uetools to find the directories?
 
     try_patch_dependencies: bool = True
@@ -70,18 +52,21 @@ class UnrealLocGatherCommandlet(LocTask):
     # This seems to be needed if the project and engine
     # are in completely separate directories
 
-    log_to_skip: list = None
     # Skip irrelevant Unreal spam (e.g., 'LogLinker: ' if you have lots of warnings)
+    log_to_skip: list = field(
+        default_factory=lambda: [
+            'LogLinker: ',
+        ]
+    )
 
-    _unreal_binary: str = 'Engine/Binaries/Win64/UE4Editor-cmd.exe'
     _config_pattern: str = 'Config/Localization/{loc_target}_{task}.ini'
-    _content_path: Path = None
-    _project_path: Path = None
-    _uproject_path: Path = None
-    _engine_path: Path = None
-    _unreal_binary_path: Path = None
+    _content_path: Path | None = None
+    _project_path: Path | None = None
+    _uproject_path: Path | None = None
+    _engine_path: Path | None = None
+    _unreal_binary_path: Path | None = None
 
-    _config_str: str = None
+    _config_str: str | None = None
 
     def post_update(self):
         super().post_update()
@@ -105,12 +90,12 @@ class UnrealLocGatherCommandlet(LocTask):
 
         if self.engine_dir:
             self._engine_path = Path(self.engine_dir).resolve()
-            self._unreal_binary_path = self._engine_path / self._unreal_binary
+            self._unreal_binary_path = self._engine_path / self.unreal_binary
         else:
             # Try to find it as if we're in Games/..
             logger.info('Checking if engine path is ../../ from project directory.')
             self._engine_path = self._project_path.parent.parent
-            self._unreal_binary_path = self._engine_path / self._unreal_binary
+            self._unreal_binary_path = self._engine_path / self.unreal_binary
 
             if not self._unreal_binary_path.exists():
                 # Try to find it in the .sln file
@@ -136,19 +121,20 @@ class UnrealLocGatherCommandlet(LocTask):
 
                 if len(engine_path) == 0:
                     logger.error(
-                        f'Couldn\'t find Engine path in the project solution file: '
-                        '{solution_file}. Aborting. '
+                        "Couldn't find Engine path in the project solution file: "
+                        f'{solution_file}. Aborting. '
                         'Try setting engine directory explicitely in config.'
                     )
                     return False
 
                 # TODO: .sln path absolute if game and engine on different disks?..
                 self._engine_path = (self._project_path / engine_path[0]).resolve()
-                self._unreal_binary_path = self._engine_path / self._unreal_binary
+                self._unreal_binary_path = self._engine_path / self.unreal_binary
 
         if not (self._unreal_binary_path and self._unreal_binary_path.exists()):
             logger.error(
                 f'No unreal binary found for engine path {self._engine_path}. '
+                f'Binary path: {self._unreal_binary_path}. '
                 'Wrong path?'
             )
             return False
@@ -210,17 +196,22 @@ class UnrealLocGatherCommandlet(LocTask):
             f'{self._config_str}'
         )
 
+        commands = [
+            str(self._unreal_binary_path),
+            str(self._uproject_path),
+            '-run=GatherText',
+            f'-config="{self._config_str}"',
+            '-SCCProvider=None',  # Source Control Provider
+            '-DisableSCC',  # Disable Source Control
+            '-Unattended',  # Run without user interaction
+            '-LogLocalizationConflict',  # Log localization conflicts
+            '-NullRHI',  # Disable rendering to avoid shader compilation
+        ]
+
+        logger.info(f'Running command: {" ".join(commands)}')
+
         with subp.Popen(
-            [
-                self._unreal_binary_path,
-                self._uproject_path,
-                '-run=GatherText',
-                f'-config="{self._config_str}"',
-                '-SCCProvider=None',
-                '-Unattended',
-                '-LogLocalizationConflict',
-                '-Log="PyCmdLocGatherAndExport.log"',
-            ],
+            commands,
             stdout=subp.PIPE,
             stderr=subp.STDOUT,
             cwd=self._engine_path,
@@ -235,23 +226,25 @@ class UnrealLocGatherCommandlet(LocTask):
                     if skip:
                         continue
 
-                    line = re.sub(r"^\[[^]]+]", "", line.strip())
+                    line = re.sub(r'^\[[^]]+]', '', line.strip())
                     if 'Error: ' in line:
                         logger.error(f'| UE | {line.strip()}')
                     elif 'Warning: ' in line:
                         logger.warning(f'| UE | {line.strip()}')
                     else:
                         logger.info(f'| UE | {line.strip()}')
-                if process.poll() != None:
+                if process.poll() is not None:
                     break
             returncode = process.returncode
 
         return returncode
 
+    def run(self):
+        return self.run_tasks()
+
 
 def main():
-
-    init_logging(logger)
+    init_logging()
 
     logger.info('')
     logger.info('--- Unreal gather text commandlet script ---')
@@ -259,9 +252,9 @@ def main():
 
     task = UnrealLocGatherCommandlet()
 
-    task.read_config(Path(__file__).name, logger)
+    task.read_config(Path(__file__).name)
 
-    returncode = task.run_tasks()
+    returncode = task.run()
 
     if returncode == 0:
         logger.info('')
@@ -274,5 +267,5 @@ def main():
 
 
 # Run the script if the isn't imported
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
