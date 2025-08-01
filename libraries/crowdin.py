@@ -11,8 +11,8 @@ class UECrowdinClient(CrowdinClient):
         self,
         token: str,
         logger=None,
-        organization: str = None,
-        project_id: int = None,
+        organization: str | None = None,
+        project_id: int | None = None,
         silent: bool = False,
     ):
         if not token:
@@ -54,7 +54,7 @@ class UECrowdinClient(CrowdinClient):
             return
         print('E | ', message, *args, kwargs)
 
-    def get_file_ID(self, file_name='Game.po') -> int:
+    def get_file_ID(self, file_name='Game.po') -> int | None:
         if not self.file_list:
             self.update_file_list_and_project_data()
 
@@ -63,16 +63,18 @@ class UECrowdinClient(CrowdinClient):
                 return entry['data']['id']
 
         self.warning(
-            f'Couldn\'t find the file: {file_name}. File list: {self.file_list}'
+            f"Couldn't find the file: {file_name}. File list: {self.file_list}"
         )
         return None
 
     def update_file_list_and_project_data(self):
-        self.file_list = self.source_files.list_files(self.project_id).get('data', None)
-
-        self.data['project_data'] = self.projects.get_project(self.project_id).get(
+        self.file_list = self.source_files.list_files(projectId=self.project_id).get(
             'data', None
         )
+
+        self.data['project_data'] = self.projects.get_project(
+            projectId=self.project_id
+        ).get('data', None)
 
         # TODO: make sure we get all languages via pagination
         self.data['supported_languages'] = self.languages.list_supported_languages(
@@ -94,23 +96,23 @@ class UECrowdinClient(CrowdinClient):
 
         return None
 
-    def check_or_build(self, build_data: dict = None):
+    def check_or_build(self, build_data: dict | None = None):
         if not build_data:
-            return self.translations.build_crowdin_project_translation(self.project_id)[
-                'data'
-            ]
+            return self.translations.build_crowdin_project_translation(
+                projectId=self.project_id
+            )['data']
         if 'id' not in build_data:
             self.error(f'No build ID in build data. Build data:\n{build_data}')
             return None
 
         return self.translations.download_project_translations(
-            self.project_id, build_data['id']
+            projectId=self.project_id, buildId=build_data['id']
         )['data']
 
     def get_or_create_directory(self, dir, create: bool = True):
         if not dir:
             return None
-        r = self.source_files.list_directories(self.project_id)
+        r = self.source_files.list_directories(projectId=self.project_id)
         if 'data' not in r:
             self.error(f'No data in list directories response. Response: {r}')
             return r
@@ -123,7 +125,7 @@ class UECrowdinClient(CrowdinClient):
         if not create:
             return None
 
-        r = self.source_files.add_directory(self.project_id, dir)
+        r = self.source_files.add_directory(projectId=self.project_id, name=dir)
         if 'data' not in r:
             self.error(f'No data in create directory response. Response: {r}')
             return r
@@ -133,10 +135,10 @@ class UECrowdinClient(CrowdinClient):
     def add_file(
         self,
         filepath: Path,
-        dir: str = None,
+        dir: str | None = None,
         type: str = 'auto',
         export_pattern: str = '',
-    ) -> int or str:
+    ) -> int | str:
         with open(filepath, mode='rb') as file:
             storage = self.storages.add_storage(file)
 
@@ -152,18 +154,18 @@ class UECrowdinClient(CrowdinClient):
 
         if dir_id:
             response = self.source_files.add_file(
-                self.project_id,
-                storage['data']['id'],
-                filepath.name,
+                projectId=self.project_id,
+                storageId=storage['data']['id'],
+                name=filepath.name,
                 directoryId=dir_id,
                 type=type,
                 exportOptions={'exportPattern': export_pattern},
             )
         else:
             response = self.source_files.add_file(
-                self.project_id,
-                storage['data']['id'],
-                filepath.name,
+                projectId=self.project_id,
+                storageId=storage['data']['id'],
+                name=filepath.name,
                 type=type,
                 exportOptions={'exportPattern': export_pattern},
             )
@@ -174,7 +176,9 @@ class UECrowdinClient(CrowdinClient):
 
         return response['data']['id']
 
-    def update_file(self, filepath: Path, fname: str = None, fID: int = None):
+    def update_file(
+        self, filepath: Path, fname: str | None = None, fID: int | None = None
+    ):
         if fname:
             file_name = fname
         else:
@@ -185,7 +189,9 @@ class UECrowdinClient(CrowdinClient):
         else:
             file_id = fID
 
-        file_data = self.source_files.get_file(self.project_id, file_id)
+        file_data = self.source_files.get_file(
+            projectId=self.project_id, fileId=file_id
+        )
 
         if 'revisionId' not in file_data['data']:
             self.error(
@@ -199,7 +205,7 @@ class UECrowdinClient(CrowdinClient):
         )
 
         with open(filepath, mode='rb') as file:
-            storage = self.storages.add_storage(file)
+            storage = self.storages.add_storage(file=file)
 
         if 'data' not in storage or 'id' not in storage['data']:
             self.error(f'Error, no storage ID recieved. Response:\n{storage}')
@@ -208,7 +214,7 @@ class UECrowdinClient(CrowdinClient):
         self.info('Uploaded to storage. Updating file...')
 
         response = self.source_files.update_file(
-            self.project_id, file_id, storage['data']['id']
+            projectId=self.project_id, fileId=file_id, storageId=storage['data']['id']
         )
 
         if 'data' not in response or 'revisionId' not in response['data']:
@@ -226,7 +232,7 @@ class UECrowdinClient(CrowdinClient):
             return response['data']['id']
 
         self.warning(
-            f'{file_name} ({file_id}) updated but revision number hasn\'t changed. '
+            f"{file_name} ({file_id}) updated but revision number hasn't changed. "
             f'Revision: {file_data["data"]["revisionId"]} → '
             f'{response["data"]["revisionId"]}'
         )
@@ -322,7 +328,7 @@ class UECrowdinClient(CrowdinClient):
         game_po_id = self.get_file_ID(filename)
 
         if not game_po_id:
-            self.error(f'Couldn\'t find {filename}, aborting. Response: {game_po_id}')
+            self.error(f"Couldn't find {filename}, aborting. Response: {game_po_id}")
             return None
 
         game_po_progress = self.translation_status.get_file_progress(
@@ -349,5 +355,5 @@ def main():
 
 
 # Run the script if the isn't imported
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
