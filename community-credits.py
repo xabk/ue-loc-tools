@@ -10,7 +10,6 @@ from libraries.crowdin import UECrowdinClient
 
 @dataclass
 class UpdateCommunityCredits(LocTask):
-
     # Declare Crowdin parameters to load them from config
     token: str = None
     organization: str = None
@@ -50,7 +49,6 @@ class UpdateCommunityCredits(LocTask):
         self._csv_path = self._content_path / self.csv_name
 
     def update_community_credits(self):
-
         reports = {}
 
         # with open('rep_json.txt', mode='r', encoding='utf-8') as f:
@@ -110,7 +108,6 @@ class UpdateCommunityCredits(LocTask):
             num_users = 0
 
             for u in users:
-
                 # TODO: Move to config file
                 # TODO: Extract into a function
                 # ----- ----- ----- ----- -----
@@ -123,7 +120,9 @@ class UpdateCommunityCredits(LocTask):
                     users_string += ', '
                 elif num_users > 0 and num_users % 4 == 0 and num_users < len(users):
                     users_string += ',\r\n'
-                users_string += re.sub(r'[^\w\d\(\)\-]', '', u['name'])
+                users_string += re.sub(
+                    r'[^\w/\\[]{}<>;:\?\+!@#$%^&\(\)=,_\.]', '', u['name']
+                )
                 num_users += 1
 
             if not users_string:
@@ -156,7 +155,6 @@ class UpdateCommunityCredits(LocTask):
 
 
 def main():
-
     logger.add(
         'logs/locsync.log',
         rotation='10MB',
@@ -185,5 +183,5 @@ def main():
     return 1
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
