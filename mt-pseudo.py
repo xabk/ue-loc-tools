@@ -12,7 +12,7 @@ from libraries.utilities import LocTask, init_logging
 
 import importlib
 
-dl_task = importlib.import_module("build-and-download")
+dl_task = importlib.import_module('build-and-download')
 
 
 @dataclass
@@ -20,9 +20,9 @@ class MTPseudo(LocTask):
     # TODO: Function to set up MT project on Crowdin or a separate script for this?
 
     # Declare Crowdin parameters to load them from config
-    token: str = None
-    organization: str = None
-    project_id: int = None
+    token: str | None = None
+    organization: str | None = None
+    project_id: int | None = None
 
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to empty list to process all loc targets when implemented
@@ -61,7 +61,7 @@ class MTPseudo(LocTask):
         ]
     )
 
-    engine_id: int or None = 1
+    engine_id: int | None = 1
 
     file_format: str = (
         'gettext_unreal'  # gettext_unreal to use the Unreal PO parser on Crowdin
@@ -89,10 +89,10 @@ class MTPseudo(LocTask):
     _fname: str = 'Localization/{target}/{locale}/{target}.po'
     _temp_fname: str = '{target}/{locale}/{target}.po'
 
-    _languages: dict[str, str] = None
+    _languages: dict[str, str] | None = None
 
-    _content_path: Path = None
-    _temp_path: Path = None
+    _content_path: Path | None = None
+    _temp_path: Path | None = None
 
     _crowdin = None
 
@@ -107,7 +107,7 @@ class MTPseudo(LocTask):
             self.token, logger, self.organization, self.project_id
         )
 
-    def add_source_file(self, target: str) -> int or dict:
+    def add_source_file(self, target: str) -> int | dict:
         fpath = self._content_path / self._fname.format(
             target=target, locale=self.src_locale
         )
@@ -133,7 +133,7 @@ class MTPseudo(LocTask):
                 logger.info(f'File for {target} added.')
             else:
                 logger.error(
-                    f'Something went wrong. Here\'s the last response from Crowdin: {r}'
+                    f"Something went wrong. Here's the last response from Crowdin: {r}"
                 )
 
         if len(targets_processed) == len(self.loc_targets):
@@ -144,7 +144,7 @@ class MTPseudo(LocTask):
 
         return targets_processed
 
-    def update_source_file(self, target: str) -> int or dict:
+    def update_source_file(self, target: str) -> int | dict:
         fpath = self._content_path / self._fname.format(
             target=target, locale=self.src_locale
         )
@@ -166,7 +166,7 @@ class MTPseudo(LocTask):
                 logger.info(f'File for {target} updated.')
             else:
                 logger.error(
-                    f'Something went wrong. Here\'s the last response from Crowdin: {r}'
+                    f"Something went wrong. Here's the last response from Crowdin: {r}"
                 )
 
         if len(targets_processed) == len(self.loc_targets):
@@ -176,13 +176,16 @@ class MTPseudo(LocTask):
             return targets_processed
 
         return targets_processed
-    
+
     def add_or_update_files(self) -> dict[str, int]:
         logger.info(f'Content path: {self._content_path}')
 
         targets_processed = {}
         self._crowdin.update_file_list_and_project_data()
-        files = {f['data']['name'].rpartition('.')[0]: f['data']['id'] for f in self._crowdin.file_list}
+        files = {
+            f['data']['name'].rpartition('.')[0]: f['data']['id']
+            for f in self._crowdin.file_list
+        }
 
         for target in self.loc_targets:
             if target in files:
@@ -197,7 +200,7 @@ class MTPseudo(LocTask):
                 logger.info(f'File for {target} updated.')
             else:
                 logger.error(
-                    f'Something went wrong. Here\'s the last response from Crowdin: {r}'
+                    f"Something went wrong. Here's the last response from Crowdin: {r}"
                 )
 
         if len(targets_processed) == len(self.loc_targets):
@@ -206,7 +209,7 @@ class MTPseudo(LocTask):
             )
             return targets_processed
 
-        return targets_processed                
+        return targets_processed
 
     def pretranslate_file(self, file_id: int):
         response = self._crowdin.translations.apply_pre_translation(
@@ -216,7 +219,7 @@ class MTPseudo(LocTask):
             autoApproveOption='all',
         )
 
-        if not 'data' in response:
+        if 'data' not in response:
             return response
 
         pre_id = response['data']['identifier']
@@ -227,8 +230,8 @@ class MTPseudo(LocTask):
 
         while response['data']['status'] != 'finished':
             logger.info(
-                f"Progress: {response['data']['progress']}. "
-                f"ETA: {response['data']['eta']}"
+                f'Progress: {response["data"]["progress"]}. '
+                f'ETA: {response["data"]["eta"]}'
             )
             sleep(10)
             response = self._crowdin.translations.pre_translation_status(
@@ -250,7 +253,7 @@ class MTPseudo(LocTask):
             else:
                 logger.error(
                     f'Something went wrong with {target}. '
-                    f'Here\'s the last response from Crowdin: {r}'
+                    f"Here's the last response from Crowdin: {r}"
                 )
 
         if len(files_processed) == len(files):
@@ -285,7 +288,7 @@ class MTPseudo(LocTask):
             engineId=self.engine_id,
         )
 
-        if not 'data' in response:
+        if 'data' not in response:
             return response
 
         pre_id = response['data']['identifier']
@@ -296,8 +299,8 @@ class MTPseudo(LocTask):
 
         while response['data']['status'] != 'finished':
             logger.info(
-                f"Progress: {response['data']['progress']}. "
-                f"ETA: {response['data']['eta']}"
+                f'Progress: {response["data"]["progress"]}. '
+                f'ETA: {response["data"]["eta"]}'
             )
             sleep(10)
             response = self._crowdin.translations.pre_translation_status(
@@ -319,7 +322,7 @@ class MTPseudo(LocTask):
             else:
                 logger.error(
                     f'Something went wrong with {target}. '
-                    f'Here\'s the last response from Crowdin: {r}'
+                    f"Here's the last response from Crowdin: {r}"
                 )
 
         if len(files_processed) == len(files):
@@ -337,7 +340,7 @@ class MTPseudo(LocTask):
             croql='count of approvals = 0 and provider is mt',
         )
 
-        if not 'data' in r:
+        if 'data' not in r:
             return r
 
         translations = [s['data']['translationId'] for s in r['data']]
@@ -365,7 +368,7 @@ class MTPseudo(LocTask):
             else:
                 logger.error(
                     f'Something went wrong with {lang}. '
-                    f'Here\'s the last response from Crowdin: {r}'
+                    f"Here's the last response from Crowdin: {r}"
                 )
 
         if len(langs_processed) == len(languages):
@@ -387,7 +390,7 @@ class MTPseudo(LocTask):
         )
         task.post_update()
         task.culture_mappings.update(self.languages)
-        print(task) # Print to avoid logging tokens
+        print(task)  # Print to avoid logging tokens
 
         task.build_and_download()
 
@@ -406,7 +409,7 @@ class MTPseudo(LocTask):
         )
         task.post_update()
         task.culture_mappings.update(self.languages)
-        print(task) # Print to avoid logging tokens
+        print(task)  # Print to avoid logging tokens
 
         return task.process_loc_targets()
 
@@ -419,7 +422,7 @@ class MTPseudo(LocTask):
                 entry.msgstr = entry.msgstr + self.suffix
         po.save()
 
-    def pseudo_mark_target(self, target: str, cultures: list[str] = None):
+    def pseudo_mark_target(self, target: str, cultures: list[str] | None = None):
         logger.info(f'Adding pseudo markers to target: {target}')
         if not cultures:
             # Find all eligible locales in the target folder
@@ -464,7 +467,7 @@ class MTPseudo(LocTask):
         return False
 
     def pseudo_mark_targets(
-        self, targets: list[str] = None, cultures: list[str] = None
+        self, targets: list[str] | None = None, cultures: list[str] | None = None
     ):
         if not targets:
             targets = self.loc_targets
@@ -526,7 +529,9 @@ class MTPseudo(LocTask):
 
         return result
 
-    def create_longest_locale_for_target(self, target: str, cultures: list[str] = None):
+    def create_longest_locale_for_target(
+        self, target: str, cultures: list[str] | None = None
+    ):
         #
         # en-SA by default
         #
@@ -610,12 +615,13 @@ class MTPseudo(LocTask):
         if not longest_path.parent.exists():
             longest_path.parent.mkdir(parents=True)
 
-        longest_po.save(longest_path)
+        if longest_po:
+            longest_po.save(longest_path)
 
         return True
 
     def create_longest_locale_for_targets(
-        self, targets: list[str] = None, cultures: list[str] = None
+        self, targets: list[str] | None = None, cultures: list[str] | None = None
     ):
         if not targets:
             targets = self.loc_targets
@@ -653,7 +659,7 @@ class MTPseudo(LocTask):
 
         return False
 
-    def create_longest_locale_pack(self, targets: list[str] = None):
+    def create_longest_locale_pack(self, targets: list[str] | None = None):
         if not targets:
             targets = self.loc_targets
 
@@ -690,12 +696,34 @@ class MTPseudo(LocTask):
 
         return task.process_loc_targets()
 
+    def run(self):
+        files = self.add_or_update_files()
+
+        logger.info(files)
+
+        self.pretranslate_files(files)
+
+        self.mt_files(files)
+
+        self.approve_languages()
+
+        self.download_transalted_files()
+
+        # self.pseudo_mark_targets()
+
+        # self.copy_downloaded_files_to_content()
+
+        self.create_longest_locale_for_targets()
+
+        self.create_longest_locale_pack()
+
+        self.copy_longest_to_content()
+
 
 def main():
-
     all_tasks_start = timer()
 
-    init_logging(logger)
+    init_logging()
 
     logger.info('')
     logger.info('--- Add source files on Crowdin script start ---')
@@ -703,29 +731,9 @@ def main():
 
     task = MTPseudo()
 
-    task.read_config(Path(__file__).name, logger)
+    task.read_config(Path(__file__).name)
 
-    files = task.add_or_update_files()
-
-    print(files)
-
-    task.pretranslate_files(files)
-
-    task.mt_files(files)
-
-    task.approve_languages()
-
-    task.download_transalted_files()
-
-    # task.pseudo_mark_targets()
-
-    # task.copy_downloaded_files_to_content()
-
-    task.create_longest_locale_for_targets()
-
-    task.create_longest_locale_pack()
-    
-    task.copy_longest_to_content()
+    task.run()
 
     elapsed = timer() - all_tasks_start
 
@@ -742,5 +750,5 @@ def main():
 
 
 # Run the main functionality of the script if it's not imported
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
