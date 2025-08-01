@@ -24,7 +24,6 @@ def logw(message):
 
 
 def main():
-
     logw('\n\n\n------ REIMPORT DATATABLES SCRIPT ------\n')
 
     config_file = Path(unreal.Paths.project_content_dir()) / CFG_FILE
@@ -102,8 +101,8 @@ def main():
         asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
 
         asset_tools.import_asset_tasks([task])
-        if len(task.result) == 1:
-            logw('Reimported:' + task.result[0])
+        if len(task.get_objects()) == 1:
+            logw(f'Reimported:{task.get_objects()[0]}')
 
     logw('\n\n\n------ END OF SCRIPT ------\n')
 
