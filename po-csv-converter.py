@@ -1,7 +1,6 @@
 import re
 import csv
 import copy
-from time import time
 from loguru import logger
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -9,8 +8,9 @@ from dataclasses import dataclass, field
 from libraries import (
     polib,  # Modified polib: _POFileParser.handle_oc only splits references by ', '
 )
-from libraries.utilities import LocTask
+from libraries.utilities import LocTask, init_logging
 from libraries.uetools import UELocTarget
+
 
 # -------------------------------------------------------------------------------------
 # Defaults - These can be edited, only used if not overridden in configs
@@ -30,7 +30,7 @@ class UE_PO_CSV_Converter(LocTask):
 
     # Source locale
     # Will be used to get source text
-    native_locale: str = 'en'
+    native_locale: str = 'io'
 
     # Debug ID locale
     # Will be skipped as a language but used to add Debug IDs to context
@@ -80,7 +80,7 @@ class UE_PO_CSV_Converter(LocTask):
     # ----
     # Warning: Expects the same structure on import
     split_CSV_using_script_rules: bool = False
-    splitting_rules: list = None
+    splitting_rules: list | None = None
 
     # TODO: Implement conversion
     # ----
@@ -117,14 +117,10 @@ class UE_PO_CSV_Converter(LocTask):
             [  # Adding hints for strings with plurals
                 'source',
                 r'}\|plural\(',
-                "Please adapt to your language plural rules. We only support "
-                "keywords: zero, one, two, few, many, other.\n"
-                "Use Alt + C on Crowdin to create a skeleton adapted "
-                "to your language grammar.\n"
-                "Translate only white text in curly braces. Test using the form "
-                "below the Preview box.\n"
-                "Check what keywords stand for here: "
-                "http://www.unicode.org/cldr/charts/29/supplemental/language_plural_rules.html.",
+                'Please adapt to your language plural rules. We only support '
+                'keywords: zero, one, two, few, many, other.\n'
+                'Check what keywords stand for here: '
+                'http://www.unicode.org/cldr/charts/47/supplemental/language_plural_rules.html.',
             ]
         ]
     )
@@ -137,17 +133,17 @@ class UE_PO_CSV_Converter(LocTask):
 
     # Internal
     # { 'target' -> { 'ID' : {...string data...} } }
-    _strings: dict[str:dict] = None
+    _strings: dict[str, dict] | None = None
 
-    _loc_targets: list[UELocTarget] = None
+    _loc_targets: list[UELocTarget] | None = None
     _locale_file: str = 'Localization/{target}/{locale}/{target}.po'
 
-    _multilingual_csv_name: str = None
-    _bilingual_csv_name: str = None
+    _multilingual_csv_name: str | None = None
+    _bilingual_csv_name: str | None = None
 
     _csv_extension: str = 'tsv'
-    _content_path: Path = None
-    _csv_path: Path = None
+    _content_path: Path | None = None
+    _csv_path: Path | None = None
 
     def post_update(self):
         super().post_update()
@@ -173,9 +169,9 @@ class UE_PO_CSV_Converter(LocTask):
 
     @staticmethod
     def parse_po_id(po_id: str):
-        '''
+        """
         Takes a text ID from CSV and returns (namespace, key) for PO
-        '''
+        """
 
         comma_index = None
         is_escaped = False
@@ -278,10 +274,10 @@ class UE_PO_CSV_Converter(LocTask):
         return string
 
     def load_source_PO(self, target: str) -> int:
-        '''
+        """
         Load a PO file for the specified target
         and return a list of dicts containing all the data
-        '''
+        """
         po_path = self._content_path / self._locale_file.format(
             target=target, locale=self.native_locale
         )
@@ -377,7 +373,7 @@ class UE_PO_CSV_Converter(LocTask):
 
         return 0
 
-    def load_POs_for_all_targets(self) -> int:
+    def load_POs_for_all_targets(self) -> None:
         for target in self._loc_targets:
             locales = target.get_current_locales()
             self.load_source_PO(target.name)
@@ -478,7 +474,7 @@ class UE_PO_CSV_Converter(LocTask):
     def _save_CSV(
         self,
         filename: str,
-        strings: dict[str:dict],
+        strings: dict[str, dict],
         fields: list,
     ):
         with open(filename, 'w', newline='', encoding=self.csv_encoding) as f:
@@ -536,17 +532,12 @@ class UE_PO_CSV_Converter(LocTask):
                 )
                 logger.info(f'{target.name}/{locale} saved!')
 
+    def run(self) -> bool:
+        return self.load_POs_for_all_targets() and self.save_bilingual_CSVs_per_target()
+
 
 def main():
-    logger.add(
-        'logs/locsync.log',
-        rotation='10MB',
-        retention='1 month',
-        enqueue=True,
-        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
-        encoding='utf-8',
-    )
+    init_logging()
 
     logger.info('')
     logger.info('--- Converting PO files into CSV file(s) ---')
@@ -556,15 +547,9 @@ def main():
 
     task_PO_to_CSVs = UE_PO_CSV_Converter()
 
-    task_PO_to_CSVs.read_config(Path(__file__).name, logger)
+    task_PO_to_CSVs.read_config(Path(__file__).name)
 
-    result = task_PO_to_CSVs.load_POs_for_all_targets()
-
-    for key, value in list(
-        task_PO_to_CSVs._strings[task_PO_to_CSVs._loc_targets[1].name].items()
-    )[:5]:
-        print(f'{key} -> {value}')
-    result = task_PO_to_CSVs.save_bilingual_CSVs_per_target()
+    result = task_PO_to_CSVs.run()
 
     # --- Load source POs and load translations from CSVs ---
 
@@ -596,5 +581,5 @@ def main():
 
 
 # Process the files if the file isn't imported
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
