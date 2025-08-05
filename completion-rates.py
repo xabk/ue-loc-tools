@@ -3,10 +3,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from loguru import logger
 
-from libraries.utilities import LocTask
+from libraries.utilities import LocTask, init_logging
 from libraries.crowdin import UECrowdinClient
-
-# TODO: Support several localization targets
 
 # ----------------------------------------------------------------------------------------------------
 # Parameters - These can be edited
@@ -14,14 +12,11 @@ from libraries.crowdin import UECrowdinClient
 
 @dataclass
 class UpdateLanguageCompletionRates(LocTask):
-
     # Declare Crowdin parameters to load them from config
-    token: str = None
-    organization: str = None
-    project_id: int = None
+    token: str | None = None
+    organization: str | None = None
+    project_id: int | None = None
 
-    # TODO: Process all loc targets if none are specified
-    # TODO: Change lambda to empty list to process all loc targets when implemented
     loc_targets: list = field(
         default_factory=lambda: ['Game']
     )  # Localization targets, empty = process all targets
@@ -37,15 +32,15 @@ class UpdateLanguageCompletionRates(LocTask):
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
 
-    _csv_path: Path = None
-    _content_path: Path = None
+    _csv_path: Path | None = None
+    _content_path: Path | None = None
 
     def post_update(self):
         super().post_update()
         self._content_path = Path(self.content_dir)
         self._csv_path = self._content_path / self.csv_name
 
-    def get_completion_rates_for_all_targets(self) -> dict:
+    def get_completion_rates_for_all_targets(self) -> dict[str, dict[str, int]] | None:
         crowdin = UECrowdinClient(
             self.token, logger, self.organization, self.project_id
         )
@@ -109,7 +104,7 @@ class UpdateLanguageCompletionRates(LocTask):
         # Data incomplete, better not use it
         if targets_processed and len(targets_processed) != len(self.loc_targets):
             logger.error(
-                'Incomplete data from Crowdin. Can\'t use it as it may lead to wrong completion rates!'
+                "Incomplete data from Crowdin. Can't use it as it may lead to wrong completion rates!"
             )
             logger.error(
                 f'Only recieved data for targets ({len(targets_processed)} / {len(self.loc_targets)}): '
@@ -147,18 +142,18 @@ class UpdateLanguageCompletionRates(LocTask):
         completion_rates = self.get_completion_rates_for_all_targets()
 
         if completion_rates:
-            logger.info(f'Got completion rates for from Crowdin:')
+            logger.info('Got completion rates for from Crowdin:')
             logger.info(completion_rates)
         else:
             # No data to process
-            logger.error(f'No completion rates recieved from Crowdin. Aborting!')
+            logger.error('No completion rates recieved from Crowdin. Aborting!')
             return False
 
         for row in rows:
             # Skip the native and test cultures (100% anyway)
             if row[0] in self.cultures_to_skip:
                 logger.info(
-                    f'{row[0]} skipped because it\'s in the locales to skip list.'
+                    f"{row[0]} skipped because it's in the locales to skip list."
                 )
                 locales_skipped += 1
                 continue
@@ -193,16 +188,7 @@ class UpdateLanguageCompletionRates(LocTask):
 
 
 def main():
-
-    logger.add(
-        'logs/locsync.log',
-        rotation='10MB',
-        retention='1 month',
-        enqueue=True,
-        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
-        encoding='utf-8',
-    )
+    init_logging()
 
     logger.info('')
     logger.info(
@@ -212,7 +198,7 @@ def main():
 
     task = UpdateLanguageCompletionRates()
 
-    task.read_config(Path(__file__).name, logger)
+    task.read_config(Path(__file__).name)
 
     result = task.update_completion_rates()
 
@@ -227,5 +213,5 @@ def main():
 
 
 # Run the main functionality of the script if it's not imported
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
