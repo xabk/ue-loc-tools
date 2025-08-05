@@ -4,13 +4,12 @@
 This pack of scripts aims to help with automating gather/export/import/compile and sync process for Unreal and Crowdin. On top of that, it adds a bunch of improvements and convenience features: it sorts and annotates the source files to help translators, creates a debug ID and 'hash' pseudolocalized locales, and lets you manipulate localization targets to avoid tedious manual tasks in Loc Dashboard (e.g., adding or deleting one or more languages to one or more targets and copying languages from one target to another).
 
 Installation:
-1. Run `#create-venv-for-loc-sync.bat` to create a virtual environment 
-and install the dependencies.
+1. Install `uv`: https://docs.astral.sh/uv/getting-started/installation/.
 2. Configure the scripts for your project: targets, Crowdin credentials, script parameters, 
 and task lists based on what you need.
 3. Run `!loc-sync.bat` to launch the loc tools and follow the instructions.
 
-You can also run the script in automated mode with `python locsync.py task-list-name -u`.
+You can also run the script in automated mode with `uv run locsync.py task-list-name -u`.
 
 By default, `base.config.yaml` contains several task lists tailored for different scenarios. Take a look at them and adjust to your needs.
 
