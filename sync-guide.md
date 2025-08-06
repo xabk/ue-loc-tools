@@ -16,6 +16,7 @@ to open the Unreal Editor or downloading and copying any files yourself.
 - [Task Lists](#loc-sync-task-lists)
 - [Typical Scenarios](#typical-scenarios)
 - [Errors](#errors-and-logging)
+- [Adding new localization targets](#adding-new-localization-targets)
 
 ## Usage
 
@@ -137,3 +138,33 @@ contain a whole bunch of warnings and non-critical errors. Don't be afraid of th
 However, if a script crashes with an exception or if it prints that a task has failed, 
 or if you see return code that isn't zero, then something's off. 
 Logs are located under `Content/Python/logs`.
+
+# Adding new localization targets
+If you want to add new localization targets:
+
+1. Add the targets in Unreal Editor and configure its name and gathering parameters, 
+like paths. *Do not not bother configuring the locales manually*.
+2. Run `python targets.py replace --source <any_existing_target> --targets <new_target_1>,<new_target_2>,...`.
+3. Add your targets in `base.config.yaml`:
+   - in the `parameters` section under `loc-targets` to include it into the base set
+     of all targets
+   - in any of the `<task-list>/script-parameters` sections under `loc_targets` 
+     to include it into the task lists that you want it to be part of
+   - *Important*: if your targets depend on each other (check Localization Dashboard setup), 
+     add them so that the independent targets are listed first, then the dependent targets. 
+4. Run `!loc-sync.bat` and choose `6`: `ALL TARGETS: *Local* Gather+Test+Longest+Import`
+5. Check the logs to see if the new targets are properly gathered and processed.
+6. Remember to add the new files in Perforce: 
+just select each `Localization/<new_target>` folder and 
+select the `Mark for Add` option in the context menu. 
+There should be a bunch of files in the root of the target folder, 
+including `.locmeta` and `.manifest` files, 
+and three files in each of the locales folders: `.archive`, `.po`, and `.locres`.
+7. Submit the changes to Perforce.
+8. Now we need to add the new targets to Crowdin:
+   - Add the new target(s) to the `loc_targets` array in the Add New Source Files
+     task in `base.config.yaml`, usually located closer to the end of the file.
+   - Run `!loc-sync.bat` and choose `3`: `ALL TARGETS: Add source files to Crowdin`.
+   - Check that the files are now on Crowdin.
+   - Comment out the new targets in `base.config.yaml` / `add-source-files` task 
+     to keep things tidy.
