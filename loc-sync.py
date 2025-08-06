@@ -13,7 +13,6 @@ try:
     import yaml
     from pathlib import Path
     from timeit import default_timer as timer
-    import re
     from loguru import logger
 except Exception as error:
     err = error
@@ -135,9 +134,13 @@ def get_task_list_from_user(config):
     task_lists = [t for t in config if t not in CFG_SECTIONS]
     task_list = ''
     while not task_list:
-        print('\nAvailable task lists from base.config.yaml:')
+        print('\nAvailable task lists from base.config.yaml:\n')
         for i, task in enumerate(task_lists, start=1):
-            print(f'{i}. {task}')
+            lines = task.split('\n')
+            print(f'\033[92m{i:>2d}.\033[0m {lines[0]}')
+            for line in lines[1:]:
+                print(f'\t\033[90m{line}\033[0m')
+
         name_or_num = input('Enter the number or name of a task list to run: ')
         if name_or_num in task_lists:
             task_list = name_or_num
@@ -147,7 +150,7 @@ def get_task_list_from_user(config):
             except ValueError:
                 print('Error. Please enter the task list name or its number.')
         if task_list:
-            print(f'\nSelected taks list: {task_list}:')
+            print(f'\nSelected task list: \033[92m{task_list}\033[0m:')
             update_warning = False
             for task in config[task_list]:
                 if 'updates-source' in task:
@@ -158,12 +161,12 @@ def get_task_list_from_user(config):
 
             if update_warning:
                 print(
-                    '\n\033[93mWarning: This task list contains tasks '
-                    'that update the source files.\033[0m'
+                    '\n\033[93mWarning: This task list contains tasks that update '
+                    'the source files.\033[0m'
                 )
 
             conf = input(
-                f'\nEnter Y to execute task list {task_list}. '
+                f'\nEnter Y to execute task list {task_list.splitlines()[0].strip()}. '
                 'Anything else to go back to task list selection... '
             )
             if conf != 'Y' and conf != 'y':
@@ -400,8 +403,8 @@ def main():
         if task[2] == 'Return code: 0':
             logger.success(f'  Success! {task[0]["script"]}: {task[1]}')
         else:
-            logger.warning(
-                f'  Something went wrong! {task[0]["script"]}: {task[1]} ({task[2]})'
+            logger.info(
+                f'\033[93m  Warning or error!\033[0m {task[0]["script"]}: {task[1]} ({task[2]})'
             )
     logger.info(f'Total execution time: {elapsed:.2f} sec.')
 
