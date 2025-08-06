@@ -603,6 +603,7 @@ script-parameters:
 "[SRV] Add new files to Crowdin with correct export settings (OBS! Relies on prior Gather and Source prep for each target)":
   - description: "Add new source files to Crowdin"
     script: update-source-files
+    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
     script-parameters:
       # Targets that have new files to be added to Crowdin:
       loc_targets: []
