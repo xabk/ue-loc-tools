@@ -1165,15 +1165,19 @@ class ProcessTestAndHashLocales(LocTask):
         """
         Run the locale processing task
         """
-        result = self.process_locales()
+        errors = self.process_locales()
 
         # Optional update of the context Excel file
         self.update_context_xlsx_file()
 
-        return result
+        return not errors  # Return True for success, False for failure
 
 
 def main():
+    """
+    Legacy main function for backward compatibility.
+    When called as a script, this provides the old interface.
+    """
     init_logging()
 
     logger.info('')
@@ -1181,19 +1185,14 @@ def main():
     logger.info('')
 
     task = ProcessTestAndHashLocales()
-
     task.read_config(Path(__file__).name)
-
     result = task.run()
 
     logger.info('')
     logger.info('--- Process debug id/test/source, and hash locales script end ---')
     logger.info('')
 
-    if result:
-        return 0
-
-    return 1
+    return 0 if result else 1
 
 
 # Process the files if the file isn't imported
