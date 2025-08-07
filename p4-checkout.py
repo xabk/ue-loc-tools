@@ -130,6 +130,9 @@ class CheckoutAssets(LocTask):
         )
         return True
 
+    def run(self):
+        return self.checkout_assets()
+
 
 def main():
     init_logging()
@@ -140,7 +143,7 @@ def main():
 
     task.read_config(script=Path(__file__).name)
 
-    result = task.checkout_assets()
+    result = task.run()
 
     logger.info('--- Checkout assets script end ---')
 
