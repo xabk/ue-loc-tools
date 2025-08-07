@@ -27,6 +27,12 @@ from libraries.types import StringContextList
 # 3. Defaults below (if no parameters found in config or no config found)
 @dataclass
 class ProcessTestAndHashLocales(LocTask):
+    # Task metadata
+    name: str = 'Test and Hash Locales'
+    description: str = (
+        'Process debug ID/test/source and hash locales with context enhancement'
+    )
+
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to list to process all loc targets when implemented
     loc_targets: list = field(
