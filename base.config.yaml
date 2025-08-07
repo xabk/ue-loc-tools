@@ -27,6 +27,57 @@ crowdin:
 
 #
 # -------------------------------------------------------------
+# ----------------- TASK DISCOVERY SECTION ------------------
+# -------------------------------------------------------------
+#
+# Configure which tasks are available for execution
+tasks:
+  test-lang:
+    module: "tasks.test_lang"
+    class: "ProcessTestAndHashLocales"
+
+  p4-checkout:
+    module: "p4-checkout"
+    class: "CheckoutAssets"
+
+  build-and-download:
+    module: "build-and-download"
+    class: "BuildAndDownloadTranslations"
+
+  ue-loc-gather-cmd:
+    module: "ue-loc-gather-cmd"
+    class: "UnrealLocGatherCommandlet"
+
+  ue-loc-gather-cmd-2:
+    module: "ue-loc-gather-cmd-2"
+    class: "UnrealLocGatherCommandlet"
+
+  update-source-files:
+    module: "update-source-files"
+    class: "UpdateSourceFile"
+
+  import-screens:
+    module: "import-screens"
+    class: "ImportScreenshots"
+
+  mt-pseudo:
+    module: "mt-pseudo"
+    class: "MTPseudo"
+
+  completion-rates:
+    module: "completion-rates"
+    class: "UpdateLanguageCompletionRates"
+
+  community-credits:
+    module: "community-credits"
+    class: "UpdateCommunityCredits"
+
+  po-csv-converter:
+    module: "po-csv-converter"
+    class: "UE_PO_CSV_Converter"
+
+#
+# -------------------------------------------------------------
 # ----------------- LOCSYNC SETTINGS SECTION ------------------
 # -------------------------------------------------------------
 #
