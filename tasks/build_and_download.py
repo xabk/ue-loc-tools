@@ -78,7 +78,7 @@ class BuildAndDownloadTranslations(LocTask):
 
     def post_update(self) -> None:
         super().post_update()
-        self._content_path = Path(self.content_dir)
+        self._content_path = Path(self.content_dir).resolve().absolute()
         self._zip_path = self._content_path / self.zip_name
         self._temp_path = self._content_path / self.temp_dir
 
@@ -188,19 +188,33 @@ class BuildAndDownloadTranslations(LocTask):
         logger.info(f'Targets to process ({len(self.loc_targets)}): {self.loc_targets}')
 
         targets_processed = []
+        targets_with_errors = []
         for t in self.loc_targets:
             if self.process_target(t):
                 targets_processed += [t]
+            else:
+                targets_with_errors += [t]
 
-        if targets_processed:
-            logger.info(
-                f'Targets processed ({len(targets_processed)}): {targets_processed}'
+        if len(targets_processed) == len(self.loc_targets):
+            logger.success(
+                f'All targets processed ({len(targets_processed)}): {targets_processed}'
             )
             return True
 
-        logger.warning('No targets processed.')
+        if targets_processed:
+            logger.error('Not all targets have been processed')
+        else:
+            logger.error('No targets processed.')
 
-        return False
+        logger.info(
+            f'Targets processed ({len(targets_processed)}): {targets_processed}'
+        )
+
+        logger.info(
+            f'Targets with errors ({len(targets_with_errors)}): {targets_with_errors}'
+        )
+
+        return True
 
     def load_csv_files_to_po(
         self, csv_files: list[Path], po_file: polib.POFile
@@ -403,13 +417,10 @@ class BuildAndDownloadTranslations(LocTask):
             if self.process_csv_target(t):
                 targets_processed += [t]
 
-        shutil.rmtree(self._temp_path)
-
         if targets_processed and len(targets_processed) == len(self.csv_loc_targets):
             logger.info(
                 f'CSV targets processed ({len(targets_processed)}): {targets_processed}'
             )
-            self._zip_path.unlink()
             return True
 
         if not self.csv_loc_targets:
@@ -417,7 +428,7 @@ class BuildAndDownloadTranslations(LocTask):
             return True
 
         logger.warning(
-            f'No or not all CSV targets processed: {targets_processed} out of {self.csv_loc_targets}'
+            f'Only some CSV targets processed: {targets_processed} out of {self.csv_loc_targets}'
         )
 
         return False
