@@ -48,10 +48,6 @@ tasks:
     module: "tasks.ue_loc_gather_cmd"
     class: "UnrealLocGatherCommandlet"
 
-  ue-loc-gather-cmd-2:
-    module: "tasks.ue_loc_gather_cmd_2"
-    class: "UnrealLocGatherCommandlet"
-
   update-source-files:
     module: "tasks.update_source_files"
     class: "UpdateSourceFile"
