@@ -7,6 +7,10 @@ from itertools import chain
 
 from libraries.utilities import LocTask, init_logging
 
+ERRORS_TO_IGNORE: list = [
+    '- file(s) not on client.',
+]
+
 
 @dataclass
 class CheckoutAssets(LocTask):
@@ -24,6 +28,9 @@ class CheckoutAssets(LocTask):
     config_name: str = '../Saved/Config/WindowsEditor/SourceControlSettings.ini'
     p4_config_section: str = 'PerforceSourceControl.PerforceSourceControlSettings'
 
+    # Ignore some harmless errors
+    errors_to_ignore: list[str] | None = None
+
     _content_path: Path | None = None
     _config_path: Path | None = None
 
@@ -31,6 +38,8 @@ class CheckoutAssets(LocTask):
         super().post_update()
         self._content_path = Path(self.content_dir)
         self._config_path = (self._content_path / self.config_name).resolve()
+        if not self.errors_to_ignore:
+            self.errors_to_ignore = ERRORS_TO_IGNORE
 
     def checkout_assets(self):
         cfg = ConfigParser()
@@ -112,16 +121,28 @@ class CheckoutAssets(LocTask):
         logger.info(f'Trying to check out {len(files)} assets in chunks of 20.')
 
         error = False
+        warning = False
         for chunk in [files[i : i + 20] for i in range(0, len(files), 20)]:
             try:
                 p4.run('edit', chunk)
             except Exception as err:
-                logger.error(f'Check out error: {err}')
-                logger.error(f'Check files or config. Config path: {self._config_path}')
-                error = True
+                if any(
+                    ignored_error in str(err) for ignored_error in self.errors_to_ignore
+                ):
+                    logger.warning(f'Ignored error: {err}')
+                    warning = True
+                else:
+                    logger.error(f'Check out error: {err}')
+                    error = True
 
-        if error:
-            logger.warning('Some files were not checked out. Check logs for details.')
+        if warning:
+            logger.warning('Some errors were ignored as configured.')
+        elif error:
+            logger.error(
+                'There was an error, please see the log and '
+                'check the files or the config.\n'
+                f'Config path: {self._config_path}'
+            )
             return False
 
         logger.info(
