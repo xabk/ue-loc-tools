@@ -12,7 +12,7 @@ from libraries.utilities import LocTask, init_logging
 
 import importlib
 
-dl_task = importlib.import_module('build-and-download')
+dl_task = importlib.import_module('tasks.build_and_download')
 
 
 @dataclass
