@@ -37,43 +37,43 @@ tasks:
     class: "ProcessTestAndHashLocales"
 
   p4-checkout:
-    module: "p4-checkout"
+    module: "tasks.p4_checkout"
     class: "CheckoutAssets"
 
   build-and-download:
-    module: "build-and-download"
+    module: "tasks.build_and_download"
     class: "BuildAndDownloadTranslations"
 
   ue-loc-gather-cmd:
-    module: "ue-loc-gather-cmd"
+    module: "tasks.ue_loc_gather_cmd"
     class: "UnrealLocGatherCommandlet"
 
   ue-loc-gather-cmd-2:
-    module: "ue-loc-gather-cmd-2"
+    module: "tasks.ue_loc_gather_cmd_2"
     class: "UnrealLocGatherCommandlet"
 
   update-source-files:
-    module: "update-source-files"
+    module: "tasks.update_source_files"
     class: "UpdateSourceFile"
 
   import-screens:
-    module: "import-screens"
+    module: "tasks.import_screens"
     class: "ImportScreenshots"
 
   mt-pseudo:
-    module: "mt-pseudo"
+    module: "tasks.mt_pseudo"
     class: "MTPseudo"
 
   completion-rates:
-    module: "completion-rates"
+    module: "tasks.completion_rates"
     class: "UpdateLanguageCompletionRates"
 
   community-credits:
-    module: "community-credits"
+    module: "tasks.community_credits"
     class: "UpdateCommunityCredits"
 
   po-csv-converter:
-    module: "po-csv-converter"
+    module: "tasks.po_csv_converter"
     class: "UE_PO_CSV_Converter"
 
 #
