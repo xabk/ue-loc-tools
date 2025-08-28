@@ -1,13 +1,15 @@
-"""CLI entry point for localization task synchronization.
+"""Typer-based CLI replicating prior argparse interface for loc-sync.
 
-This file now delegates all task running logic to `libraries.task_runner` in
-order to keep the script lean. Existing imports / usage of TaskRunner should
-continue to work (TaskRunner symbol is re-exported for backwards compatibility).
+Usage:
+    uv run loc-sync.py                 -> interactive task list selection
+    uv run loc-sync.py MYLIST          -> run task list MYLIST
+    uv run loc-sync.py -u MYLIST       -> unattended run
+    uv run loc-sync.py --list-tasks    -> list registered tasks
 """
 
-import sys
-import argparse
-from typing import Any, cast
+import typer
+from typing import Any, Optional, cast
+from typing_extensions import Annotated as A
 from timeit import default_timer as timer
 from loguru import logger
 
@@ -18,94 +20,92 @@ from libraries.task_runner import (
     DEFAULT_SECRET_CONFIG,
 )
 
-
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="""
-        Run localization tasks based on configuration
-        Example: uv run loc-sync.py"""
-    )
-    parser.add_argument(
-        'tasklist', type=str, nargs='?', help='Task list to run from base.config.yaml'
-    )
-    parser.add_argument(
-        '-u', '--unattended', action='store_true', help='Run without user interaction'
-    )
-    parser.add_argument(
-        '-c',
-        '--config',
-        type=str,
-        help=f'Base config file path (default: {DEFAULT_BASE_CONFIG})',
-    )
-    parser.add_argument(
-        '-s',
-        '--secret',
-        type=str,
-        help=f'Secret config file path (default: {DEFAULT_SECRET_CONFIG})',
-    )
-    parser.add_argument(
-        '--list-tasks', action='store_true', help='List available tasks with metadata'
-    )
-    parser.add_argument(
-        '--debug', action='store_true', help='Enable debug logging and exceptions'
-    )
-    return parser.parse_args()
+app = typer.Typer(
+    add_completion=False,
+    invoke_without_command=True,
+    no_args_is_help=False,
+    help='Run localization synchronization tasks.',
+)
 
 
-def main():
-    init_logging()
-
-    args = parse_arguments()
-
+def _build_runner(
+    base_cfg: str, secret_cfg: str, unattended: bool, debug: bool
+) -> TaskRunner:
     runner = TaskRunner()
+    runner.unattended = unattended
+    runner.debug = debug
+    runner.load_config(base_cfg, secret_cfg)
+    return runner
 
-    # Load config early for discovery
+
+@app.command()
+def run(
+    tasklist: A[
+        Optional[str], typer.Argument(help='Task list to run.', show_default=False)
+    ] = None,
+    unattended: A[
+        bool,
+        typer.Option('--unattended', '-u', help='Run without prompts', is_flag=True),
+    ] = False,
+    config: A[
+        str, typer.Option('--config', '-c', help='Base config file')
+    ] = DEFAULT_BASE_CONFIG,
+    secret: A[
+        str, typer.Option('--secret', '-s', help='Secret config file')
+    ] = DEFAULT_SECRET_CONFIG,
+    list_tasks: A[
+        bool, typer.Option('--list-tasks', help='List available tasks', is_flag=True)
+    ] = False,
+    debug: A[
+        bool, typer.Option('--debug', help='Enable debug logging', is_flag=True)
+    ] = False,
+):
+    """Primary entry point (no subcommand). Future subcommands can be added without changing usage."""
+    init_logging(debug)
     try:
-        runner.load_config(
-            args.config or DEFAULT_BASE_CONFIG, args.secret or DEFAULT_SECRET_CONFIG
-        )
+        runner = _build_runner(config, secret, unattended, debug)
     except FileNotFoundError as e:
         logger.error(str(e))
-        return 1
+        raise typer.Exit(code=1)
 
-    if args.list_tasks:
+    if list_tasks:
         logger.info('Available tasks:')
-        task_items = runner.list_task_metadata()
-        if not task_items:
-            logger.warning('No tasks available - check your configuration')
-            return 1
-        for script_name, task_name, task_description in task_items:
+        items = runner.list_task_metadata()
+        if not items:
+            logger.warning('No tasks available - check configuration')
+            raise typer.Exit(code=1)
+        for script_name, task_name, task_description in items:
             logger.info(f'  {script_name}')
             logger.info(f'    Name: {task_name}')
             logger.info(f'    Description: {task_description}')
             logger.info('')
-        return 0
+        raise typer.Exit(code=0)
 
-    runner.unattended = args.unattended
-    runner.debug = args.debug
-
-    if args.tasklist:
-        runner.task_list_name = args.tasklist
+    if tasklist:
+        runner.task_list_name = tasklist
     else:
         try:
             runner.task_list_name = runner.get_task_list_from_user()
         except (ValueError, KeyboardInterrupt) as e:
             logger.error(str(e))
-            return 1
+            raise typer.Exit(code=1)
 
     if runner.task_list_name not in runner.config:
         logger.error(f"Task list '{runner.task_list_name}' not found in configuration")
-        return 1
+        raise typer.Exit(code=1)
 
     tasks = cast(list[dict[str, Any]], runner.config[runner.task_list_name])
-
     logger.info(f'Executing task list: {runner.task_list_name}')
     total_start = timer()
     results = runner.run_task_list(tasks)
     total_duration = timer() - total_start
+    code = runner.summarize(results, total_duration)
+    raise typer.Exit(code=code)
 
-    return runner.summarize(results, total_duration)
+
+def main():  # external entry point if imported
+    app()
 
 
-if __name__ == '__main__':  # pragma: no cover
-    sys.exit(main())
+if __name__ == '__main__':
+    app()
