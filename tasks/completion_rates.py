@@ -2,9 +2,14 @@ import csv
 from dataclasses import dataclass, field
 from pathlib import Path
 from loguru import logger
+import subprocess
+import re
+from math import ceil
 
-from libraries.utilities import LocTask, init_logging
+from libraries.utilities import LocTask
 from libraries.crowdin import UECrowdinClient
+
+# TODO: Support several localization targets
 
 # ----------------------------------------------------------------------------------------------------
 # Parameters - These can be edited
@@ -17,6 +22,23 @@ class UpdateLanguageCompletionRates(LocTask):
     organization: str | None = None
     project_id: int | None = None
 
+    use_cli: bool = True
+    cli_branch: str | None = None
+    cli_folders: list[str] | None = None
+    cli_files: list[str] | None = None
+
+    override_progress: dict[str, int] | None = None  # lang: progress
+
+    language_mappings: dict[str, str] = field(
+        default_factory=lambda: {
+            'zh-CN': 'zh-Hans',
+            'zh-TW': 'zh-Hant',
+            'es-MX': 'es-419',
+        }
+    )
+
+    # TODO: Process all loc targets if none are specified
+    # TODO: Change lambda to empty list to process all loc targets when implemented
     loc_targets: list = field(
         default_factory=lambda: ['Game']
     )  # Localization targets, empty = process all targets
@@ -40,7 +62,101 @@ class UpdateLanguageCompletionRates(LocTask):
         self._content_path = Path(self.content_dir)
         self._csv_path = self._content_path / self.csv_name
 
-    def get_completion_rates_for_all_targets(self) -> dict[str, dict[str, int]] | None:
+    def cli_get_completion_rates(self) -> dict[str, dict[str, int]]:
+        def add_stats(
+            result: list[str], stats: dict[str, dict[str, int]]
+        ) -> dict[str, dict[str, int]]:
+            current_lang = ''
+            for line in result:
+                if line.strip() == '':
+                    continue
+                if re.match(r'^.+?\):$', line):
+                    current_lang = re.search(r'\(([^()]+)\):$', line).group(1)
+                    continue
+                if 'Translated: ' in line:
+                    match = re.search(r'Words: (\d+)/(\d+)', line)
+                    if match:
+                        translated = int(match.group(1))
+                        total = int(match.group(2))
+                        if current_lang in stats:
+                            stats[current_lang]['translated'] += translated
+                            stats[current_lang]['total'] += total
+                        else:
+                            stats[current_lang] = {
+                                'translated': translated,
+                                'total': total,
+                            }
+            return stats
+
+        stats = {}
+
+        if self.organization:
+            base_url = f'https://{self.organization}.api.crowdin.com'
+        else:
+            base_url = 'https://api.crowdin.com'
+
+        command = [
+            'crowdin',
+            'status',
+            'translation',
+            f'--base-url={base_url}',
+            f'--project-id={self.project_id}',
+            '-v',
+            '--no-progress',
+            '--plain',
+        ]
+
+        if self.cli_branch:
+            command.append(f'--branch="{self.cli_branch}"')
+
+        for folder in self.cli_folders:
+            logger.info(
+                f'Getting completion rates for {folder}:\n'
+                f'{" ".join(command)} -d="{folder}"'
+            )
+
+            result = subprocess.run(
+                [*command, f'-d={folder}', f'--token={self.token}'],
+                capture_output=True,
+                text=True,
+                shell=True,
+            )
+            if result.returncode != 0:
+                logger.error(
+                    f'Failed to get completion rates for {folder}. CLI output:'
+                )
+                logger.error(result.stdout)
+                logger.error(result.stderr)
+                continue
+
+            stats = add_stats(result.stdout.splitlines(), stats)
+
+        for file in self.cli_files:
+            result = subprocess.run(
+                [*command, f'-f={file}', f'--token={self.token}'],
+                capture_output=True,
+                text=True,
+                shell=True,
+            )
+            if result.returncode != 0:
+                logger.error(f'Failed to get completion rates for {folder}')
+                continue
+
+            stats = add_stats(result.stdout.splitlines(), stats)
+
+        for lang in stats:
+            stats[lang]['translationProgress'] = ceil(
+                stats[lang]['translated'] / stats[lang]['total'] * 100
+            )
+
+        for lang in self.language_mappings:
+            if lang in stats:
+                stats[self.language_mappings[lang]] = stats.pop(lang)
+
+        return stats
+
+    def get_completion_rates_for_all_targets(self) -> dict | None:
+        ### TODO: DEPRECATED
         crowdin = UECrowdinClient(
             self.token, logger, self.organization, self.project_id
         )
@@ -139,15 +255,20 @@ class UpdateLanguageCompletionRates(LocTask):
         locales_processed = 0
         locales_skipped = 0
 
-        completion_rates = self.get_completion_rates_for_all_targets()
+        completion_rates = {}
 
-        if completion_rates:
-            logger.info('Got completion rates for from Crowdin:')
-            logger.info(completion_rates)
+        if self.use_cli:
+            completion_rates = self.cli_get_completion_rates()
         else:
-            # No data to process
-            logger.error('No completion rates recieved from Crowdin. Aborting!')
+            completion_rates = self.get_completion_rates_for_all_targets()
+
+        if not completion_rates:
+            logger.error('No completion rates received. Exiting.')
             return False
+
+        logger.info('Completion rates received:')
+        for lang, data in completion_rates.items():
+            logger.info(f'{lang}: {data["translationProgress"]}%')
 
         for row in rows:
             # Skip the native and test cultures (100% anyway)
@@ -156,6 +277,14 @@ class UpdateLanguageCompletionRates(LocTask):
                     f"{row[0]} skipped because it's in the locales to skip list."
                 )
                 locales_skipped += 1
+                continue
+
+            if self.override_progress and row[0] in self.override_progress:
+                logger.info(
+                    f'{row[0]} updated from {row[4]} to {self.override_progress[row[0]]} (Override).'
+                )
+                row[4] = self.override_progress[row[0]]
+                locales_processed += 1
                 continue
 
             if row[0] in completion_rates:
@@ -186,9 +315,20 @@ class UpdateLanguageCompletionRates(LocTask):
 
         return False
 
+    def run(self):
+        return self.update_completion_rates()
+
 
 def main():
-    init_logging()
+    logger.add(
+        'logs/locsync.log',
+        rotation='10MB',
+        retention='1 month',
+        enqueue=True,
+        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
+        level='INFO',
+        encoding='utf-8',
+    )
 
     logger.info('')
     logger.info(
