@@ -2,12 +2,7 @@ import re
 from loguru import logger
 from pathlib import Path
 from dataclasses import dataclass, field
-import pandas as pd  # TODO Get rid of pandas?
 import csv
-import openpyxl
-from openpyxl import Workbook
-from openpyxl.utils import get_column_letter
-from openpyxl.styles import PatternFill, Font, Alignment
 from datetime import datetime
 
 from libraries import (
@@ -15,6 +10,10 @@ from libraries import (
 )
 from libraries.utilities import LocTask, init_logging
 from libraries.types import StringContextList
+
+# Heavy imports moved to lazy loading to improve startup time
+# import pandas as pd  # Moved to methods that use it
+# import openpyxl  # Moved to methods that use it
 
 
 # -------------------------------------------------------------------------------------
@@ -129,7 +128,7 @@ class ProcessTestAndHashLocales(LocTask):
     _id_regex: str | None = None
     _content_path: Path | None = None
     _external_context: dict[str | None, StringContextList] | None = None
-    _external_context_fields: list[str] = field(
+    _external_context_fields: dict[str, dict[str, int]] = field(
         default_factory=lambda: {
             'Key': {'Wrap': True, 'Width': 20},
             'Path': {'Wrap': False, 'Width': 30},
@@ -315,6 +314,9 @@ class ProcessTestAndHashLocales(LocTask):
         """
         Load narrative context from Excel files
         """
+        # Lazy import to avoid startup delay
+        import pandas as pd
+
         if not Path(fpath).exists():
             logger.warning(f'Narrative context file not found: {fpath}')
             return {}
@@ -475,6 +477,9 @@ class ProcessTestAndHashLocales(LocTask):
         """
         Load context from an Excel file
         """
+        # Lazy import to avoid startup delay
+        import pandas as pd
+
         if not fpath.exists():
             logger.warning(f'Context file not found: {fpath}')
             return {}
@@ -580,6 +585,12 @@ class ProcessTestAndHashLocales(LocTask):
         return context
 
     def update_context_xlsx_file(self):
+        # Lazy import to avoid startup delay
+        import openpyxl
+        from openpyxl import Workbook
+        from openpyxl.utils import get_column_letter
+        from openpyxl.styles import PatternFill, Font, Alignment
+
         if not self.external_context_xlsx or not self.external_context_targets:
             return
 
@@ -598,9 +609,9 @@ class ProcessTestAndHashLocales(LocTask):
                 path = ''
                 for comment in entry.comment.splitlines(False):
                     if re.match(r'^(Loc:\s|SourceLocation:\s)(.+)$', comment):
-                        path = re.search(
-                            r'(Loc:\s|SourceLocation:\s)(.+)$', comment
-                        ).group(2)
+                        match = re.search(r'(Loc:\s|SourceLocation:\s)(.+)$', comment)
+                        if match:
+                            path = match.group(2)
                         continue
 
                     if comment not in loc_comments:
