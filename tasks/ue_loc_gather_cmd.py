@@ -237,7 +237,11 @@ class UnrealLocGatherCommandlet(LocTask):
                     break
             returncode = process.returncode
 
-        return returncode
+            logger.info(
+                f'Unreal loc gather commandlet finished with return code: {returncode}'
+            )
+
+        return returncode == 0
 
     def run(self):
         return self.run_tasks()
