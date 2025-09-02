@@ -275,7 +275,7 @@ class BuildAndDownloadTranslations(LocTask):
 
             if po_source == csv_source:
                 # Update the translation (if source is the same, or if we're ignoring the mismatch)
-                entry.msgstr = csv_data[key]['target']
+                entry.msgstr = translation
                 del csv_data[key]
                 continue
 
@@ -289,14 +289,14 @@ class BuildAndDownloadTranslations(LocTask):
                     'csv': csv_source,
                 }
                 # Update the translation (if source is the same, or if we're ignoring the mismatch)
-                entry.msgstr = csv_data[key]['target']
+                entry.msgstr = translation
                 del csv_data[key]
                 continue
 
             if self.ignore_source_mismatch:
                 logger.warning(f'Ignoring source string mismatch for key {key}')
                 # Update the translation (if source is the same, or if we're ignoring the mismatch)
-                entry.msgstr = csv_data[key]['target']
+                entry.msgstr = translation
                 del csv_data[key]
                 continue
 
