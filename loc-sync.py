@@ -81,26 +81,34 @@ def run(
             logger.info('')
         raise typer.Exit(code=0)
 
-    if tasklist:
-        runner.task_list_name = tasklist
-    else:
-        try:
-            runner.task_list_name = runner.get_task_list_from_user()
-        except (ValueError, KeyboardInterrupt) as e:
-            logger.error(str(e))
+    # Interactive loop: after running a task list, offer to run another
+    while True:
+        if tasklist:
+            runner.task_list_name = tasklist
+        else:
+            try:
+                runner.task_list_name = runner.get_task_list_from_user()
+            except (ValueError, KeyboardInterrupt) as e:
+                logger.error(str(e))
+                raise typer.Exit(code=1)
+
+        if runner.task_list_name not in runner.config:
+            logger.error(
+                f"Task list '{runner.task_list_name}' not found in configuration"
+            )
             raise typer.Exit(code=1)
 
-    if runner.task_list_name not in runner.config:
-        logger.error(f"Task list '{runner.task_list_name}' not found in configuration")
-        raise typer.Exit(code=1)
+        tasks = cast(list[dict[str, Any]], runner.config[runner.task_list_name])
+        logger.info(f'Executing task list: {runner.task_list_name}')
+        total_start = timer()
+        results = runner.run_task_list(tasks)
+        total_duration = timer() - total_start
+        code = runner.summarize(results, total_duration)
 
-    tasks = cast(list[dict[str, Any]], runner.config[runner.task_list_name])
-    logger.info(f'Executing task list: {runner.task_list_name}')
-    total_start = timer()
-    results = runner.run_task_list(tasks)
-    total_duration = timer() - total_start
-    code = runner.summarize(results, total_duration)
-    raise typer.Exit(code=code)
+        if unattended or tasklist:
+            raise typer.Exit(code=code)
+
+        tasklist = None
 
 
 def main():  # external entry point if imported
