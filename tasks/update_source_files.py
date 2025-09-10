@@ -299,6 +299,7 @@ class UpdateSourceFile(LocTask):
             universal_newlines=True,
             cwd=self._temp_path,
             shell=True,
+            encoding='utf-8',
         ) as process:
             while True:
                 if not process.stdout:

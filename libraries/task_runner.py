@@ -337,6 +337,7 @@ class TaskRunner:
                 stderr=subp.STDOUT,
                 cwd=ue_cwd,
                 universal_newlines=True,
+                encoding='utf-8',
             ) as process:
                 while True:
                     if not process.stdout:

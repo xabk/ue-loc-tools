@@ -216,6 +216,7 @@ class UnrealLocGatherCommandlet(LocTask):
             stderr=subp.STDOUT,
             cwd=self._engine_path,
             universal_newlines=True,
+            encoding='utf-8',
         ) as process:
             while True:
                 for line in process.stdout:
