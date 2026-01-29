@@ -4,6 +4,7 @@ unreal.py
 unreal.py.stub
 logs/
 *.code-workspace
+y-*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
