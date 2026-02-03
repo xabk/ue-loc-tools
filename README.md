@@ -9,7 +9,7 @@ This pack of scripts aims to help with automating gather/export/import/compile a
 
 "An extremely fast Python package and project manager, written in Rust", as they put it.
 
-You can install it with `winget install --id=astral-sh.uv  -e`.
+You can install it with `winget install --id=astral-sh.uv -e`.
 
 See https://docs.astral.sh/uv/getting-started/installation/ for other options.
 
