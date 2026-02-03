@@ -31,14 +31,16 @@ You can download and install it using this link: https://github.com/crowdin/crow
 
 See other installation options: https://crowdin.github.io/crowdin-cli/installation#windows
 
-## Installation
+## Installation and usage
 1. Install the requirements listed above.
 2. Configure the scripts for your project: paths, targets, Crowdin credentials, script parameters, 
 and task lists based on what you need.
-3. Run `!loc-sync.bat` to launch the loc tools and follow the instructions.
-
+3. `uv run loc-sync.py` or `!loc-sync.bat` will launch the script and present you with the list of tasks.
+It also accepts task names as command-line parameters for automation, for example, `uv run loc-sync.py "[X, ALL] #5 Import Translations"`.
+Note that _uv_ should take care of everything automatically, from Python to all the required packages.
 You can also run the script in automated mode with `!locsync.bat task-list-name -u`.
 
+## Configuration
 By default, `base.config.yaml` contains several task lists tailored for different scenarios. Take a look at them and adjust to your needs.
 
 Actual workflow depends on what features you want for the project, but the basics are as follows:
