@@ -15,9 +15,11 @@ See https://docs.astral.sh/uv/getting-started/installation/ for other options.
 
 ### Crowdin CLI
 
-A Crowdin CLI application to simplify routine operations: https://github.com/crowdin/crowdin-cli.
+A Crowdin CLI application to simplify routine operations.
 
-You can download and install it using this link: https://github.com/crowdin/crowdin-cli/releases/latest/download/crowdin.exe
+You should be able to install it with `winget install -e --id Crowdin.CrowdinCLI`.
+
+Alternatively, you can download and install it using this link: https://github.com/crowdin/crowdin-cli/releases/latest/download/crowdin.exe
 
 >[!IMPORTANT]
 >
