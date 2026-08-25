@@ -16,7 +16,7 @@
 crowdin:
   # Set to your organization name if the project is on enterprise account.
   # Leave this empty, if the project is on crowdin.com.
-  organization: ""
+  organization: ''
 
   # You CANNOT set it here, you can only set it in crowdin.config.yaml,
   # which you should keep secret.
@@ -33,44 +33,44 @@ crowdin:
 # Configure which tasks are available for execution
 tasks:
   test-lang:
-    module: "tasks.test_lang"
-    class: "ProcessTestAndHashLocales"
+    module: 'tasks.test_lang'
+    class: 'ProcessTestAndHashLocales'
 
   p4-checkout:
-    module: "tasks.p4_checkout"
-    class: "CheckoutAssets"
+    module: 'tasks.p4_checkout'
+    class: 'CheckoutAssets'
 
   build-and-download:
-    module: "tasks.build_and_download"
-    class: "BuildAndDownloadTranslations"
+    module: 'tasks.build_and_download'
+    class: 'BuildAndDownloadTranslations'
 
   ue-loc-gather-cmd:
-    module: "tasks.ue_loc_gather_cmd"
-    class: "UnrealLocGatherCommandlet"
+    module: 'tasks.ue_loc_gather_cmd'
+    class: 'UnrealLocGatherCommandlet'
 
   update-source-files:
-    module: "tasks.update_source_files"
-    class: "UpdateSourceFile"
+    module: 'tasks.update_source_files'
+    class: 'UpdateSourceFile'
 
   import-screens:
-    module: "tasks.import_screens"
-    class: "ImportScreenshots"
+    module: 'tasks.import_screens'
+    class: 'ImportScreenshots'
 
   mt-pseudo:
-    module: "tasks.mt_pseudo"
-    class: "MTPseudo"
+    module: 'tasks.mt_pseudo'
+    class: 'MTPseudo'
 
   completion-rates:
-    module: "tasks.completion_rates"
-    class: "UpdateLanguageCompletionRates"
+    module: 'tasks.completion_rates'
+    class: 'UpdateLanguageCompletionRates'
 
   community-credits:
-    module: "tasks.community_credits"
-    class: "UpdateCommunityCredits"
+    module: 'tasks.community_credits'
+    class: 'UpdateCommunityCredits'
 
   po-csv-converter:
-    module: "tasks.po_csv_converter"
-    class: "UE_PO_CSV_Converter"
+    module: 'tasks.po_csv_converter'
+    class: 'UE_PO_CSV_Converter'
 
 #
 # -------------------------------------------------------------
@@ -95,7 +95,7 @@ parameters:
   # Should we check in the files back to p4?
   p4-checkin: False # TODO: implement this
 
-  # Default CL descripiton to use for check-outs and check-ins:
+  # Default CL description to use for check-outs and check-ins:
   # TODO: check out the files into a separate CL with this description
   p4-cl-desc: |
     * Imported latest translations from Crowdin
@@ -121,31 +121,33 @@ parameters:
   content_dir: ../../
   project_dir: ../../../
   engine_dir: ../../../../
+
   # Relative to the engine directory
-  unreal_binary: Engine/Binaries/Win64/UnrealEditor-Cmd.exe # Standard UE5
   # unreal_binary: Engine/Binaries/Win64/UE4Editor-Cmd.exe # Standard UE4
+  unreal_binary: Engine/Binaries/Win64/UnrealEditor-Cmd.exe # Standard UE5
 
 # -------------------------------------------------------------
 # ----- SCRIPT PARAMETERS: SET DEFAULTS FOR SCRIPTS HERE ------
 # -------------------------------------------------------------
 script-parameters:
-  # Defining empty parameters here so that targets.py
-  # could run with command line parameters without any extra noise
   targets:
+    # Defining empty parameters here so that targets.py
+    # could run with command line parameters without any extra noise
     source_target:
     loc_targets:
     locales:
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-  # Create source locale (sorted, with debug IDs in context, with comments),
-  # which also serves as debug ID locale (simple unique debug IDs for all strings).
-  # And creating a Hash locale (basic pseudo-localization) if needed.
   test-lang:
+    # Create source locale (sorted, with debug IDs in context, with comments),
+    # which also serves as debug ID locale (simple unique debug IDs for all strings).
+    # And creating a Hash locale (basic pseudo-localization) if needed.
+
     # loc_targets: [Game]
 
     # Generate/update Excel file with all the strings from the specified loc targets
-    external_context_xlsx: ""
+    external_context_xlsx: ''
     external_context_targets: []
     external_context_create_backup: No
 
@@ -170,15 +172,15 @@ script-parameters:
 
     debug_ID_locale: io # Set to '' (empty) to disable debug ID locale generation
     clear_translations: No
-    debug_prefix: "#" # Start over (clear_translations = True) if you change debug prefix
-    debug_separator: ":"
+    debug_prefix: '#' # Start over (clear_translations = True) if you change debug prefix
+    debug_separator: ':'
     id_length: 4 # Start over (clear_translations = True) if you change id length
     encoding: utf-8-sig
     sort_po: No
     sort_by_key: No
     var_regex: '{[^}\[<]+}|<[^/>]+/>' # Looking for {variables} and <empty tags ... />
     comments_criteria:
-      # Ths will add comments based on criteria (e.g., to explain a feature or syntax)
+      # This will add comments based on criteria (e.g., to explain a feature or syntax)
       # Format is as follows:
       #     - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
       #       - 'RegEx' = regex to use for checking
@@ -193,20 +195,21 @@ script-parameters:
           Check what the keywords mean: https://www.unicode.org/cldr/charts/47/supplemental/language_plural_rules.html.
 
     delete_comments_criteria: [
-        "^Key:.*$", # Delete 'Key: NNN' comments: we have them in msgctxt
+        '^Key:.*$', # Delete 'Key: NNN' comments: we have them in msgctxt
         'InfoMetaData:\t".*?" : "\s*"', # Empty InfoMetaData fields
       ]
-    delete_occurrences: Yes # Delete occurences: we have them in SourceLocation comments
+    delete_occurrences: Yes # Delete occurrences: we have them in SourceLocation comments
     remove_source_loc_prefixes: [/Game, Source]
 
     skip_empty_namespace: No
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-  # Build the translation project on Crowdin, download it, unpack,
-  # move to the Unreal Localization directory to make it ready for import.
-  # Warning: This will overwrite any existing POs in Unreal Localization directory.
   build-and-download:
+    # Build the translation project on Crowdin, download it, unpack,
+    # move to the Unreal Localization directory to make it ready for import.
+    # Warning: This will overwrite any existing POs in Unreal Localization directory.
+
     # Set this to override project ID
     # project_id: xx
 
@@ -221,57 +224,57 @@ script-parameters:
     locales_to_delete: [en, en-US]
 
     culture_mappings:
-      "af-ZA": "af"
-      "ar-SA": "ar"
-      "bg-BG": "bg"
-      "ca-ES": "ca"
-      "zh-CN": "zh-Hans"
-      "zh-TW": "zh-Hant"
-      "kw-GB": "kw"
-      "hr-HR": "hr"
-      "cs-CZ": "cs"
-      "da-DK": "da"
-      "nl-NL": "nl"
-      "en-AU": "en-AU"
-      "en-CA": "en-CA"
-      "en-PRT": "ia-001"
-      "en-SHAX": "vo"
-      "en-GB": "en-GB"
-      "eo-UY": "eo"
-      "et-EE": "et"
-      "fi-FI": "fi"
-      "fr-FR": "fr"
-      "de-DE": "de"
-      "el-GR": "el"
-      "he-IL": "he"
-      "hi-IN": "hi"
-      "hu-HU": "hu"
-      "id-ID": "id"
-      "it-IT": "it"
-      "ja-JP": "ja"
-      "ko-KR": "ko"
-      "lv-LV": "lv"
-      "lt-LT": "lt"
-      "lb-LU": "lb"
-      "mt-MT": "mt"
-      "no-NO": "no"
-      "fa-IR": "fa"
-      "pl-PL": "pl"
-      "pt-PT": "pt-PT"
-      "pt-BR": "pt-BR"
-      "ro-RO": "ro"
-      "ru-RU": "ru"
-      "sr-Cyrl": "sr-Cyrl"
-      "sr-Latn": "sr-Latn"
-      "sk-SK": "sk"
-      "es-ES": "es"
-      "es-MX": "es-419"
-      "sv-SE": "sv"
-      "th-TH": "th"
-      "tr-TR": "tr"
-      "uk-UA": "uk"
-      "vi-VN": "vi"
-      "cy-GB": "cy"
+      'af-ZA': 'af'
+      'ar-SA': 'ar'
+      'bg-BG': 'bg'
+      'ca-ES': 'ca'
+      'zh-CN': 'zh-Hans'
+      'zh-TW': 'zh-Hant'
+      'kw-GB': 'kw'
+      'hr-HR': 'hr'
+      'cs-CZ': 'cs'
+      'da-DK': 'da'
+      'nl-NL': 'nl'
+      'en-AU': 'en-AU'
+      'en-CA': 'en-CA'
+      'en-PRT': 'ia-001'
+      'en-SHAX': 'vo'
+      'en-GB': 'en-GB'
+      'eo-UY': 'eo'
+      'et-EE': 'et'
+      'fi-FI': 'fi'
+      'fr-FR': 'fr'
+      'de-DE': 'de'
+      'el-GR': 'el'
+      'he-IL': 'he'
+      'hi-IN': 'hi'
+      'hu-HU': 'hu'
+      'id-ID': 'id'
+      'it-IT': 'it'
+      'ja-JP': 'ja'
+      'ko-KR': 'ko'
+      'lv-LV': 'lv'
+      'lt-LT': 'lt'
+      'lb-LU': 'lb'
+      'mt-MT': 'mt'
+      'no-NO': 'no'
+      'fa-IR': 'fa'
+      'pl-PL': 'pl'
+      'pt-PT': 'pt-PT'
+      'pt-BR': 'pt-BR'
+      'ro-RO': 'ro'
+      'ru-RU': 'ru'
+      'sr-Cyrl': 'sr-Cyrl'
+      'sr-Latn': 'sr-Latn'
+      'sk-SK': 'sk'
+      'es-ES': 'es'
+      'es-MX': 'es-419'
+      'sv-SE': 'sv'
+      'th-TH': 'th'
+      'tr-TR': 'tr'
+      'uk-UA': 'uk'
+      'vi-VN': 'vi'
+      'cy-GB': 'cy'
 
     ignore_source_mismatch: No
     ignore_unsafe_whitespace_mismatch: Yes
@@ -280,17 +283,18 @@ script-parameters:
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-  # Check out Localization directory and any other assets from p4 server
   p4-checkout:
+    # Check out Localization directory and any other assets from p4 server
+
     # loc_targets: [Game]
 
     add_assets_to_checkout: []
 
     add_paths_to_checkout: []
 
-    config_name: "../Saved/Config/WindowsEditor/SourceControlSettings.ini" # UE5
-    # config_name: "../Saved/Config/Windows/SourceControlSettings.ini" # UE4
-    p4_config_section: "PerforceSourceControl.PerforceSourceControlSettings"
+    # config_name: '../Saved/Config/Windows/SourceControlSettings.ini' # UE4
+    config_name: '../Saved/Config/WindowsEditor/SourceControlSettings.ini' # UE5
+    p4_config_section: 'PerforceSourceControl.PerforceSourceControlSettings'
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
@@ -306,16 +310,17 @@ script-parameters:
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-  # Run the Unreal gather text commandlet for any number of loc targets
-  # with any number of ini files as parameters
-  # Set the defaults here, and specify ini files (steps) in task lists
   ue-loc-gather-cmd:
+    # Run the Unreal gather text commandlet for any number of loc targets
+    # with any number of ini files as parameters
+    # Set the defaults here, and specify ini files (steps) in task lists
+
     # loc_targets: [Game]
 
     # Relative to Game/Content directory
     tasks_to_perform: [Gather, Export]
     # Steps to perform. Config/Localization .ini file suffixes:
-    # Gather, Export, Import, Сompile, GenerateReports, etc.
+    # Gather, Export, Import, Compile, GenerateReports, etc.
     # Specify this in task lists to run specific tasks.
     # E.g., [Gather, Export] or [Import, Compile, GenerateReports]
 
@@ -325,32 +330,13 @@ script-parameters:
     try_patch_dependencies: No
 
     # Logs to skip (to avoid irrelevant spam)
-    log_to_skip: ["LogLinker: "]
+    log_to_skip: ['LogLinker: ']
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-  ue-loc-gather-cmd-2:
-    # loc_targets: [Game]
-
-    # Relative to Game/Content directory
-    tasks_to_perform: [Import, Compile, GenerateReports]
-    # Steps to perform. Config/Localization .ini file suffixes:
-    # Gather, Export, Import, Сompile, GenerateReports, etc.
-    # Specify this in task lists to run specific tasks.
-    # E.g., [Gather, Export] or [Import, Compile, GenerateReports]
-
-    # Should we patch dependencies in *_Gather.ini files?
-    # This seems to be needed if the project and engine
-    # are in completely separate directories
-    try_patch_dependencies: No
-
-    # Logs to skip (to avoid irrelevant spam)
-    log_to_skip: ["LogLinker: "]
-
-  ### ### ### ### ### ### ### ### ### ### ### ### ###
-
-  # Update source files for several loc targets on Crowdin
   update-source-files:
+    # Update source files for several loc targets on Crowdin
+
     # Same script is used to add files to Crowdin:
     # Set to Yes to only add files, without updating existing files.
     add_files_only: No
@@ -377,23 +363,23 @@ script-parameters:
 
     # Use Crowdin CLI to upload the files
     # Config will be generated in the temp directory
-    # Requires Crowdin CLI to be installed and availalbe in PATH
+    # Requires Crowdin CLI to be installed and available in PATH
     cli_upload: Yes
 
     # Branch for CLI upload, defaults to None / main branch
-    branch: ""
+    branch: ''
 
-    cli_cfg_name: "#Config/#crowdin.upload.yaml" # Will be generated in temp_dir
-    cli_sources_dir: "#Sources" # Relative to temp_dir
+    cli_cfg_name: '#Config/#crowdin.upload.yaml' # Will be generated in temp_dir
+    cli_sources_dir: '#Sources' # Relative to temp_dir
 
     cli_csv_first_line_is_header: Yes
-    cli_csv_scheme: "identifier,source_phrase,translation,max_length,labels,context"
+    cli_csv_scheme: 'identifier,source_phrase,translation,max_length,labels,context'
 
     encoding: utf-8-sig
 
     csv_dir: CSVs
     split_csv_rules: [
-        [msgctxt, "([^,]*),.*", ""], # (string_table),key → {string_table}.csv
+        [msgctxt, '([^,]*),.*', ''], # (string_table),key → {string_table}.csv
       ] # The lines that don't match any of these rules will be saved in {target}.csv
     delete_unsafe_whitespace: No
 
@@ -403,40 +389,40 @@ script-parameters:
       #  - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
       #   - 'RegEx' = regex to use for checking
 
-    temp_dir: "Localization/~Temp"
+    temp_dir: 'Localization/~Temp'
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-  # Import screens from links in strings context
-  # Defaults:
-  # - expects Doogle Drive links
-  # - .png screenshots
-  # - converts Google Drive view links to DL links
-  # - Google doesn't like scripts downloading things, so you might have to
-  #   download screens in a few tries using VPNs...
   import-screens:
+    # Import screens from links in strings context
+    # Defaults:
+    # - expects Google Drive links
+    # - .png screenshots
+    # - converts Google Drive view links to DL links
+    # - Google doesn't like scripts downloading things, so you might have to
+    #   download screens in a few tries using VPNs...
     src_google_drive: No
 
     src_local: Yes
 
     # Default file extension
-    def_ext: "png"
+    def_ext: 'png'
 
     ### Google Drive sourcing
 
     # Link filter for Croql
     # (part of the link common to all screenshots
     # used to fetch strings with screenshot links from Crowdin)
-    link_croql_filter: "https://drive.google.com/file/d/"
+    link_croql_filter: 'https://drive.google.com/file/d/'
 
     # Link regex to extract link from comment
     # Group 0 will be used as link
     # Group 1 will be used as filename on Crowdin
     # and as {name} to create a download link if dl_link is set
-    link_regex: "(https://drive.google.com/file/d/([^/]+)/view)"
+    link_regex: '(https://drive.google.com/file/d/([^/]+)/view)'
 
     # If set, it will be formatted with {name} and used to download the file
-    dl_link: "https://drive.google.com/uc?id={name}&export=download"
+    dl_link: 'https://drive.google.com/uc?id={name}&export=download'
 
     ### Local sourcing
 
@@ -451,18 +437,18 @@ script-parameters:
     local_delete_all_auto_screens: No
 
     # Base directory for screenshots
-    local_screens_base_dir: "../../LocalizationScreenshots"
+    local_screens_base_dir: '../../LocalizationScreenshots'
 
-    # Subdirectory for screenshots, this is to allow for dirrerent types of screenshots
-    local_screens_sub_dir: "~"
+    # Subdirectory for screenshots, this is to allow for different types of screenshots
+    local_screens_sub_dir: '~'
 
     local_scr_name_preprocessing: [
-        ['(?<![\s^-])(?<!^)(?=[A-Z])', " "], # CamelCase → Camel Case
+        ['(?<![\s^-])(?<!^)(?=[A-Z])', ' '], # CamelCase → Camel Case
       ]
     # Screenshot names prefixed before upload to make them easy to maintain
-    local_scr_name_prefix: "~~~"
+    local_scr_name_prefix: '~~~'
 
-    local_croql_filter: ""
+    local_croql_filter: ''
 
     # If Yes, the script will try to find the main string, extract the key stem
     # and use it to find all relevant strings
@@ -470,7 +456,7 @@ script-parameters:
 
     ### Local: Simple Tagging (UI context, etc.)
 
-    local_match_field: "context" # Crowdin field to match against
+    local_match_field: 'context' # Crowdin field to match against
 
     # {screenshot} will be replaced with the screenshot stem
     local_match_regex: 'Screenshot:\s+{screenshot}'
@@ -478,21 +464,21 @@ script-parameters:
     ### Local: Multi-Tagging (Cards, etc.)
 
     # Only string keys matching this pattern will be used to match against screenshot names
-    local_all_strings_key_scope: "^Gameplay_Strings,(?!.*Intent).*_Name$"
+    local_all_strings_key_scope: '^Gameplay_Strings,(?!.*Intent).*_Name$'
     # We exclude monster Intent cards since some of them have the same names as regular cards
 
     # Group 1 will be used as a stem to find all relevant strings to attach the screenshot
-    local_extract_key_stem_pattern: "^(Gameplay_Strings,.*)_Name$"
+    local_extract_key_stem_pattern: '^(Gameplay_Strings,.*)_Name$'
 
     # Patterns to filter out strings that are not relevant to the screenshot
-    local_relevant_strings_key_filter: ["^{stem}_.*$", "^{stem}Plus_.*$"]
+    local_relevant_strings_key_filter: ['^{stem}_.*$', '^{stem}Plus_.*$']
 
     # Patterns to exclude from filtered strings that are relevant to the screenshot
     local_relevant_strings_key_exclude: []
     # '^{stem}_NameModifier',
     # E.g., we can exclude BaseKey_NameModifier strings
 
-    temp_dir: "Localization/~Temp/#Screenshots"
+    temp_dir: 'Localization/~Temp/#Screenshots'
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
@@ -502,18 +488,18 @@ script-parameters:
     loc_targets: [] # Reset here to avoid updating with defaults
 
     languages:
-      "fr": "fr"
-      "it": "it"
-      "de": "de"
-      "es-ES": "es"
-      "zh-CN": "zh-Hans"
-      "zh-TW": "zh-Hant"
-      "ja": "ja"
-      "ko": "ko"
-      "pl": "pl"
-      "pt-BR": "pt-BR"
-      "ru": "ru"
-      "tr": "tr"
+      'fr': 'fr'
+      'it': 'it'
+      'de': 'de'
+      'es-ES': 'es'
+      'zh-CN': 'zh-Hans'
+      'zh-TW': 'zh-Hant'
+      'ja': 'ja'
+      'ko': 'ko'
+      'pl': 'pl'
+      'pt-BR': 'pt-BR'
+      'ru': 'ru'
+      'tr': 'tr'
 
     locales_to_skip: [io, ia]
 
@@ -525,20 +511,20 @@ script-parameters:
 
     longest_locale: en-AE
 
-    export_pattern: "/{target}/%locale%/{target}.po"
+    export_pattern: '/{target}/%locale%/{target}.po'
 
-    po_encoding: "utf-8-sig"
+    po_encoding: 'utf-8-sig'
 
-    prefix: "‹"
-    suffix: "›"
+    prefix: '‹'
+    suffix: '›'
 
-    filler: "~"
+    filler: '~'
 
-    var_regex: "{[^}]*}"
-    tags_regex: "<[^>]*>"
+    var_regex: '{[^}]*}'
+    tags_regex: '<[^>]*>'
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
-    temp_dir: "Localization/~Temp/MT+Pseudo/"
+    temp_dir: 'Localization/~Temp/MT+Pseudo/'
 
 #
 # -------------------------------------------------------------
@@ -547,7 +533,7 @@ script-parameters:
 #
 # Task lists are lists of scripts to be executed one after another.
 # You can add as many task lists as you like.
-# Launch them by running 'locsync.py scenario_name'
+# Launch them by running 'loc-sync.py scenario_name'
 # A list of tasks, each task is a few of key-value pairs like this:
 #   description: required, this will be printed as the task is performed,
 #                and in the summary
@@ -560,71 +546,71 @@ script-parameters:
 #                      that will override the defaults above
 # All scripts use this config and crowdin.config.yaml for configuration.
 
-"[X, ALL] #1 Check out all targets":
-  - description: "Checkout Localization folder"
+'[X, ALL] #1 Check out all targets':
+  - description: 'Checkout Localization folder'
     # Enable p4-checkout to let this work or check out Localization folder and other assets manually
     script: p4-checkout
     p4-checkout: True
     script-parameters:
       # loc_targets: []
       add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ["Localization/~Temp/#Sources"] # Add any additional paths to check out
+      add_paths_to_checkout: ['Localization/~Temp/#Sources'] # Add any additional paths to check out
 
-"[X, ALL] #2 Gather and export all targets":
-  - description: "Gather the text in UE for all targets and export the source/test locale draft"
+'[X, ALL] #2 Gather and export all targets':
+  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
     script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Gather, Export]
       # loc_targets: []
 
-"[X] #3 Catch All Target: Generate test and hash locales":
-  - description: "Generate test from draft and source locale with comments and debug IDs"
+'[X] #3 Catch All Target: Generate test and hash locales':
+  - description: 'Generate test from draft and source locale with comments and debug IDs'
     script: test-lang
     script-parameters:
       loc_targets: [Game] # Catch-all target, if any
-      hash_prefix: "?"
-      debug_prefix: "?"
+      hash_prefix: '?'
+      debug_prefix: '?'
       sort_by_key: Yes
 
       clear_translations: No
 
-"[X] #4 All String Tables: Test and hash":
-  - description: "Generate test from draft and source locale with comments and debug IDs"
+'[X] #4 All String Tables: Test and hash':
+  - description: 'Generate test from draft and source locale with comments and debug IDs'
     script: test-lang
     script-parameters:
       loc_targets: [AllStringTables] # String table targets
-      debug_prefix: "#"
-      hash_prefix: "#"
+      debug_prefix: '#'
+      hash_prefix: '#'
       clear_translations: No
 
-"[X] #5 Narrative: Test and hash":
-  - description: "Generate test from draft and source locale with comments and debug IDs"
+'[X] #5 Narrative: Test and hash':
+  - description: 'Generate test from draft and source locale with comments and debug IDs'
     script: test-lang
     script-parameters:
       loc_targets: [Narrative] # String table targets
-      debug_prefix: "="
-      hash_prefix: "#"
+      debug_prefix: '='
+      hash_prefix: '#'
       clear_translations: No
 
-"[X] #6 InputKeys: Test and hash":
-  - description: "Generate test from draft and source locale with comments and debug IDs"
+'[X] #6 InputKeys: Test and hash':
+  - description: 'Generate test from draft and source locale with comments and debug IDs'
     script: test-lang
     script-parameters:
       loc_targets: [InputKeys] # String table targets
-      debug_prefix: "~"
-      hash_prefix: "#"
+      debug_prefix: '~'
+      hash_prefix: '#'
       clear_translations: No
 
-"[X, ALL] #7 Import Translations":
-  - description: "Build the project on Crowdin and download all targets to Content/Localization"
+'[X, ALL] #7 Import Translations':
+  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
     script: build-and-download
     script-parameters:
       # loc_targets: []
       # csv_loc_targets: []
 
-"[X, ALL] #8 Import and compile all targets":
-  - description: "Import and compile all targets in UE"
-    script: ue-loc-gather-cmd-2
+'[X, ALL] #8 Import and compile all targets':
+  - description: 'Import and compile all targets in UE'
+    script: ue-loc-gather-cmd
     script-parameters:
       tasks: [Import, Compile, GenerateReports]
       # loc_targets: []
@@ -633,9 +619,9 @@ script-parameters:
 ### ### ### ### ### ### ### ### ### ### ### ### ###
 ### ### ### ### ### ### ### ### ### ### ### ### ###
 
-"[X, ALL] #7 Update source on Crowdin (OBS! Relies on prior Gather and Source prep for each target)":
+'[X, ALL] #7 Update source on Crowdin (OBS! Relies on prior Gather and Source prep for each target)':
   # Upload new source file from test/io locale to Crowdin
-  - description: "Upload the updated source files to Crowdin"
+  - description: 'Upload the updated source files to Crowdin'
     script: update-source-files
     updates-source: Yes # Marker to warn the user that it updates the source file in CAT
     script-parameters:
@@ -645,10 +631,8 @@ script-parameters:
       # wait_for_upload_confirmation: Yes
       cli_upload: Yes
 
-# end of upload-source
-
-"[SRV] Add new files to Crowdin with correct export settings (OBS! Relies on prior Gather and Source prep for each target)":
-  - description: "Add new source files to Crowdin"
+'[SRV] Add new files to Crowdin with correct export settings (OBS! Relies on prior Gather and Source prep for each target)':
+  - description: 'Add new source files to Crowdin'
     script: update-source-files
     updates-source: Yes # Marker to warn the user that it updates the source file in CAT
     script-parameters:
@@ -657,11 +641,9 @@ script-parameters:
       csv_loc_targets: []
       add_files_only: Yes # Won't update existing files
 
-# end of add-source-files
-
-"[SRV] Update files into the WordCount branch":
+'[SRV] Update files into the WordCount branch':
   # Upload new source file from test/io locale to Crowdin WordCount branch
-  - description: "Upload the updated source files to Crowdin"
+  - description: 'Upload the updated source files to Crowdin'
     script: update-source-files
     updates-source: Yes # Marker to warn the user that it updates the source file in CAT
     script-parameters:
@@ -671,11 +653,11 @@ script-parameters:
       # wait_for_upload_confirmation: Yes
       cli_upload: Yes
       # cli_dry_run: Yes
-      branch: "DO-NOT-TRANSLATE-WordCountBranch"
+      branch: 'DO-NOT-TRANSLATE-WordCountBranch'
 
-"[SRV] Manual upload":
+'[SRV] Manual upload':
   # Upload new source file from test/io locale to Crowdin WordCount branch
-  - description: "Upload the updated source files to Crowdin"
+  - description: 'Upload the updated source files to Crowdin'
     script: update-source-files
     updates-source: Yes # Marker to warn the user that it updates the source file in CAT
     script-parameters:
@@ -684,6 +666,5 @@ script-parameters:
       manual_upload: Yes
       wait_for_upload_confirmation: Yes
       cli_upload: No
-# end of add source files
 
 ### ### ### ### ### ### ### ### ### ### ### ### ###
