@@ -40,7 +40,7 @@ and task lists based on what you need.
 3. `uv run loc-sync.py` or `!loc-sync.bat` will launch the script and present you with the list of tasks.
 It also accepts task names as command-line parameters for automation, for example, `uv run loc-sync.py "[X, ALL] #5 Import Translations"`.
 Note that _uv_ should take care of everything automatically, from Python to all the required packages.
-You can also run the script in automated mode with `!locsync.bat task-list-name -u`.
+You can also run the script in automated mode with `!loc-sync.bat task-list-name -u`.
 
 ## Configuration
 By default, `base.config.yaml` contains several task lists tailored for different scenarios. Take a look at them and adjust to your needs.
@@ -49,7 +49,7 @@ Actual workflow depends on what features you want for the project, but the basic
 1. Check out related assets from Perforce using the Unreal Editor source control settings. You have to set up source control in the editor for this to work.
 2. Gather and export localization data from Unreal as PO files.
 3. Prepare the debug ID and source locale: lines sorted by asset paths to group things together, with additional comments and cleaned up context info, with asset names and repetition markers for convenience. Source locale is based on the debug ID locale that contains unique and simple to remember IDs like #1234 that allow you to identify any string you see in the game (default locale: io). Optionally, prepare the 'hash' locale: basic pseudolocalization locale where the script adds beginning and end markers to all strings (default locale: ia-001).
---- Possible game-specific scipts would go here ---
+--- Possible game-specific scripts would go here ---
 4. Update source files on Crowdin using source locale files generated on step 3. This requires you to configure the integration: provide API token, project ID, and organization name (empty if you're using crowdin.com).
 5. Build the project on Crowdin, download latest translations, and copy them to the relevant Unreal project folders. This requires you to configure the integration: provide API token, project ID, and organization name (empty if you're using crowdin.com).
 6. Import translations from PO files copied over on step 5 and compile translations in Unreal.
@@ -71,6 +71,6 @@ List of available scripts and parameters (coming later):
 - Update existing source files in Crowdin project
 - Build, download, extract, and move translated files from Crowdin to UE Localization directory
 - Generate user contribution reports on Crowdin and save the data to CSV (to reimport the data table)
-- Generate translation status reports on Crowidn and save the data to CSV (to reimport the data table)
+- Generate translation status reports on Crowdin and save the data to CSV (to reimport the data table)
 - Reimport assets (e.g., data tables from CSVs)
 - Create "longest" locale with start and end markers, based on TM and MT, where English text is extended to match the length of the longest translation
