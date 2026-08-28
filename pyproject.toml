@@ -24,4 +24,7 @@ test = ["pytest>=8.0.0", "pytest-cov>=5.0.0"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
-addopts = "--verbose --tb=short"
+addopts = "--verbose --tb=short -m 'not crowdin'"
+markers = [
+    "crowdin: hits the live Crowdin API, needs LOCTOOLS_TEST_SECRET. Run with -m crowdin",
+]

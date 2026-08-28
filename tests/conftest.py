@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 
@@ -43,3 +44,50 @@ def task_lists(config: dict) -> dict:
 def write_config(path: Path, data: dict) -> Path:
     path.write_text(yaml.safe_dump(data), encoding='utf-8')
     return path
+
+
+# ------------------------------ live Crowdin ------------------------------ #
+# Credentials live outside every repo, in the file LOCTOOLS_TEST_SECRET points
+# at, so the same machine setup serves every project. These tests are marked
+# `crowdin` and excluded from the default run.
+
+SECRET_ENV = 'LOCTOOLS_TEST_SECRET'
+TEST_PROJECT_ID = 127
+
+
+@pytest.fixture(scope='session')
+def crowdin_credentials() -> dict:
+    path = os.environ.get(SECRET_ENV)
+    if not path:
+        pytest.skip(f'{SECRET_ENV} is not set')
+
+    secret = Path(path)
+    if not secret.is_file():
+        pytest.skip(f'{SECRET_ENV} points at a missing file: {secret}')
+
+    crowdin = (yaml.safe_load(secret.read_text(encoding='utf-8')) or {}).get('crowdin')
+    if not crowdin or not crowdin.get('token') or 'PASTE' in str(crowdin['token']):
+        pytest.skip(f'no Crowdin token in {secret}')
+
+    project_id = crowdin.get('project_id')
+    if project_id != TEST_PROJECT_ID:
+        pytest.fail(
+            f'{secret} points at project {project_id}, but these tests only run '
+            f'against the test project {TEST_PROJECT_ID}. They create and delete '
+            'content, so refusing rather than touching a real project.',
+            pytrace=False,
+        )
+
+    return crowdin
+
+
+@pytest.fixture(scope='session')
+def crowdin(crowdin_credentials: dict):
+    from libraries.crowdin import UECrowdinClient
+
+    return UECrowdinClient(
+        crowdin_credentials['token'],
+        organization=crowdin_credentials.get('organization'),
+        project_id=crowdin_credentials['project_id'],
+        silent=True,
+    )
