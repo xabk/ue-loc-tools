@@ -141,9 +141,12 @@ class TaskRunner:
         self,
         base_config: str = DEFAULT_BASE_CONFIG,
         secret_config: str = DEFAULT_SECRET_CONFIG,
+        crowdin_overrides: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         self.base_config_path = base_config
         self.secret_config_path = secret_config
+
+        overrides = {k: v for k, v in (crowdin_overrides or {}).items() if v is not None}
 
         if not Path(base_config).exists():
             raise FileNotFoundError(f'Base config file {base_config} not found')
@@ -151,14 +154,23 @@ class TaskRunner:
         with open(base_config, 'r', encoding='utf-8') as f:
             config: dict[str, dict] = yaml.safe_load(f)
 
-        if not Path(secret_config).exists():
+        if Path(secret_config).exists():
+            with open(secret_config, 'r', encoding='utf-8') as f:
+                secret_cfg = yaml.safe_load(f) or {}
+
+            if 'crowdin' in secret_cfg:
+                config.setdefault('crowdin', {}).update(secret_cfg['crowdin'])
+        elif 'token' in overrides:
+            logger.info(
+                f'No secret config at {secret_config}, using the credentials '
+                'passed on the command line.'
+            )
+        else:
             raise FileNotFoundError(f'Secret config file {secret_config} not found')
 
-        with open(secret_config, 'r', encoding='utf-8') as f:
-            secret_cfg = yaml.safe_load(f)
-
-        if 'crowdin' in secret_cfg:
-            config.setdefault('crowdin', {}).update(secret_cfg['crowdin'])
+        if overrides:
+            logger.info(f'Crowdin settings overridden: {sorted(overrides.keys())}')
+            config.setdefault('crowdin', {}).update(overrides)
 
         self.config = config
         self._task_registry.clear()

@@ -29,12 +29,16 @@ app = typer.Typer(
 
 
 def _build_runner(
-    base_cfg: str, secret_cfg: str, unattended: bool, debug: bool
+    base_cfg: str,
+    secret_cfg: str,
+    unattended: bool,
+    debug: bool,
+    crowdin_overrides: dict[str, Any] | None = None,
 ) -> TaskRunner:
     runner = TaskRunner()
     runner.unattended = unattended
     runner.debug = debug
-    runner.load_config(base_cfg, secret_cfg)
+    runner.load_config(base_cfg, secret_cfg, crowdin_overrides)
     return runner
 
 
@@ -56,14 +60,38 @@ def run(
     list_tasks: A[
         bool, typer.Option('--list-tasks', help='List available tasks', is_flag=True)
     ] = False,
+    token: A[
+        Optional[str],
+        typer.Option(
+            '--token',
+            help='Crowdin API token. Visible in the process list and in CI '
+            'logs: prefer --secret for anything long-lived.',
+            show_default=False,
+        ),
+    ] = None,
+    organization: A[
+        Optional[str],
+        typer.Option(
+            '--organization', help='Crowdin organization', show_default=False
+        ),
+    ] = None,
+    project_id: A[
+        Optional[int],
+        typer.Option('--project-id', help='Crowdin project ID', show_default=False),
+    ] = None,
     debug: A[
         bool, typer.Option('--debug', help='Enable debug logging', is_flag=True)
     ] = False,
 ):
     """Primary entry point (no subcommand). Future subcommands can be added without changing usage."""
     init_logging(debug)
+    overrides = {
+        'token': token,
+        'organization': organization,
+        'project_id': project_id,
+    }
     try:
-        runner = _build_runner(config, secret, unattended, debug)
+        runner = _build_runner(config, secret, unattended, debug, overrides)
     except FileNotFoundError as e:
         logger.error(str(e))
         raise typer.Exit(code=1)
