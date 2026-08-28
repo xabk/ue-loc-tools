@@ -105,7 +105,9 @@ class CheckoutAssets(LocTask):
             )
         )
 
-        files += [self._content_path / asset for asset in self.add_assets_to_checkout]
+        files += [
+            self._content_path / asset for asset in (self.add_assets_to_checkout or [])
+        ]
         if self.add_paths_to_checkout is not None:
             files += list(
                 chain.from_iterable(
