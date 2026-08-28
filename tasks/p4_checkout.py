@@ -101,7 +101,7 @@ class CheckoutAssets(LocTask):
         files = list(
             chain.from_iterable(
                 [item for item in (loc_root / target).glob('**/*') if item.is_file()]
-                for target in [*self.loc_targets, *self.csv_loc_targets]
+                for target in [*(self.loc_targets or []), *(self.csv_loc_targets or [])]
             )
         )
 

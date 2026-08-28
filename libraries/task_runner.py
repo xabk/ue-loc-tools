@@ -167,7 +167,11 @@ class TaskRunner:
         return config
 
     # -------------------- Task Creation & Metadata -------------------- #
-    def _apply_config_to_task(self, task: LocTask, config_dict: dict[str, Any]):
+    def _apply_config_to_task(
+        self, task: LocTask, config_dict: dict[str, Any] | None
+    ):
+        if not config_dict:
+            return
         task_fields = {f.name for f in fields(task)}
         for key, value in config_dict.items():
             if not key.startswith('_') and key in task_fields:
