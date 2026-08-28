@@ -27,6 +27,9 @@ DEF_ENGINE_DIR = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/'
 def init_logging(verbose: bool = False) -> None:
     logger.remove()
     level = 'TRACE' if verbose else 'INFO'
+    # Redirected stdout defaults to the locale encoding, and UE logs CJK
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     logger.add(
         sys.stdout,
         format='<green>{time:HH:mm:ss}</green> '
