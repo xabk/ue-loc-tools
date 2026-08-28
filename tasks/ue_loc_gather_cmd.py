@@ -20,6 +20,11 @@ from dataclasses import dataclass, field
 
 from libraries.utilities import LocTask, init_logging
 
+COMMANDLET_VERDICT = r'GatherText completed with exit code (-?\d+)'
+CONFIG_STARTED = r"Beginning GatherText Commandlet for '"
+STEP_STARTED = r'Executing GatherTextStep\d+:'
+STEP_COMPLETED = r'Completed GatherTextStep\d+:'
+
 
 @dataclass
 class UnrealLocGatherCommandlet(LocTask):
@@ -37,6 +42,10 @@ class UnrealLocGatherCommandlet(LocTask):
     # ['Gather', 'Export']
     # ['Import', 'Compile', 'GenerateReports']
     # ['Gather', 'Import', 'Compile', 'GenerateReports']
+
+    # Unreal exits 1 if anything logged an error, so prefer the commandlet's
+    # own reported exit code when it is present in the output
+    trust_commandlet_exit_code: bool = True
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     # Assume we're in Content/Python/loctools/
@@ -210,6 +219,12 @@ class UnrealLocGatherCommandlet(LocTask):
 
         logger.info(f'Running command: {" ".join(commands)}')
 
+        commandlet_codes = []
+        errors = 0
+        configs_started = 0
+        steps_started = 0
+        steps_completed = 0
+
         with subp.Popen(
             commands,
             stdout=subp.PIPE,
@@ -228,7 +243,19 @@ class UnrealLocGatherCommandlet(LocTask):
                         continue
 
                     line = re.sub(r'^\[[^]]+]', '', line.strip())
+
+                    verdict = re.search(COMMANDLET_VERDICT, line)
+                    if verdict:
+                        commandlet_codes.append(int(verdict.group(1)))
+                    elif re.search(CONFIG_STARTED, line):
+                        configs_started += 1
+                    elif re.search(STEP_STARTED, line):
+                        steps_started += 1
+                    elif re.search(STEP_COMPLETED, line):
+                        steps_completed += 1
+
                     if 'Error: ' in line:
+                        errors += 1
                         logger.error(f'| UE | {line.strip()}')
                     elif 'Warning: ' in line:
                         logger.warning(f'| UE | {line.strip()}')
@@ -242,7 +269,88 @@ class UnrealLocGatherCommandlet(LocTask):
                 f'Unreal loc gather commandlet finished with return code: {returncode}'
             )
 
-        return returncode == 0
+        return self.task_succeeded(
+            returncode,
+            commandlet_codes,
+            errors,
+            configs_started,
+            steps_started,
+            steps_completed,
+        )
+
+    def task_succeeded(
+        self,
+        returncode: int,
+        commandlet_codes: list[int],
+        errors: int = 0,
+        configs_started: int = 0,
+        steps_started: int = 0,
+        steps_completed: int = 0,
+    ) -> bool:
+        """Unreal exits non-zero if anything logged an error, including errors
+        that have nothing to do with localization, so the commandlet's own
+        verdict is the more accurate signal when we have it.
+
+        One engine run covers several steps and normally reports once, but a
+        single non-zero verdict fails the task however many are printed. No
+        verdict at all means Unreal never reached the end of the commandlet,
+        which is a failure whatever the process exit code says."""
+        if not self.trust_commandlet_exit_code:
+            if returncode != 0 and commandlet_codes and not any(commandlet_codes):
+                logger.warning(
+                    'The commandlet reported success but Unreal exited '
+                    f'{returncode}. Reporting failure because '
+                    'trust_commandlet_exit_code is off.'
+                )
+            return returncode == 0
+
+        if not commandlet_codes:
+            logger.error(
+                f'GatherText never reported an exit code (Unreal exited '
+                f'{returncode}). Unreal either failed to start or died during '
+                'the run, so the output cannot be trusted even if some steps '
+                'wrote files. Check the log for a crash. Set '
+                'trust_commandlet_exit_code: No to go back to judging by the '
+                'process exit code alone.'
+            )
+            return False
+
+        failed = [code for code in commandlet_codes if code != 0]
+        if failed:
+            logger.error(
+                f'GatherText reported exit code(s) {failed} across '
+                f'{len(commandlet_codes)} verdict(s).'
+            )
+            return False
+
+        expected_configs = len(self.loc_targets) * len(self.tasks)
+        if configs_started < expected_configs:
+            logger.error(
+                f'Only {configs_started} of {expected_configs} configs were '
+                f'started ({len(self.loc_targets)} target(s) x '
+                f'{len(self.tasks)} task(s)), so Unreal stopped part way '
+                'through even though it reported success.'
+            )
+            return False
+
+        if steps_completed < steps_started:
+            logger.error(
+                f'{steps_started - steps_completed} of {steps_started} gather '
+                'steps never reported completion, so one died part way '
+                'through even though the run reported success.'
+            )
+            return False
+
+        if returncode != 0:
+            logger.warning(
+                f'GatherText completed with exit code 0, but Unreal exited '
+                f'{returncode}. Unreal does that when anything logged an error '
+                f'during the run ({errors} error line(s) here), including '
+                'errors unrelated to localization. Treating the run as '
+                'successful: check the log if the output looks wrong.'
+            )
+
+        return True
 
     def run(self):
         return self.run_tasks()
