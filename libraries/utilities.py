@@ -113,6 +113,10 @@ class LocTask:
         with open(base_config, mode='r', encoding='utf-8') as f:
             yaml_config = yaml.safe_load(f)
 
+        # Task modules are named test_lang.py, their config sections test-lang
+        if script not in (yaml_config.get(SCRIPT_SECTION) or {}):
+            script = script.replace('_', '-')
+
         # Update config from the base section
         updated = False
         if BASE_SECTION in yaml_config:
@@ -130,8 +134,8 @@ class LocTask:
 
         # Update config from the defaults section of base config
         updated = False
-        if script in yaml_config[SCRIPT_SECTION]:
-            for key, value in yaml_config[SCRIPT_SECTION][script].items():
+        if script in (yaml_config.get(SCRIPT_SECTION) or {}):
+            for key, value in (yaml_config[SCRIPT_SECTION][script] or {}).items():
                 if not key.startswith('_') and key in [
                     field.name for field in fields(self)
                 ]:
