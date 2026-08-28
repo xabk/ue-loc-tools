@@ -7,6 +7,11 @@ The CSV shape mirrors what update-source-files uploads today:
     identifier,source_phrase,translation,max_length,labels,context
 with the header row skipped, as in the generated Crowdin CLI config.
 
+Keep these small. A handful of rows is enough to pin how Crowdin parses a
+scheme; uploading real project files to prove the same thing would spam a
+service we do not own. Anything heavier than this belongs in a deliberate
+one-off run, not in a suite people run on a whim.
+
 Run with:  uv run --extra test python -m pytest -m crowdin
 """
 
