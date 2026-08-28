@@ -1,5 +1,9 @@
 # Project-specific
-crowdin.config.yaml
+# Leading slash matters: it anchors these to the repo root, so a live config
+# dropped here is ignored while templates/*.config.yaml stays tracked.
+# Without it, `crowdin.config.yaml` also matches templates/crowdin.config.yaml.
+/crowdin.config.yaml
+/base.config.yaml
 unreal.py
 unreal.py.stub
 logs/

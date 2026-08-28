@@ -1,0 +1,29 @@
+---
+#
+# -------------------------------------------------------------
+# ------------ CROWDIN SECRETS: NEVER SHARE THIS --------------
+# -------------------------------------------------------------
+#
+# Copy this file to the repo root as `crowdin.config.yaml` and fill in your
+# own values, or let `generate-configs init` do it for you.
+#
+# The root copy is gitignored on purpose: it holds your API token and must
+# never be committed, published, or shared. This template is tracked, so keep
+# it free of real credentials.
+#
+# Any key set here overrides the same key in base.config.yaml. The token can
+# ONLY be set here, never in base.config.yaml.
+#
+crowdin:
+  # Your organization name if the project is on an enterprise account.
+  # Leave empty for projects hosted on crowdin.com.
+  organization: ''
+
+  # The API token you generate on Crowdin.
+  # -----------------------------------------------------------
+  # ---------- NEVER SHARE YOUR API TOKEN ANYWHERE! -----------
+  # -----------------------------------------------------------
+  token: replace-with-your-crowdin-api-token
+
+  # Project ID on Crowdin.
+  project_id: 123456

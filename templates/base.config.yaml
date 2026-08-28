@@ -305,8 +305,10 @@ script-parameters:
   # "AssetType'/Game/GameName/Path/To/Asset/Asset_Name.Asset_Name'",
   # don't add any comments and don't change any other lines in this section.
   ue-reimport-assets: # Don't change this line
-    assets_to_reimport: # Don't change this line, add assets one per line below
-      ["DataTable'/Game/.../Name.Name'", "DataTable'/Game/.../Name.Name'"] # Don't change this line
+    assets_to_reimport: [ # Don't change this line, add assets one per line below
+        "DataTable'/Game/.../Name.Name'",
+        "DataTable'/Game/.../Name.Name'",
+      ] # Don't change this line
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
@@ -318,7 +320,7 @@ script-parameters:
     # loc_targets: [Game]
 
     # Relative to Game/Content directory
-    tasks_to_perform: [Gather, Export]
+    tasks: [Gather, Export]
     # Steps to perform. Config/Localization .ini file suffixes:
     # Gather, Export, Import, Compile, GenerateReports, etc.
     # Specify this in task lists to run specific tasks.
@@ -370,7 +372,7 @@ script-parameters:
     branch: ''
 
     cli_cfg_name: '#Config/#crowdin.upload.yaml' # Will be generated in temp_dir
-    cli_sources_dir: '#Sources' # Relative to temp_dir
+    cli_source_dir: '#Sources' # Relative to temp_dir
 
     cli_csv_first_line_is_header: Yes
     cli_csv_scheme: 'identifier,source_phrase,translation,max_length,labels,context'
