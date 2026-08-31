@@ -35,6 +35,10 @@ class UpdateSourceFile(LocTask):
 
     csv_loc_targets: list[str] | None = None
     csv_dir: str = 'CSVs'
+    # Locales whose existing translations should be written out as bilingual
+    # CSVs too, for a project that was localized before it came to Crowdin
+    translated_csv_locales: list[str] | None = None
+    translated_csv_dir: str = 'TranslatedCSVs'
     # Split CSV file into multiple files based on rules
     split_csv_rules: list[tuple[str, str, str]] | None = None
     # List of tuples: (column name, regex pattern, output file name)
@@ -173,7 +177,11 @@ class UpdateSourceFile(LocTask):
         return len(text.encode('utf-8')) <= limit
 
     def write_bilingual_csv(
-        self, po_file: str, target: str = '', dir: Path | None = None
+        self,
+        po_file: str,
+        target: str = '',
+        dir: Path | None = None,
+        locale: str = '',
     ):
         """
         Write a CSV file with source, target, and context fields
@@ -189,6 +197,9 @@ class UpdateSourceFile(LocTask):
 
         if target:
             csv_path = csv_path / target
+
+        if locale:
+            csv_path = csv_path / locale
 
         csv_path.mkdir(parents=True, exist_ok=True)
 
@@ -423,6 +434,26 @@ class UpdateSourceFile(LocTask):
             self._cli_config['files'].append(self.cli_files_for_csv_loc_target(target))
 
             targets_processed.append(target)
+
+        if self.translated_csv_locales and self.csv_loc_targets:
+            for target in self.csv_loc_targets:
+                for locale in self.translated_csv_locales:
+                    translated_fname = f'Localization/{target}/{locale}/{target}.po'
+                    fpath = self._content_path / translated_fname
+
+                    if not fpath.exists():
+                        logger.warning(
+                            f'Translated PO file not found: {translated_fname}. Skipping.'
+                        )
+                        continue
+
+                    self.write_bilingual_csv(
+                        str(fpath),
+                        target,
+                        dir=self._temp_path / self.translated_csv_dir,
+                        locale=locale,
+                    )
+                    logger.success(f'Generated translated CSVs for {target}/{locale}')
 
         if len(targets_processed) == len(self.loc_targets) + len(self.csv_loc_targets):
             logger.success(
