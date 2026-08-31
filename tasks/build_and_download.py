@@ -13,6 +13,12 @@ from libraries.utilities import init_logging
 from libraries import polib
 
 
+def _truncate_for_logging(text: str, max_bytes: int = 65536, max_length: int = 1000) -> str:
+    if len(text.encode('utf-8')) > max_bytes:
+        return text[:max_length]
+    return text
+
+
 @dataclass
 class BuildAndDownloadTranslations(LocTask):
     # Declare Crowdin parameters to load them from config
@@ -315,19 +321,22 @@ class BuildAndDownloadTranslations(LocTask):
                 f'--- Skipped / Source mismatch ({len(skipped_due_to_mismatch)}):'
             )
             for key, data in skipped_due_to_mismatch.items():
-                logger.warning(f'{key}:\n{data["po"]}\n!=\n{data["csv"]}')
+                logger.warning(
+                    f'{key}:\n{_truncate_for_logging(data["po"])}\n!=\n'
+                    f'{_truncate_for_logging(data["csv"])}'
+                )
         if missing_in_CSV:
             logger.warning(
                 f'--- Missing: PO entries not found in CSV ({len(missing_in_CSV)})'
             )
             for key, data in missing_in_CSV.items():
-                logger.warning(f'{key}:\n{data["source"]}')
+                logger.warning(f'{key}:\n{_truncate_for_logging(data["source"])}')
         if csv_data:
             logger.warning(
                 f'--- Missing: CSV entries not found in PO ({len(csv_data)})'
             )
             for key, data in csv_data.items():
-                logger.warning(f'{key}:\n{data["source"]}')
+                logger.warning(f'{key}:\n{_truncate_for_logging(data["source"])}')
 
         logger.info(f'CSV entries loaded {csv_length}')
         logger.info(f'PO entries loaded {len(po_file)}')
