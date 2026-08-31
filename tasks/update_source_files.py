@@ -13,6 +13,8 @@ from libraries.crowdin import UECrowdinClient
 from libraries.utilities import LocTask, init_logging
 from libraries import polib
 
+CROWDIN_CELL_BYTE_LIMIT = 65535
+
 
 @dataclass
 class UpdateSourceFile(LocTask):
@@ -163,6 +165,13 @@ class UpdateSourceFile(LocTask):
         new_po.save(filtered_po_path)
         return filtered_po_path
 
+    def within_byte_limit(
+        self, text: str, limit: int = CROWDIN_CELL_BYTE_LIMIT
+    ) -> bool:
+        if not text:
+            return True
+        return len(text.encode('utf-8')) <= limit
+
     def write_bilingual_csv(
         self, po_file: str, target: str = '', dir: Path | None = None
     ):
@@ -267,8 +276,26 @@ class UpdateSourceFile(LocTask):
                     ]
                 )
 
+                skipped = 0
                 for row in data:
+                    key, source, target = row[0], row[1], row[2]
+                    if not self.within_byte_limit(source) or not self.within_byte_limit(
+                        target
+                    ):
+                        skipped += 1
+                        logger.warning(
+                            f'Skipping entry: key="{key}" - '
+                            f'source byte length: {len(source.encode("utf-8"))}, '
+                            f'target byte length: {len(target.encode("utf-8"))} '
+                            f'(exceeds the {CROWDIN_CELL_BYTE_LIMIT}-byte limit)'
+                        )
+                        continue
                     writer.writerow(row)
+
+                if skipped:
+                    logger.warning(
+                        f'Skipped {skipped} entries that exceed the byte limit'
+                    )
 
             logger.info(f'CSV file saved: {csv_file}')
 
