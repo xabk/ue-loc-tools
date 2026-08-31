@@ -596,12 +596,19 @@ class UEProject:
         5: 'Binaries/Win64/UnrealEditor-Cmd.exe',
     }
 
+    def _cmd_binary_candidates(self, version: int) -> list[str]:
+        """Standard engine layouts keep the binary under Engine/, but a project
+        that renames its editor target keeps it beside the project instead."""
+        name = self._cmd_binary.get(version)
+        return [f'Engine/{name}', name] if name else []
+
     def __init__(
         self,
         ue_major_version: int | None = None,
         project_path: str | Path | None = None,  # Absolute/relative to _script_ path
         script_path: str | Path | None = None,  # Absolute/relative to project
         engine_path: str | Path | None = None,  # Absolute/relative to project
+        unreal_binary: str | None = None,  # Relative to engine root
     ):
         # Project path
         if not project_path:
@@ -757,16 +764,7 @@ class UEProject:
         )
 
         # UE CMD binary path
-        if not ue_major_version:
-            for version in self._supported_versions:
-                self.cmd_binary_path = self.engine_path / self._cmd_binary[version]
-                if self.cmd_binary_path.exists() and self.cmd_binary_path.is_file():
-                    ue_major_version = version
-                    self.version = ue_major_version
-                    logger.info(f'Version detected as {ue_major_version}')
-                    break
-
-        elif (
+        if ue_major_version is not None and (
             not isinstance(ue_major_version, int)
             or ue_major_version not in self._supported_versions
         ):
@@ -780,26 +778,43 @@ class UEProject:
                 f'Supported major versions: {self._supported_versions}.'
             )
 
-        if self._cmd_binary.get(ue_major_version, None) is None:
+        self.cmd_binary_path = None
+
+        if unreal_binary:
+            self.cmd_binary_path = self.engine_path / unreal_binary
+            if ue_major_version is None:
+                ue_major_version = 4 if 'UE4Editor' in unreal_binary else 5
+                logger.info(
+                    f'Version assumed to be {ue_major_version} from the binary name. '
+                    'Pass ue_major_version if that is wrong.'
+                )
+        else:
+            versions = (
+                [ue_major_version] if ue_major_version else self._supported_versions
+            )
+            for version in versions:
+                for name in self._cmd_binary_candidates(version):
+                    candidate = self.engine_path / name
+                    if candidate.is_file():
+                        self.cmd_binary_path = candidate
+                        ue_major_version = version
+                        logger.info(f'Version detected as {ue_major_version}')
+                        break
+                if self.cmd_binary_path is not None:
+                    break
+
+        if self.cmd_binary_path is None or not self.cmd_binary_path.is_file():
             logger.error(
-                f'No CMD binary path specified for UE version {ue_major_version}. '
+                f'No Unreal CMD binary found under engine root {self.engine_path}. '
+                'If the editor target is renamed, set unreal_binary in the config. '
                 'Aborting.'
             )
             raise ValueError(
-                f'No CMD binary path specified for UE version {ue_major_version}.'
+                f'No Unreal CMD binary found under engine root {self.engine_path}. '
+                f'Tried: {unreal_binary or self._cmd_binary}'
             )
 
-        self.cmd_binary_path = self.engine_path / self._cmd_binary[ue_major_version]
-        if not self.cmd_binary_path.exists() or not self.cmd_binary_path.is_file():
-            logger.error(
-                f'CMD binary path {self.cmd_binary_path} '
-                'does not exist or is not a file. Aborting.'
-            )
-            raise ValueError(
-                f'CMD binary path {self.cmd_binary_path} '
-                'does not exist or is not a file.'
-            )
-
+        self.version = ue_major_version
         self.cmd_binary_path = self.cmd_binary_path.resolve().absolute()
 
         # P4 config path and configuration

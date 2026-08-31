@@ -44,7 +44,8 @@ class LocaleTask(LocTask):
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     project_dir: str | Path | None = '../../../'  # Absolute or relative to cwd
-    engine_dir: str | Path | None = None  # Absolute or relative to project_dir
+    engine_dir: str | Path | None = None  # Absolute or relative to cwd
+    unreal_binary: str | None = None  # Relative to engine root
 
     _ue_project: UEProject | None = None
 
@@ -74,8 +75,13 @@ class LocaleTask(LocTask):
         super().post_update()
 
         if not self._ue_project:
+            # engine_dir is relative to the working directory everywhere else,
+            # but UEProject resolves relative engine paths against the project.
+            engine_path = Path(self.engine_dir).resolve() if self.engine_dir else None
             self._ue_project = UEProject(
-                project_path=self.project_dir, engine_path=self.engine_dir
+                project_path=self.project_dir,
+                engine_path=engine_path,
+                unreal_binary=self.unreal_binary,
             )
 
         if self.source_target is not None:
