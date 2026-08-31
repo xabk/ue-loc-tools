@@ -1,6 +1,6 @@
 [project]
 name = "loc-tools"
-version = "1.0.0"
+version = "1.6.0"
 description = "Loc tools for Unreal Engine and Crowdin"
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
