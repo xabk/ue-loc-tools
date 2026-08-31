@@ -5,7 +5,7 @@
 # -------------------------------------------------------------
 #
 # Copy this file to the repo root as `crowdin.config.yaml` and fill in your
-# own values, or let `generate-configs init` do it for you.
+# own values, or let `loc-project init` do it for you.
 #
 # The root copy is gitignored on purpose: it holds your API token and must
 # never be committed, published, or shared. This template is tracked, so keep

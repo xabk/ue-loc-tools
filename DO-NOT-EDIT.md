@@ -22,8 +22,8 @@ Start a project config from the templates rather than by copying another
 project's:
 
 ```
-uv run --project loctools loctools/generate-configs.py           # creates both configs
-uv run --project loctools loctools/generate-configs.py --check   # validates them
+uv run --project loctools loctools/loc-project.py           # creates both configs
+uv run --project loctools loctools/loc-project.py --check   # validates them
 ```
 
 `--check` is worth running before any upgrade: a config key that matches no

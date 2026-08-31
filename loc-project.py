@@ -1,9 +1,12 @@
-"""Create, validate and diff project configs against the shipped templates.
+"""Set up and validate the project side of the loc tools.
+
+loc-sync.py runs the work; this one looks after the files the project owns:
+the configs, the runner batch file, the gitignore and the sync guide.
 
 Usage:
-    generate-configs.py                -> copy templates into the project, never overwriting
-    generate-configs.py --check        -> validate the project config, exit 1 on problems
-    generate-configs.py --upgrade      -> report how the template and the project config differ
+    loc-project.py                -> scaffold a project from the templates, never overwriting
+    loc-project.py --check        -> validate the project config, exit 1 on problems
+    loc-project.py --upgrade      -> report how the template and the project config differ
 """
 
 import difflib
@@ -33,7 +36,7 @@ app = typer.Typer(
     add_completion=False,
     invoke_without_command=True,
     no_args_is_help=False,
-    help='Create, validate and diff project configs.',
+    help='Set up and validate the project side of the loc tools.',
 )
 
 
@@ -43,27 +46,40 @@ def load_yaml(path: Path) -> dict:
 
 
 def do_init(base_path: Path, secret_path: Path) -> int:
-    existing = [p for p in (base_path, secret_path) if p.exists()]
+    project_dir = base_path.parent
+    # template name -> where it lands in the project
+    scaffold = {
+        'base.config.yaml': base_path,
+        'crowdin.config.yaml': secret_path,
+        '!loc-sync.bat': project_dir / '!loc-sync.bat',
+        'gitignore': project_dir / '.gitignore',
+        'sync-guide.md': project_dir / 'sync-guide.md',
+    }
+
+    existing = [p for p in scaffold.values() if p.exists()]
     if existing:
         for path in existing:
-            logger.error(f'Refusing to overwrite an existing config: {path}')
+            logger.error(f'Refusing to overwrite: {path}')
         logger.error('Move or delete it first, or use --upgrade to compare.')
         return 1
 
-    for template, target in (
-        (TEMPLATE_DIR / 'base.config.yaml', base_path),
-        (TEMPLATE_DIR / 'crowdin.config.yaml', secret_path),
-    ):
+    for name, target in scaffold.items():
+        template = TEMPLATE_DIR / name
         if not template.exists():
             logger.error(f'Template missing: {template}')
             return 1
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(template, target)
-        logger.success(f'Created {target} from {template.name}')
+        logger.success(f'Created {target}')
 
     logger.warning(
         f'Fill in your Crowdin token and project ID in {secret_path}, '
         'and keep that file out of version control.'
+    )
+    logger.info(
+        'For Perforce, add the rules in '
+        f'{TEMPLATE_DIR / "p4ignore-snippet.txt"} to the .p4ignore.txt at your '
+        'workspace root.'
     )
     return 0
 

@@ -1,0 +1,24 @@
+# Project loc-tools repo. Copied to .gitignore by generate-configs.
+#
+# The vendor tree lives in loctools/ as a submodule and has its own ignores.
+
+# Secrets and machine-local files
+crowdin.config.yaml
+unreal.py
+unreal.py.stub
+logs/
+
+# One-off scripts kept local rather than shared
+project/y-*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Note: do NOT ignore .python-version. uv reads it next to pyproject.toml
+# inside loctools/, and a checkout without it resolves the wrong interpreter.

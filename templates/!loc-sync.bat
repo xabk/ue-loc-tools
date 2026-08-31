@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0"
 @echo Running the loc-sync script in interactive mode.
 @echo.
 @echo See logs/locsync.log for logs.
@@ -16,9 +17,8 @@ if %errorlevel% neq 0 (
 
 @echo.
 @echo ------------------------------------------------------------
-@echo @echo Running the loc-sync script in interactive mode...
-@echo Command: python loc-sync.py
-uv run loc-sync.py %*
+@echo Command: uv run --project loctools loctools/loc-sync.py
+uv run --project loctools loctools/loc-sync.py %*
 @echo.
 @echo.
 pause

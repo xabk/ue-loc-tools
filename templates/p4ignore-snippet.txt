@@ -1,0 +1,31 @@
+# Add to the .p4ignore.txt at your Perforce workspace root, adjusting the path
+# prefix to where the loc tools live in your depot.
+#
+# Two things that are easy to get wrong:
+#
+#  - `.git` has NO trailing slash on purpose. A submodule leaves a gitlink
+#    *file* named .git, not a directory, and a trailing slash matches only
+#    directories.
+#  - `**/` needs at least one directory between it and the name, so
+#    `Game/Content/Python/**/.venv/` does not match
+#    `Game/Content/Python/.venv/`. Drop the path prefix entirely if you want
+#    a pattern that matches at any depth and survives folder moves.
+#
+# P4IGNORE must actually be set for any of this to apply. Check with
+# `p4 set P4IGNORE`; a .p4config at the workspace root is the per-workspace way:
+#
+#     p4 set P4CONFIG=.p4config
+#     echo P4IGNORE=.p4ignore.txt >> <workspace root>/.p4config
+#
+# Verify a rule without submitting anything: `p4 ignores -i <path>`.
+
+Game/Content/Python/**/.venv/
+Game/Content/Python/**/logs/
+Game/Content/Python/**/.git
+Game/Content/Python/**/.pytest_cache/
+Game/Content/Python/**/.ruff_cache/
+Game/Content/Python/**/htmlcov/
+Game/Content/Python/**/.coverage
+
+# Machine-local Perforce config, if you use one
+/.p4config

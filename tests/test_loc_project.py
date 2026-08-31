@@ -1,4 +1,4 @@
-"""generate-configs is the first step of any upgrade, so its exit codes matter."""
+"""loc-project is the first step of any upgrade, so its exit codes matter."""
 
 import importlib.util
 import shutil
@@ -10,8 +10,8 @@ from conftest import TEMPLATE_BASE, TEMPLATE_SECRET
 
 
 def load_module(repo_root):
-    path = repo_root / 'generate-configs.py'
-    spec = importlib.util.spec_from_file_location('generate_configs', path)
+    path = repo_root / 'loc-project.py'
+    spec = importlib.util.spec_from_file_location('loc_project', path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -22,12 +22,38 @@ def gc(repo_root):
     return load_module(repo_root)
 
 
-def test_init_creates_both_configs(gc, tmp_path):
+def test_init_scaffolds_the_project(gc, tmp_path):
     base = tmp_path / 'base.config.yaml'
     secret = tmp_path / 'crowdin.config.yaml'
 
     assert gc.do_init(base, secret) == 0
-    assert base.is_file() and secret.is_file()
+
+    written = sorted(p.name for p in tmp_path.iterdir())
+    assert written == [
+        '!loc-sync.bat',
+        '.gitignore',
+        'base.config.yaml',
+        'crowdin.config.yaml',
+        'sync-guide.md',
+    ]
+
+
+def test_the_scaffolded_bat_targets_the_submodule_layout(gc, tmp_path):
+    gc.do_init(tmp_path / 'base.config.yaml', tmp_path / 'crowdin.config.yaml')
+
+    bat = (tmp_path / '!loc-sync.bat').read_text(encoding='utf-8')
+    assert 'cd /d "%~dp0"' in bat
+    assert 'uv run --project loctools loctools/loc-sync.py' in bat
+
+
+def test_the_scaffolded_gitignore_keeps_python_version(gc, tmp_path):
+    """Ignoring .python-version makes uv resolve the wrong interpreter."""
+    gc.do_init(tmp_path / 'base.config.yaml', tmp_path / 'crowdin.config.yaml')
+
+    ignored = (tmp_path / '.gitignore').read_text(encoding='utf-8')
+    assert 'crowdin.config.yaml' in ignored
+    assert '.pytest_cache/' in ignored
+    assert '\n.python-version' not in ignored
 
 
 def test_init_refuses_to_overwrite(gc, tmp_path):

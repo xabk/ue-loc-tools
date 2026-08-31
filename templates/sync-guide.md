@@ -1,3 +1,10 @@
+<!--
+Template. Copy this next to your base.config.yaml and rewrite it for the
+project: the task list names below are examples, and yours are whatever
+base.config.yaml defines. This is the document a producer or loc manager
+reads, so keep it about what to run and when, not about how the tools work.
+-->
+
 # Loc Sync Guide
 Loc sync scripts live in the `Content/Python` folder in the project directory 
 and are synced and updated along with the project.
@@ -73,6 +80,28 @@ This will gather and export the text from UE, update the debug/hash locales,
 and then update the sources on Crowdin.
 
 # Typical scenarios
+
+## Updating the source on Crowdin: automatically or by hand
+
+There are two ways to update source files, and the choice costs or saves
+translations.
+
+**Automatic** is the default: the script replaces every file, and Crowdin drops
+the translations of any string whose source changed — including a one-character
+typo fix. Fast, and fine when the text genuinely changed.
+
+**Manual** (`manual_upload: Yes`) preps the files and opens the folder so you
+upload them yourself, one by one. Crowdin then shows you the diff per file and
+lets you keep translations where the change was cosmetic. Worth the time when
+you have been fixing typos in the repo but not on Crowdin, and do not want to
+send a batch of already-translated strings back out for retranslation.
+
+Rule of thumb when uploading by hand: keep translations for typo fixes only.
+Drop them for anything that changes meaning, variables, or formatting that a
+translator has to mirror — added or removed punctuation and spacing included.
+
+If an upload goes wrong — far more strings added or removed than you expected —
+Crowdin keeps file revisions, so revert the file there rather than re-uploading.
 
 ## Launch a new batch of translations (update source files on Crowdin)
 Make sure you sync to latest change list in Perforce/UGS, run the loc sync script 
