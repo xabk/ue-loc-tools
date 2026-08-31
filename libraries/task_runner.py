@@ -409,6 +409,7 @@ class TaskRunner:
         if self.unattended:
             raise ValueError('Task list must be specified in unattended mode')
         task_list = ''
+        print(f'\nProject directory: {COLOR_YELLOW}{Path.cwd()}{COLOR_RESET}')
         print('\nAvailable task lists from base.config.yaml:\n')
         for i, task in enumerate(task_lists, start=1):
             lines = task.split('\n')
@@ -457,6 +458,7 @@ class TaskRunner:
         self, tasks: list[dict[str, Any]]
     ) -> list[tuple[dict[str, Any], str, str]]:
         results: list[tuple[dict[str, Any], str, str]] = []
+        logger.info(f'Project directory: {Path.cwd()}')
         for i, task_config in enumerate(tasks, 1):
             script_name = task_config['script']
             task_name, task_description = self.get_task_metadata(script_name)
