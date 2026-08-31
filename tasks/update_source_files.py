@@ -194,14 +194,12 @@ class UpdateSourceFile(LocTask):
                 for entry in po[:]:
                     if re.search(pattern, getattr(entry, column)):
                         cat = output_file
-                        if not cat:
-                            # logger.info(
-                            #     f'Trying to match category for {getattr(entry, column)}'
-                            # )
-                            # logger.info(f'Using pattern: {pattern}')
-                            match = re.search(pattern, str(getattr(entry, column)))
-                            # logger.info(f'Match: {match}')
-                            cat = match.group(1)
+                        match = re.search(pattern, str(getattr(entry, column)))
+                        if match:
+                            if not cat:
+                                cat = match.group(1)
+                            else:
+                                cat = cat.replace('$1', match.group(1))
 
                         # TODO: Assign MaxLength and Labels based on regex criteria / metadata
                         labels = ''
