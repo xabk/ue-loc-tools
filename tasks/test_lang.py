@@ -563,7 +563,7 @@ class ProcessTestAndHashLocales(LocTask):
         Get external context for a key from a dictionary
         """
         context = []
-        for title, data in self._external_context.items():
+        for title, data in (self._external_context or {}).items():
             if key in data:
                 if title:
                     context += [f'{title}: {c}' for c in data[key]]
