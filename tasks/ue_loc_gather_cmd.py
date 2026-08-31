@@ -278,6 +278,25 @@ class UnrealLocGatherCommandlet(LocTask):
             steps_completed,
         )
 
+    def incomplete_run(
+        self, configs_started: int, steps_started: int, steps_completed: int
+    ) -> str | None:
+        """What the run's own accounting says is missing, if anything."""
+        expected = len(self.loc_targets) * len(self.tasks)
+        if configs_started < expected:
+            return (
+                f'only {configs_started} of {expected} configs were started '
+                f'({len(self.loc_targets)} target(s) x {len(self.tasks)} task(s))'
+            )
+        if steps_started == 0:
+            return 'no gather steps ran at all'
+        if steps_completed < steps_started:
+            return (
+                f'{steps_started - steps_completed} of {steps_started} gather '
+                'steps never reported completion'
+            )
+        return None
+
     def task_succeeded(
         self,
         returncode: int,
@@ -292,9 +311,13 @@ class UnrealLocGatherCommandlet(LocTask):
         verdict is the more accurate signal when we have it.
 
         One engine run covers several steps and normally reports once, but a
-        single non-zero verdict fails the task however many are printed. No
-        verdict at all means Unreal never reached the end of the commandlet,
-        which is a failure whatever the process exit code says."""
+        single non-zero verdict fails the task however many are printed.
+
+        UE4 streams no verdict at all, so its absence cannot mean failure:
+        there the run is judged by its own accounting instead: every config
+        started, every step that started also completed, and a clean process
+        exit. That is weaker — counts cannot tell a step that succeeded from
+        one that failed cleanly — so it is the fallback, not the rule."""
         if not self.trust_commandlet_exit_code:
             if returncode != 0 and commandlet_codes and not any(commandlet_codes):
                 logger.warning(
@@ -304,16 +327,27 @@ class UnrealLocGatherCommandlet(LocTask):
                 )
             return returncode == 0
 
+        incomplete = self.incomplete_run(
+            configs_started, steps_started, steps_completed
+        )
+
         if not commandlet_codes:
-            logger.error(
-                f'GatherText never reported an exit code (Unreal exited '
-                f'{returncode}). Unreal either failed to start or died during '
-                'the run, so the output cannot be trusted even if some steps '
-                'wrote files. Check the log for a crash. Set '
-                'trust_commandlet_exit_code: No to go back to judging by the '
-                'process exit code alone.'
+            if incomplete or returncode != 0:
+                logger.error(
+                    'GatherText never reported an exit code, and the run does '
+                    'not look complete: '
+                    f'{incomplete or f"Unreal exited {returncode}"}. Check the '
+                    'log for a crash.'
+                )
+                return False
+
+            logger.warning(
+                'GatherText reported no exit code, which UE 4.27 and older do '
+                f'not print. Accepting the run on its own accounting: '
+                f'{configs_started} config(s) started, {steps_completed} of '
+                f'{steps_started} steps completed, process exit 0.'
             )
-            return False
+            return True
 
         failed = [code for code in commandlet_codes if code != 0]
         if failed:
@@ -323,21 +357,10 @@ class UnrealLocGatherCommandlet(LocTask):
             )
             return False
 
-        expected_configs = len(self.loc_targets) * len(self.tasks)
-        if configs_started < expected_configs:
+        if incomplete:
             logger.error(
-                f'Only {configs_started} of {expected_configs} configs were '
-                f'started ({len(self.loc_targets)} target(s) x '
-                f'{len(self.tasks)} task(s)), so Unreal stopped part way '
-                'through even though it reported success.'
-            )
-            return False
-
-        if steps_completed < steps_started:
-            logger.error(
-                f'{steps_started - steps_completed} of {steps_started} gather '
-                'steps never reported completion, so one died part way '
-                'through even though the run reported success.'
+                f'GatherText reported success, but {incomplete}, so Unreal '
+                'stopped part way through.'
             )
             return False
 

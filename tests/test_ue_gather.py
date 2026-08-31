@@ -65,6 +65,13 @@ def test_negative_exit_codes_are_recognised():
     assert int(re.search(COMMANDLET_VERDICT, line).group(1)) == -1
 
 
+def test_the_ue4_error_count_line_is_not_treated_as_a_verdict():
+    """`Success - 0 error(s)` is LogInit counting logged errors, which is the
+    weak signal this logic exists to stop trusting."""
+    line = 'LogInit: Display: Success - 0 error(s), 0 warning(s)'
+    assert re.search(COMMANDLET_VERDICT, line) is None
+
+
 def test_a_complete_run_passes(task):
     assert task.task_succeeded(0, [0], 0, **FULL_RUN) is True
 
@@ -81,9 +88,34 @@ def test_one_failing_verdict_among_many_fails(task):
     assert task.task_succeeded(0, [0, 0, 2, 0], 0, **FULL_RUN) is False
 
 
-def test_no_verdict_fails_even_when_unreal_exits_clean(task):
-    assert task.task_succeeded(0, [], 0, **FULL_RUN) is False
+def test_no_verdict_passes_on_a_complete_run(task):
+    """UE 4.27 prints no verdict line, so its absence cannot mean failure.
+    A complete run with a clean exit is accepted on its own accounting."""
+    assert task.task_succeeded(0, [], 0, **FULL_RUN) is True
+
+
+def test_no_verdict_fails_when_unreal_exits_nonzero(task):
     assert task.task_succeeded(1, [], 0, **FULL_RUN) is False
+
+
+def test_no_verdict_fails_on_an_incomplete_run(task):
+    assert (
+        task.task_succeeded(
+            0, [], 0, configs_started=3, steps_started=8, steps_completed=8
+        )
+        is False
+    )
+    assert (
+        task.task_succeeded(
+            0, [], 0, configs_started=4, steps_started=10, steps_completed=9
+        )
+        is False
+    )
+
+
+def test_no_verdict_and_nothing_ran_fails(task):
+    """Unreal failing to start leaves a clean exit and no accounting at all."""
+    assert task.task_succeeded(0, [], 0) is False
 
 
 def test_a_config_that_never_started_fails(task):
