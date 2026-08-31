@@ -418,7 +418,7 @@ class ProcessTestAndHashLocales(LocTask):
         asset_name = None
         subtitle = None
         for comment in entry.comment.splitlines(False):
-            if comment.startswith('SourceLocation:'):
+            if comment.startswith(('SourceLocation:', 'Loc:')):
                 asset_name = re.search(r'/([^.]+)\.\1', comment)
                 if asset_name:
                     asset_name = asset_name[1]
@@ -963,6 +963,10 @@ class ProcessTestAndHashLocales(LocTask):
             new_comments = []
             new_comments.append(debug_ID)
             for comment in entry.comment.splitlines(False):
+                # Drop the one written by an earlier pass: the gather rewrites
+                # SourceLocation every time, so a kept Loc: line goes stale
+                if comment.startswith('Loc:'):
+                    continue
                 if comment.startswith('SourceLocation:'):
                     pattern = 'SourceLocation:\t'
                     if (
