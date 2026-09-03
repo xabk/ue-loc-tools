@@ -6,8 +6,8 @@ reads, so keep it about what to run and when, not about how the tools work.
 -->
 
 # Loc Sync Guide
-Loc sync scripts live in the `Content/Python` folder in the project directory 
-and are synced and updated along with the project.
+The loc tools live next to this guide in the project directory, and are synced
+and updated along with the project.
 
 It's a bunch of scripts that could be run separately but the intended way
 is to launch them in batches—or task lists—via `loc-sync.py`.
@@ -20,18 +20,39 @@ from Crowdin, plus do some other project-specific things. All without you having
 to open the Unreal Editor or downloading and copying any files yourself.
 
 ### Contents
+- [First, on a new PC](#first-on-a-new-pc)
 - [Task Lists](#loc-sync-task-lists)
 - [Typical Scenarios](#typical-scenarios)
 - [Errors](#errors-and-logging)
 - [Adding new localization targets](#adding-new-localization-targets)
 
+## First, on a new PC
+
+Double-click **`update-loc-tools.bat`**. It installs uv, which brings Python and
+every dependency, and the Crowdin CLI at the version the tools are tested
+against, then checks the config, the machine and the tools.
+
+It ends with either `ALL GOOD` or `SOMETHING NEEDS ATTENTION`. Do not run a sync
+until it says `ALL GOOD`. If it installed something, it may ask you to open a
+new terminal and run it again: a freshly installed tool is not on your PATH
+until then.
+
+Run the same script whenever the tools are updated.
+
+> You also need the Unreal Editor connected to your source control at least
+> once on this PC, and a buildable project: the tools drive the editor from the
+> command line. `update-loc-tools.bat` tells you if either is missing.
+
 ## Usage
 
-Navigate to the `Content` folder in your project directory, select the `Python` 
-folder, then hold `shift` and `right click` to open the extended context menu, 
-choose `Open in Terminal` and this will open a terminal window. 
-Type `python loc-sync.py` to run the script and you'll see the task lists available 
-(configured in base.config.yaml).
+Double-click **`!loc-sync.bat`** and you will see the task lists available
+(configured in `base.config.yaml`). Type the number and press Enter.
+
+It also takes a task list name directly, which is how you automate it:
+
+```
+!loc-sync.bat "<task list name>" -u
+```
 
 # Loc sync task lists
 When you run the loc sync script it reads tasks, parameters 
@@ -166,7 +187,7 @@ contain a whole bunch of warnings and non-critical errors. Don't be afraid of th
 
 However, if a script crashes with an exception or if it prints that a task has failed, 
 or if you see return code that isn't zero, then something's off. 
-Logs are located under `Content/Python/logs`.
+Logs are located in the `logs` folder next to this guide: `logs/locsync.log`.
 
 # Adding new localization targets
 If you want to add new localization targets:

@@ -156,15 +156,19 @@ installs the requirements and verifies the result.
 2. Configure the scripts for your project: paths, targets, Crowdin credentials, script parameters,
 and task lists based on what you need.
 3. `!loc-sync.bat`, or `uv run --project loctools loctools/loc-sync.py`, will launch the script and present you with the list of tasks.
-It also accepts task names as command-line parameters for automation, for example, `uv run loc-sync.py "[X, ALL] #5 Import Translations"`.
-Note that _uv_ should take care of everything automatically, from Python to all the required packages.
-You can also run the script in automated mode with `!loc-sync.bat task-list-name -u`.
+It also accepts a task list name as a command-line parameter for automation, for example `!loc-sync.bat "[X, ALL] #5 Import Translations"`.
+Note that _uv_ takes care of everything automatically, from Python itself to all the required packages.
+Add `-u` to run unattended, without the confirmation prompt: `!loc-sync.bat "<task list name>" -u`.
+
+Other useful flags: `--list-tasks` prints the individual tasks and their
+descriptions, and `--debug` turns on verbose logging. Logs go to
+`logs/locsync.log` next to your config.
 
 ## Configuration
 By default, `base.config.yaml` contains several task lists tailored for different scenarios. Take a look at them and adjust to your needs.
 
 Actual workflow depends on what features you want for the project, but the basics are as follows:
-1. Check out related assets from Perforce using the Unreal Editor source control settings. You have to set up source control in the editor for this to work.
+1. Check out related assets from Perforce using the Unreal Editor source control settings. You have to set up source control in the editor for this to work; `loc-project.py --check-env` warns you when those settings are missing.
 2. Gather and export localization data from Unreal as PO files.
 3. Prepare the debug ID and source locale: lines sorted by asset paths to group things together, with additional comments and cleaned up context info, with asset names and repetition markers for convenience. Source locale is based on the debug ID locale that contains unique and simple to remember IDs like #1234 that allow you to identify any string you see in the game (default locale: io). Optionally, prepare the 'hash' locale: basic pseudolocalization locale where the script adds beginning and end markers to all strings (default locale: ia-001).
 --- Possible game-specific scripts would go here ---
@@ -179,16 +183,29 @@ Game-specific scripts:
 
 You can adjust all the script parameters in `base.config.yaml`: set the defaults in `script-parameters/[script name]` sections and adjust them in task lists if you want under `[task list name]/[corresponding script entry]/script-parameters` section.
 
-List of available scripts and parameters (coming later):
+The tasks a project can put in a task list, by the name you use under
+`script:`:
 
-- Unreal Localization Targets: add/delete cultures for loc targets, copy cultures from one target to other targets.
-- Check out the assets you're about to update from Perforce
-- Gather, export, import, compile text in Unreal using the UE command line executable
-- Generate source/debug ID locale with automated comments and sorting, generate 'hash' locale
-- Add source files to Crowdin project using predefined export settings
-- Update existing source files in Crowdin project
-- Build, download, extract, and move translated files from Crowdin to UE Localization directory
-- Generate user contribution reports on Crowdin and save the data to CSV (to reimport the data table)
-- Generate translation status reports on Crowdin and save the data to CSV (to reimport the data table)
-- Reimport assets (e.g., data tables from CSVs)
-- Create "longest" locale with start and end markers, based on TM and MT, where English text is extended to match the length of the longest translation
+| task | what it does |
+| --- | --- |
+| `p4-checkout` | check out the localization files and any extra assets from Perforce |
+| `ue-loc-gather-cmd` | gather, export, import and compile text in Unreal via the editor command line |
+| `test-lang` | generate the source/debug-ID locale with sorting and automated comments, plus the hash pseudo-locale |
+| `mt-pseudo` | create the "longest" locale from TM and MT, where English is extended to the length of the longest translation |
+| `update-source-files` | add or update source files on Crowdin, with the export settings and file type you configure |
+| `build-and-download` | build on Crowdin, download the translations and move them into the UE Localization folders |
+| `completion-rates` | pull language completion rates into a CSV, for a language selection menu |
+| `community-credits` | pull contributor stats into a CSV, for game credits |
+| `po-csv-converter` | convert between the PO files and CSV, including bilingual CSVs |
+| `import-screens` | upload screenshots to Crowdin, optionally pulling them from Google Drive |
+
+Two more run as standalone scripts rather than tasks, and are configured in the
+same file for convenience:
+
+| script | what it does |
+| --- | --- |
+| `targets.py` | add or delete locales across loc targets, and copy locales from one target to others |
+| `scripts/ue-reimport-assets.py` | reimport assets, for example data tables from the CSVs above |
+
+The last two are why `script-parameters` may contain `targets` and
+`ue-reimport-assets` sections that match no registered task.
