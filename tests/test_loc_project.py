@@ -35,6 +35,7 @@ def test_init_scaffolds_the_project(gc, tmp_path):
         'base.config.yaml',
         'crowdin.config.yaml',
         'sync-guide.md',
+        'update-loc-tools.bat',
     ]
 
 
@@ -170,3 +171,18 @@ def test_check_env_skips_tasks_the_project_never_runs(gc, tmp_path, monkeypatch)
 
     assert gc.do_check_env(tmp_path / 'base.yaml', tmp_path / 'secret.yaml') == 0
     assert called == []
+
+
+def test_every_template_reaches_the_project(gc, tmp_path):
+    """A template nobody copies is a template nobody gets: update-loc-tools.bat
+    sat in templates/ unscaffolded, so new projects had no install script.
+    p4ignore-snippet.txt is the one exception: it is pasted into the
+    p4ignore at the workspace root, which is outside the project."""
+    templates = {p.name for p in gc.TEMPLATE_DIR.iterdir() if p.is_file()}
+    scaffolded = set(
+        gc.scaffold_map(
+            tmp_path / 'base.config.yaml', tmp_path / 'crowdin.config.yaml'
+        )
+    )
+
+    assert templates - scaffolded == {'p4ignore-snippet.txt'}

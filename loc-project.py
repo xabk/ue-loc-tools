@@ -53,16 +53,23 @@ def load_yaml(path: Path) -> dict:
         return yaml.safe_load(f) or {}
 
 
-def do_init(base_path: Path, secret_path: Path) -> int:
+def scaffold_map(base_path: Path, secret_path: Path) -> dict[str, Path]:
+    """Template name -> where it lands in the project. Every template except
+    p4ignore-snippet.txt belongs here: that one is pasted into the p4ignore
+    at the workspace root, which is outside the project."""
     project_dir = base_path.parent
-    # template name -> where it lands in the project
-    scaffold = {
+    return {
         'base.config.yaml': base_path,
         'crowdin.config.yaml': secret_path,
         '!loc-sync.bat': project_dir / '!loc-sync.bat',
+        'update-loc-tools.bat': project_dir / 'update-loc-tools.bat',
         'gitignore': project_dir / '.gitignore',
         'sync-guide.md': project_dir / 'sync-guide.md',
     }
+
+
+def do_init(base_path: Path, secret_path: Path) -> int:
+    scaffold = scaffold_map(base_path, secret_path)
 
     existing = [p for p in scaffold.values() if p.exists()]
     if existing:
