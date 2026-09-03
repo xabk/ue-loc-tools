@@ -63,6 +63,15 @@ class UpdateSourceFile(LocTask):
         'identifier,source_phrase,translation,max_length,labels,context'
     )
 
+    # One Crowdin folder per loc target, or every target at the project root.
+    # A folder each keeps a target that is split into many files together.
+    # Set this to False for a project whose targets are already one file each,
+    # and whose files therefore live at the root.
+    # Note: at the root, CSV file names have to be unique across targets.
+    # This moves the source files only. Translations always export into a
+    # folder per target, because that is the layout the download expects.
+    subfolder_per_target: bool = True
+
     # Crowdin file type for PO sources, e.g. gettext_unreal to get the Unreal
     # parser. Left unset, Crowdin decides for itself and new files land as
     # plain gettext. Only affects files being created: an upload never retypes
@@ -108,7 +117,8 @@ class UpdateSourceFile(LocTask):
         if self.cli_source_dir:
             config['source'] = f'{self.cli_source_dir}/{config["source"]}'
 
-        config['dest'] = f'{target}/{target}.po'
+        prefix = f'{target}/' if self.subfolder_per_target else ''
+        config['dest'] = f'{prefix}{target}.po'
 
         if self.file_format:
             config['type'] = self.file_format
@@ -132,7 +142,8 @@ class UpdateSourceFile(LocTask):
 
         config['source'] = f'{source_dir}/*.csv'
 
-        config['dest'] = f'{target}/%file_name%.csv'
+        prefix = f'{target}/' if self.subfolder_per_target else ''
+        config['dest'] = f'{prefix}%file_name%.csv'
 
         if isinstance(ignore, str):
             config['ignore'] = [f'{source_dir}/{ignore}.csv']

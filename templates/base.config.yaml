@@ -374,6 +374,15 @@ script-parameters:
     cli_cfg_name: '#Config/#crowdin.upload.yaml' # Will be generated in temp_dir
     cli_source_dir: '#Sources' # Relative to temp_dir
 
+    # One Crowdin folder per loc target. Keep this on when a target is split
+    # into many files: the folder is what keeps each target together.
+    # Set it to No for a project whose targets are already one file each and
+    # whose files live at the project root on Crowdin. At the root, CSV file
+    # names have to be unique across targets.
+    # This moves the source files only: translations always export into a
+    # folder per target, since that is the layout the download expects.
+    subfolder_per_target: Yes
+
     cli_csv_first_line_is_header: Yes
     cli_csv_scheme: 'identifier,source_phrase,translation,max_length,labels,context'
 
