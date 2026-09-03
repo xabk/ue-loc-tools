@@ -354,6 +354,7 @@ class TaskRunner:
                 cwd=ue_cwd,
                 universal_newlines=True,
                 encoding='utf-8',
+                errors='replace',
             ) as process:
                 while True:
                     if not process.stdout:

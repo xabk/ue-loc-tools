@@ -345,6 +345,7 @@ class UpdateSourceFile(LocTask):
             cwd=self._temp_path,
             shell=True,
             encoding='utf-8',
+            errors='replace',
         ) as process:
             while True:
                 if not process.stdout:
