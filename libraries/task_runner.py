@@ -409,32 +409,35 @@ class TaskRunner:
             raise ValueError('No task lists found in configuration')
         if self.unattended:
             raise ValueError('Task list must be specified in unattended mode')
-        task_list = ''
-        print(f'\nProject directory: {COLOR_YELLOW}{Path.cwd()}{COLOR_RESET}')
-        print('\nAvailable task lists from base.config.yaml:\n')
-        for i, task in enumerate(task_lists, start=1):
-            lines = task.split('\n')
-            print(f'{COLOR_GREEN}{i:>2d}.{COLOR_RESET} {lines[0]}')
-            for line in lines[1:]:
-                print(f'\t{COLOR_DARK_GRAY}{line}{COLOR_RESET}')
-        while not task_list:
-            choice = ''
-            try:
-                choice = input('Select task list (number or name): ').strip()
-                if choice in task_lists:
-                    task_list = choice
-                idx = int(choice) - 1
-                if 0 <= idx < len(task_lists):
-                    task_list = task_lists[idx]
-            except ValueError:
-                if choice in EXIT_COMMANDS:
+        # Declining the confirmation comes back here, as the prompt promises.
+        while True:
+            task_list = ''
+            print(f'\nProject directory: {COLOR_YELLOW}{Path.cwd()}{COLOR_RESET}')
+            print('\nAvailable task lists from base.config.yaml:\n')
+            for i, task in enumerate(task_lists, start=1):
+                lines = task.split('\n')
+                print(f'{COLOR_GREEN}{i:>2d}.{COLOR_RESET} {lines[0]}')
+                for line in lines[1:]:
+                    print(f'\t{COLOR_DARK_GRAY}{line}{COLOR_RESET}')
+            while not task_list:
+                choice = ''
+                try:
+                    choice = input('Select task list (number or name): ').strip()
+                    if choice in task_lists:
+                        task_list = choice
+                        break
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(task_lists):
+                        task_list = task_lists[idx]
+                except ValueError:
+                    if choice in EXIT_COMMANDS:
+                        print('\nTask selection cancelled by user.')
+                        quit(0)
+                    print('Invalid input. Please try again.')
+                except KeyboardInterrupt:
                     print('\nTask selection cancelled by user.')
                     quit(0)
-                print('Invalid input. Please try again.')
-            except KeyboardInterrupt:
-                print('\nTask selection cancelled by user.')
-                quit(0)
-        if task_list:
+
             print(f'\nSelected task list: {COLOR_GREEN}{task_list}{COLOR_RESET}:')
             update_warning = False
             for task in self.config[task_list]:
@@ -450,9 +453,8 @@ class TaskRunner:
             conf = input(
                 f'\nEnter Y to execute task list {task_list.splitlines()[0].strip()}. Anything else to go back to task list selection... '
             )
-            if conf != 'Y' and conf != 'y':
-                task_list = None
-        return task_list
+            if conf.strip() in ('Y', 'y'):
+                return task_list
 
     # -------------------- Orchestration -------------------- #
     def run_task_list(
