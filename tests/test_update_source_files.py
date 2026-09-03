@@ -23,3 +23,30 @@ def test_empty_and_short_strings_pass():
     task = UpdateSourceFile()
     assert task.within_byte_limit('') is True
     assert task.within_byte_limit('Continue') is True
+
+
+def test_no_file_type_is_sent_unless_configured():
+    """Crowdin decides for itself when type is absent, which is what every
+    project relying on autodetect already gets."""
+    task = UpdateSourceFile()
+
+    assert 'type' not in task.cli_files_for_loc_target('Game')
+
+
+def test_the_configured_file_type_reaches_the_cli_config():
+    """Without this, a PO file created by the CLI lands as plain gettext and
+    loses the Unreal parser."""
+    task = UpdateSourceFile()
+    task.file_format = 'gettext_unreal'
+
+    assert task.cli_files_for_loc_target('Game')['type'] == 'gettext_unreal'
+
+
+def test_the_file_type_does_not_disturb_the_other_keys():
+    task = UpdateSourceFile()
+    task.file_format = 'gettext_unreal'
+    entry = task.cli_files_for_loc_target('Game')
+
+    assert entry['dest'] == 'Game/Game.po'
+    assert entry['translation'] == '/Game/%locale%/%original_file_name%'
+    assert entry['source'].endswith('Game.po')

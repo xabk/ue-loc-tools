@@ -63,6 +63,12 @@ class UpdateSourceFile(LocTask):
         'identifier,source_phrase,translation,max_length,labels,context'
     )
 
+    # Crowdin file type for PO sources, e.g. gettext_unreal to get the Unreal
+    # parser. Left unset, Crowdin decides for itself and new files land as
+    # plain gettext. Only affects files being created: an upload never retypes
+    # a file that already exists.
+    file_format: str | None = None
+
     branch: str | None = None
 
     # TODO: Do I need this here? Or rather in smth from uetools lib?
@@ -103,6 +109,9 @@ class UpdateSourceFile(LocTask):
             config['source'] = f'{self.cli_source_dir}/{config["source"]}'
 
         config['dest'] = f'{target}/{target}.po'
+
+        if self.file_format:
+            config['type'] = self.file_format
 
         config['translation'] = f'/{target}/%locale%/%original_file_name%'
 
