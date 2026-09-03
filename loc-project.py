@@ -11,6 +11,8 @@ Usage:
 
 import difflib
 import shutil
+import subprocess
+import tomllib
 from dataclasses import fields
 from pathlib import Path
 
@@ -84,6 +86,58 @@ def do_init(base_path: Path, secret_path: Path) -> int:
     return 0
 
 
+def pinned_crowdin_cli_version() -> str | None:
+    pyproject = Path(__file__).resolve().parent / 'pyproject.toml'
+    if not pyproject.is_file():
+        return None
+    with open(pyproject, 'rb') as f:
+        return (
+            tomllib.load(f).get('tool', {}).get('loctools', {})
+        ).get('crowdin_cli_version')
+
+
+def installed_crowdin_cli_version() -> str | None:
+    try:
+        result = subprocess.run(
+            ['crowdin', '--version'],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            shell=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip().splitlines()[0].strip() if result.stdout else None
+
+
+def check_crowdin_cli() -> None:
+    """Warns only. A mismatch is worth knowing about, not worth blocking on:
+    the CLI is used for uploads, and most task lists never touch it."""
+    pinned = pinned_crowdin_cli_version()
+    if not pinned:
+        return
+
+    installed = installed_crowdin_cli_version()
+    if installed is None:
+        logger.warning(
+            f'Crowdin CLI not found on PATH. Source uploads need it, pinned at '
+            f'{pinned}. See the README for install instructions.'
+        )
+        return
+
+    if installed != pinned:
+        logger.warning(
+            f'Crowdin CLI is {installed}, this release is tested against '
+            f'{pinned}. Uploads may behave differently. Either install {pinned} '
+            'or bump crowdin_cli_version in pyproject.toml and re-run the tests.'
+        )
+        return
+
+    logger.success(f'Crowdin CLI {installed} matches the pinned version.')
+
+
 def do_check(base_path: Path, secret_path: Path) -> int:
     if not base_path.exists():
         logger.error(f'No config to check: {base_path}')
@@ -141,6 +195,7 @@ def do_check(base_path: Path, secret_path: Path) -> int:
         return 1
 
     logger.success(f'{base_path} is valid.')
+    check_crowdin_cli()
     return 0
 
 

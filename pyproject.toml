@@ -20,6 +20,12 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest>=8.0.0", "pytest-cov>=5.0.0"]
 
+[tool.loctools]
+# The Crowdin CLI this release is tested against. Upgrading is a deliberate
+# change: bump this, re-run the tests, and the upload paths in particular.
+# loc-project.py --check warns when the installed CLI differs.
+crowdin_cli_version = "5.0.1"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
