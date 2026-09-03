@@ -6,6 +6,7 @@ the configs, the runner batch file, the gitignore and the sync guide.
 Usage:
     loc-project.py                -> scaffold a project from the templates, never overwriting
     loc-project.py --check        -> validate the project config, exit 1 on problems
+    loc-project.py --check-env    -> check what the project needs from this machine
     loc-project.py --upgrade      -> report how the template and the project config differ
     loc-project.py --ensure-crowdin -> install the pinned Crowdin CLI if it is missing
 """
@@ -249,10 +250,13 @@ def check_crowdin_cli(install_missing: bool = False) -> bool:
     return True
 
 
-def do_check(base_path: Path, secret_path: Path) -> int:
+def load_for_checking(
+    base_path: Path, secret_path: Path
+) -> tuple[TaskRunner, dict] | None:
+    """Returns None and reports why if the config cannot be loaded."""
     if not base_path.exists():
         logger.error(f'No config to check: {base_path}')
-        return 1
+        return None
 
     if not secret_path.exists():
         logger.warning(
@@ -264,10 +268,109 @@ def do_check(base_path: Path, secret_path: Path) -> int:
     runner = TaskRunner()
     runner.unattended = True
     try:
-        config = runner.load_config(str(base_path), str(secret_path))
+        return runner, runner.load_config(str(base_path), str(secret_path))
     except Exception as err:
         logger.error(f'Config does not load: {err}')
+        return None
+
+
+def tasks_in_use(config: dict) -> set[str]:
+    """Scripts named by at least one task list. An environment check only
+    applies to a project that actually runs the task that needs it."""
+    used = set()
+    for tasks in config.values():
+        if not isinstance(tasks, list):
+            continue
+        for task in tasks:
+            if isinstance(task, dict) and task.get('script'):
+                used.add(task['script'])
+    return used
+
+
+def check_unreal_binary(path: Path | None) -> int:
+    """Fatal: gather, export, import and compile all shell out to the editor,
+    and it is usually not in source control, so a fresh machine has none
+    until someone builds it."""
+    if path is None:
+        logger.error('Could not work out where the Unreal editor binary is.')
         return 1
+
+    if not path.exists():
+        logger.error(
+            f'Unreal editor binary not found: {path}. Gather, export, import '
+            'and compile all run through it, so most task lists will fail. '
+            'Build the editor, or fix engine_dir and unreal_binary in your '
+            'config.'
+        )
+        return 1
+
+    logger.success(f'Unreal editor binary found: {path}')
+    return 0
+
+
+def check_p4_settings(path: Path | None) -> None:
+    """Warns: the editor writes this file on first Perforce login and it is
+    not in source control, so a fresh machine will not have it yet."""
+    if path is None:
+        logger.warning('Could not work out where the Perforce settings are.')
+        return
+
+    if not path.exists():
+        logger.warning(
+            f'No Perforce settings at {path}. p4-checkout reads them to check '
+            'out the localization files. The editor writes this file when you '
+            'first connect it to Perforce: do that, then run this again.'
+        )
+        return
+
+    logger.success(f'Perforce settings found: {path}')
+
+
+def resolved_task_path(runner: TaskRunner, script: str, attr: str) -> Path | None:
+    """Lets each task work out its own paths rather than second-guessing the
+    config here."""
+    try:
+        task = runner.create_task_instance(script, {})
+    except Exception as err:
+        logger.error(f'Could not set up {script} to check it: {err}')
+        return None
+    return getattr(task, attr, None)
+
+
+def do_check_env(base_path: Path, secret_path: Path) -> int:
+    """Checks what the project needs from the machine, as opposed to what the
+    config says. Kept apart from --check so that stays a pure config check
+    that does not depend on the machine it runs on."""
+    loaded = load_for_checking(base_path, secret_path)
+    if loaded is None:
+        return 1
+    runner, config = loaded
+
+    used = tasks_in_use(config)
+    problems = 0
+
+    if 'ue-loc-gather-cmd' in used:
+        problems += check_unreal_binary(
+            resolved_task_path(runner, 'ue-loc-gather-cmd', '_unreal_binary_path')
+        )
+
+    if 'p4-checkout' in used:
+        check_p4_settings(
+            resolved_task_path(runner, 'p4-checkout', '_config_path')
+        )
+
+    if problems:
+        logger.error('The project cannot run localization tasks yet.')
+        return 1
+
+    return 0
+
+
+def do_check(base_path: Path, secret_path: Path) -> int:
+    loaded = load_for_checking(base_path, secret_path)
+    if loaded is None:
+        return 1
+    runner, config = loaded
 
     problems = 0
 
@@ -366,6 +469,13 @@ def run(
     check: A[
         bool, typer.Option('--check', help='Validate the project config')
     ] = False,
+    check_env: A[
+        bool,
+        typer.Option(
+            '--check-env',
+            help='Check the Unreal binary and Perforce settings on this machine',
+        ),
+    ] = False,
     upgrade: A[
         bool,
         typer.Option('--upgrade', help='Report template/config differences'),
@@ -398,6 +508,8 @@ def run(
     base_path = Path(config)
     secret_path = Path(secret)
 
+    if check_env:
+        raise typer.Exit(code=do_check_env(base_path, secret_path))
     if check:
         raise typer.Exit(code=do_check(base_path, secret_path))
     if upgrade:

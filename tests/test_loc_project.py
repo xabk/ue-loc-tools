@@ -116,3 +116,57 @@ def test_upgrade_never_modifies_the_config(gc, tmp_path):
     gc.do_upgrade(base)
 
     assert base.read_text(encoding='utf-8') == before
+def test_tasks_in_use_collects_scripts_from_every_task_list(gc):
+    config = {
+        'parameters': {'not': 'a list'},
+        'list-one': [{'script': 'ue-loc-gather-cmd'}, {'script': 'p4-checkout'}],
+        'list-two': [{'script': 'test-lang'}],
+    }
+
+    assert gc.tasks_in_use(config) == {
+        'ue-loc-gather-cmd',
+        'p4-checkout',
+        'test-lang',
+    }
+
+
+def test_tasks_in_use_ignores_entries_without_a_script(gc):
+    config = {'list': [{'no-script': 1}, 'a string', {'script': 'test-lang'}]}
+
+    assert gc.tasks_in_use(config) == {'test-lang'}
+
+
+def test_missing_unreal_binary_is_fatal(gc, tmp_path):
+    assert gc.check_unreal_binary(tmp_path / 'UE4Editor-Cmd.exe') == 1
+
+
+def test_unresolvable_unreal_binary_is_fatal(gc):
+    assert gc.check_unreal_binary(None) == 1
+
+
+def test_present_unreal_binary_passes(gc, tmp_path):
+    binary = tmp_path / 'UE4Editor-Cmd.exe'
+    binary.touch()
+
+    assert gc.check_unreal_binary(binary) == 0
+
+
+def test_missing_p4_settings_only_warns(gc, tmp_path):
+    """The editor writes this file on first Perforce login, so a fresh machine
+    not having it yet is expected rather than broken: no exit code."""
+    assert gc.check_p4_settings(tmp_path / 'nope.ini') is None
+
+
+def test_check_env_skips_tasks_the_project_never_runs(gc, tmp_path, monkeypatch):
+    """A project with no UE gather in any task list must not be failed for
+    lacking an editor binary."""
+    called = []
+    monkeypatch.setattr(gc, 'check_unreal_binary', lambda p: called.append(p) or 1)
+    monkeypatch.setattr(
+        gc,
+        'load_for_checking',
+        lambda b, s: (None, {'list': [{'script': 'test-lang'}]}),
+    )
+
+    assert gc.do_check_env(tmp_path / 'base.yaml', tmp_path / 'secret.yaml') == 0
+    assert called == []

@@ -19,7 +19,7 @@ call :refresh_path
 @echo ============================================================
 @echo.
 
-@echo [1/6] Checking for uv...
+@echo [1/7] Checking for uv...
 where uv >nul 2>&1
 if %errorlevel% neq 0 (
   @echo   uv was not found on PATH. Installing it with winget...
@@ -48,7 +48,7 @@ if %errorlevel% neq 0 (
 )
 @echo.
 
-@echo [2/6] Updating the loc tools...
+@echo [2/7] Updating the loc tools...
 if exist ".git" (
   git submodule update --remote --merge loctools
   if !errorlevel! neq 0 (
@@ -70,7 +70,7 @@ if exist ".git" (
 )
 @echo.
 
-@echo [3/6] Installing dependencies...
+@echo [3/7] Installing dependencies...
 uv sync --project loctools --locked --extra test
 if %errorlevel% neq 0 (
   @echo   Dependencies failed to install.
@@ -79,7 +79,7 @@ if %errorlevel% neq 0 (
 )
 @echo.
 
-@echo [4/6] Checking the Crowdin CLI...
+@echo [4/7] Checking the Crowdin CLI...
 uv run --project loctools --no-sync loctools/loc-project.py --ensure-crowdin
 if %errorlevel% neq 0 (
   @echo   The Crowdin CLI needs attention. See the messages above.
@@ -88,7 +88,7 @@ if %errorlevel% neq 0 (
 call :refresh_path
 @echo.
 
-@echo [5/6] Checking the project configuration...
+@echo [5/7] Checking the project configuration...
 uv run --project loctools --no-sync loctools/loc-project.py --check
 if %errorlevel% neq 0 (
   @echo   The configuration has problems. See the messages above.
@@ -96,7 +96,15 @@ if %errorlevel% neq 0 (
 )
 @echo.
 
-@echo [6/6] Running the tool's own tests...
+@echo [6/7] Checking this machine...
+uv run --project loctools --no-sync loctools/loc-project.py --check-env
+if %errorlevel% neq 0 (
+  @echo   This machine cannot run localization tasks yet.
+  set FAILED=1
+)
+@echo.
+
+@echo [7/7] Running the tool's own tests...
 uv run --directory loctools --extra test python -m pytest -q
 if %errorlevel% neq 0 (
   @echo   Tests failed. The tools may not work correctly.
