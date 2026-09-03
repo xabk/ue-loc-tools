@@ -7,6 +7,7 @@ Usage:
     loc-project.py                -> scaffold a project from the templates, never overwriting
     loc-project.py --check        -> validate the project config, exit 1 on problems
     loc-project.py --upgrade      -> report how the template and the project config differ
+    loc-project.py --ensure-crowdin -> install the pinned Crowdin CLI if it is missing
 """
 
 import difflib
@@ -33,6 +34,10 @@ TEMPLATE_DIR = Path(__file__).resolve().parent / 'templates'
 # Sections under script-parameters that no registered task owns: standalone
 # scripts with their own parsers, configured here for convenience.
 NON_TASK_SECTIONS = {'targets', 'ue-reimport-assets'}
+
+# winget is the only distribution channel we automate. The CLI ships as a
+# portable exe, so winget puts it on PATH without an installer.
+CROWDIN_WINGET_ID = 'Crowdin.CrowdinCLI'
 
 app = typer.Typer(
     add_completion=False,
@@ -103,6 +108,7 @@ def installed_crowdin_cli_version() -> str | None:
             capture_output=True,
             text=True,
             timeout=60,
+            stdin=subprocess.DEVNULL,
             shell=True,
         )
     except (OSError, subprocess.SubprocessError):
@@ -112,20 +118,124 @@ def installed_crowdin_cli_version() -> str | None:
     return result.stdout.strip().splitlines()[0].strip() if result.stdout else None
 
 
-def check_crowdin_cli() -> None:
-    """Warns only. A mismatch is worth knowing about, not worth blocking on:
-    the CLI is used for uploads, and most task lists never touch it."""
+def winget_has_crowdin_cli() -> bool:
+    """winget list exits 0 when the package is installed, 20 when it is not.
+    Asks winget rather than PATH, which this process cannot see updates to."""
+    try:
+        result = subprocess.run(
+            [
+                'winget',
+                'list',
+                '--id',
+                CROWDIN_WINGET_ID,
+                '-e',
+                '--accept-source-agreements',
+                '--disable-interactivity',
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+            stdin=subprocess.DEVNULL,
+            shell=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
+def install_crowdin_cli(version: str) -> bool:
+    """Installs the pinned version with winget. Installing anything other than
+    the pin would defeat the point, so a pin winget cannot supply is reported
+    rather than substituted."""
+    if not shutil.which('winget'):
+        logger.error(
+            'winget is not available, so the Crowdin CLI cannot be installed '
+            f'automatically. Install {version} by hand: '
+            'https://crowdin.github.io/crowdin-cli'
+        )
+        return False
+
+    logger.info(
+        f'Installing Crowdin CLI {version} with winget. This downloads from '
+        'the internet and can take a minute.'
+    )
+    try:
+        result = subprocess.run(
+            [
+                'winget',
+                'install',
+                '--id',
+                CROWDIN_WINGET_ID,
+                '-e',
+                '--version',
+                version,
+                '--accept-source-agreements',
+                '--accept-package-agreements',
+                '--disable-interactivity',
+            ],
+            timeout=1800,
+            stdin=subprocess.DEVNULL,
+            shell=True,
+        )
+    except subprocess.SubprocessError as err:
+        logger.error(
+            f'winget did not finish installing the Crowdin CLI: {err}. It may '
+            'have been left half-installed, so check with: '
+            f'winget list --id {CROWDIN_WINGET_ID} -e'
+        )
+        return False
+
+    if result.returncode != 0:
+        # Most often winget declining to reinstall something it already has.
+        if winget_has_crowdin_cli():
+            logger.warning(
+                'winget reports the Crowdin CLI as installed, but it is not '
+                'on PATH in this shell. Open a new terminal and run this again.'
+            )
+            return False
+
+        logger.error(f'winget could not install Crowdin CLI {version}.')
+        logger.error(
+            'Run this by hand to see what it is asking for: '
+            f'winget install --id {CROWDIN_WINGET_ID} -e --version {version}'
+        )
+        logger.error(
+            'If that version is not published, bump crowdin_cli_version in '
+            'pyproject.toml and re-run the tests. Published versions: '
+            f'winget show --id {CROWDIN_WINGET_ID} -e --versions'
+        )
+        return False
+
+    if installed_crowdin_cli_version() == version:
+        logger.success(f'Installed Crowdin CLI {version}.')
+        return True
+
+    # winget puts the exe on the user PATH in the registry, which this
+    # process cannot see: it inherited PATH when it started.
+    logger.success(
+        f'Installed Crowdin CLI {version}. It is not visible in this shell '
+        'yet, so the checks below may not see it either.'
+    )
+    return True
+
+
+def check_crowdin_cli(install_missing: bool = False) -> bool:
+    """A version mismatch warns rather than blocks: the CLI is only used for
+    uploads, and most task lists never touch it. Returns False only when
+    there is no usable CLI at all."""
     pinned = pinned_crowdin_cli_version()
     if not pinned:
-        return
+        return True
 
     installed = installed_crowdin_cli_version()
     if installed is None:
+        if install_missing:
+            return install_crowdin_cli(pinned)
         logger.warning(
             f'Crowdin CLI not found on PATH. Source uploads need it, pinned at '
-            f'{pinned}. See the README for install instructions.'
+            f'{pinned}. Run update-loc-tools.bat to install it.'
         )
-        return
+        return False
 
     if installed != pinned:
         logger.warning(
@@ -133,9 +243,10 @@ def check_crowdin_cli() -> None:
             f'{pinned}. Uploads may behave differently. Either install {pinned} '
             'or bump crowdin_cli_version in pyproject.toml and re-run the tests.'
         )
-        return
+        return True
 
     logger.success(f'Crowdin CLI {installed} matches the pinned version.')
+    return True
 
 
 def do_check(base_path: Path, secret_path: Path) -> int:
@@ -259,6 +370,13 @@ def run(
         bool,
         typer.Option('--upgrade', help='Report template/config differences'),
     ] = False,
+    ensure_crowdin: A[
+        bool,
+        typer.Option(
+            '--ensure-crowdin',
+            help='Install the pinned Crowdin CLI if it is missing',
+        ),
+    ] = False,
     config: A[str, typer.Option('--config', '-c', help='Base config file')] = (
         DEFAULT_BASE_CONFIG
     ),
@@ -268,6 +386,10 @@ def run(
     debug: A[bool, typer.Option('--debug', help='Enable debug logging')] = False,
 ):
     init_logging(debug)
+
+    if ensure_crowdin:
+        ok = check_crowdin_cli(install_missing=True)
+        raise typer.Exit(code=0 if ok else 1)
 
     if check and upgrade:
         logger.error('Use either --check or --upgrade, not both.')
