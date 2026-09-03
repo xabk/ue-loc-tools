@@ -9,35 +9,153 @@ This pack of scripts aims to help with automating gather/export/import/compile a
 
 "An extremely fast Python package and project manager, written in Rust", as they put it.
 
-You can install it with `winget install --id=astral-sh.uv -e`.
+`update-loc-tools.bat` installs it if it is missing, so you normally do not
+need to do this by hand. If you want to: `winget install --id=astral-sh.uv -e`.
+
+uv also takes care of Python itself and every package, so there is nothing
+else to install.
 
 See https://docs.astral.sh/uv/getting-started/installation/ for other options.
 
 ### Crowdin CLI
 
-A Crowdin CLI application to simplify routine operations.
+Used to upload source files to Crowdin.
 
-You should be able to install it with `winget install -e --id Crowdin.CrowdinCLI`.
+`update-loc-tools.bat` installs the version these tools are tested against, so
+you normally do not need to do this by hand either. That version is pinned as
+`crowdin_cli_version` in `pyproject.toml`, and `loc-project.py --check` warns
+when the installed CLI differs from the pin.
 
-Alternatively, you can download and install it using this link: https://github.com/crowdin/crowdin-cli/releases/latest/download/crowdin.exe
+Upgrading it is a deliberate change: bump the pin, then re-run the tests and
+the upload paths in particular.
 
->[!IMPORTANT]
+To install a specific version by hand:
+
+```
+winget install --id Crowdin.CrowdinCLI -e --version <pinned version>
+```
+
+> [!NOTE]
 >
-> Choose `Yes` when the installer asks you if you want to update the Java version, or it won't continue:
-> 
-> ![image](https://github.com/user-attachments/assets/08b82d18-3d3e-4369-a42d-dd4a255a9e62)
->
-> Do not install Java from the page that is opened automatically: it's an older version, which isn't enough for this.
->
-> Instead, download and install the latest version from https://www.oracle.com/java/technologies/downloads/?er=221886#jdk24-windows.
+> Version 5 and later is a single portable executable and does **not** need
+> Java. The 4.x releases were Java-based, so any instructions you find about
+> installing a JDK or letting the installer update Java apply only to those.
+
+Note that winget only publishes stable releases, so a preview version has to be
+installed by hand.
 
 See other installation options: https://crowdin.github.io/crowdin-cli/installation#windows
 
+## Setting up a new project
+
+These tools are meant to live in a `loctools` subfolder of the project that uses
+them: the project owns the configs and any project-specific scripts, and this
+repo stays generic.
+
+1. Create the project repo, then add these tools as a submodule:
+
+   ```
+   git submodule add -b main <this repo> loctools
+   ```
+
+   The `-b main` matters: without a branch recorded in `.gitmodules`,
+   `git submodule update --remote` has nothing to follow.
+
+2. Scaffold the project files:
+
+   ```
+   uv run --project loctools loctools/loc-project.py
+   ```
+
+   That writes `base.config.yaml`, `crowdin.config.yaml`, `!loc-sync.bat`,
+   `update-loc-tools.bat`, `.gitignore` and `sync-guide.md`. It refuses to
+   overwrite anything that already exists, so it is safe to re-run.
+
+3. Fill in the Crowdin token and project ID in `crowdin.config.yaml`.
+
+4. Edit `base.config.yaml`: loc targets and locales, `project_dir` and
+   `engine_dir`, and `unreal_binary` if the project runs UE5 or renames its
+   editor target. Set `file_format` under `update-source-files` if the
+   project's existing Crowdin files are not plain gettext.
+
+5. For Perforce, paste `loctools/templates/p4ignore-snippet.txt` into the
+   `p4ignore.txt` at your **workspace root**. Step 2 cannot do this for you:
+   that file lives outside the project.
+
+6. Put any project-specific scripts in `project/` and register them under
+   `tasks:` with a `file:` key. That folder is intentionally empty here.
+
+7. Run `update-loc-tools.bat`. It installs the dependencies and verifies the
+   config, the machine and the tools before you commit anything.
+
+8. Commit to git. For Perforce, reconcile and submit.
+
+## Upgrading a project to a newer version of the tools
+
+1. Pull the new version:
+
+   ```
+   git submodule update --remote --merge loctools
+   ```
+
+   `update-loc-tools.bat` does exactly this as its second step, so running the
+   script is usually enough.
+
+2. See what the templates changed:
+
+   ```
+   uv run --project loctools loctools/loc-project.py --upgrade
+   ```
+
+   This reports every config key where your project and the template now
+   differ, and modifies nothing: a config is judgment, not data. Apply what
+   you want by hand.
+
+   It compares keys rather than files, so it will not tell you that a new
+   template file appeared. On a version bump, glance at `loctools/templates/`
+   for anything new.
+
+3. Run `update-loc-tools.bat` to re-sync the dependencies and re-run the
+   checks.
+
+4. Commit the new submodule pointer:
+
+   ```
+   git commit -am "Bump loctools"
+   ```
+
+A Perforce-only copy has no `.git`, so the script detects that, skips the
+update and just verifies. Sync in Perforce to update those.
+
+## Checking a project
+
+`loc-project.py` has a mode for each question:
+
+| command | what it answers |
+| --- | --- |
+| no flags | scaffold a new project from the templates |
+| `--check` | is the config valid? |
+| `--check-env` | does this machine have what the project needs? |
+| `--upgrade` | how do my config and the template differ? |
+| `--ensure-crowdin` | install the pinned Crowdin CLI if it is missing |
+
+`--check` validates the config on its own, so it does not depend on the machine
+it runs on. `--check-env` covers the machine: the Unreal editor binary, which is
+an error because gather, export, import and compile all run through it, and the
+Perforce settings the editor writes on first connect, which is only a warning.
+Both only check what the task lists in your config actually use.
+
+> [!IMPORTANT]
+>
+> The editor binary is usually not in source control, so a fresh machine has
+> none until someone builds it. No script can install it for you.
+
 ## Installation and usage
-1. Install the requirements listed above.
-2. Configure the scripts for your project: paths, targets, Crowdin credentials, script parameters, 
+1. Set the project up or upgrade it as described above. `update-loc-tools.bat`
+installs the requirements and verifies the result.
+2. Configure the scripts for your project: paths, targets, Crowdin credentials, script parameters,
 and task lists based on what you need.
-3. `uv run loc-sync.py` or `!loc-sync.bat` will launch the script and present you with the list of tasks.
+3. `!loc-sync.bat`, or `uv run --project loctools loctools/loc-sync.py`, will launch the script and present you with the list of tasks.
 It also accepts task names as command-line parameters for automation, for example, `uv run loc-sync.py "[X, ALL] #5 Import Translations"`.
 Note that _uv_ should take care of everything automatically, from Python to all the required packages.
 You can also run the script in automated mode with `!loc-sync.bat task-list-name -u`.
