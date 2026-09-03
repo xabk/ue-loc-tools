@@ -55,50 +55,75 @@ It also takes a task list name directly, which is how you automate it:
 ```
 
 # Loc sync task lists
-When you run the loc sync script it reads tasks, parameters 
-and task lists from base.config.yaml and prints them out for you to choose.
+When you run the loc sync script it reads the tasks, parameters and task lists
+from `base.config.yaml` and prints them out for you to choose.
 
-Task lists cover the most common things you do with the project and translations. 
-And you can always create your own.
+The names come in two lines: the first says what you get, the second lists the
+steps that run. The lists below are the ones the template ships with — rename
+them, drop the ones you do not need, and add your own.
 
-By default, you have the following list and here's what each of the task lists does.
+## Full-cycle lists
 
-### `1: full-but-no-source-update`
-By default, this runs all the tasks you've set up except for the one 
-that updates the source files on Crowdin. This is to avoid leaking something 
-when you just need to grab the latest translations and import them into the game. 
-And maybe do some other project-specific things, like updating completion rates 
-or translators in credits.
+These take the project all the way from Perforce to Crowdin and back. Reach for
+one of these first: running the single-task lists one after another by hand is
+how steps get missed.
 
-### `2: update-source`
-*Warning*: this doesn't gather the latest text from the UE project, 
-this only updates the source files on Crowdin with what's already exported locally. 
-The idea is to use it after #1 (but you could also run it after #5 or #6). 
-If you need to gather and then update, you can use #7.
+### `ALL TARGETS: Full sync`
+Everything: check out, gather and export from Unreal, prepare the debug IDs and
+source, update the source on Crowdin, build and download the translations, then
+import and compile. Use it when you are confident the source is ready to go out
+to translators.
 
-### `3: add-source`
-This only has one task: adding new files to Crowdin. Sort of a utility script 
-to simplify adding new translation targets (which result in new files) with 
-the correct settings.
+### `ALL TARGETS: Full sync but *without* updating the source on Crowdin`
+The same, minus the source upload. This is the safe default: use it when you
+just want the latest translations in the game and do not want to risk leaking
+unfinished text to translators.
 
-### `4: full-sync`
-This does all the tasks you've set up, including updating the source. 
-Use this if you're certain that everything's fine and you want to update the sources.
+### `ALL TARGETS: Gather and update the source on Crowdin only`
+Gathers the latest text, prepares it, and sends it to Crowdin. Stops there: no
+translations come back. Use it to start a new batch of translation.
 
-### `5: recreate-test-language`
-This resets all the debug IDs and recreates them from scratch. 
-This is mainly for a case when you change the number of digits in a debug ID 
-and have to recreate it. You might want to do this for some other reason, though.
+### `ALL TARGETS: Pull the latest translations only`
+Downloads from Crowdin and imports into Unreal, without gathering first. Use it
+when the source has not changed and you only want the newest translations.
 
-### `6: local-gather-test-import`
-This will gather and export the text from UE, update the debug/hash locales, 
-and then import and compile the text in UE. 
-Good if you only need to update debug/hash locales 
-and don't want to touch Crowdin at all.
+### `ALL TARGETS: *Local* gather, prepare and import`
+Gather, prepare the debug and hash locales, import and compile — nothing leaves
+the machine. Good for refreshing the debug IDs without touching Crowdin at all.
 
-### `7: gather-and-update-source-only`
-This will gather and export the text from UE, update the debug/hash locales, 
-and then update the sources on Crowdin.
+## Single-task lists
+
+One task each. Two reasons to use them: picking a full cycle back up after it
+failed halfway, and the occasional one-off. Most of them assume the steps
+before them have already run.
+
+- `ONE STEP: Check out the localization files from Perforce`
+- `ONE STEP: Gather and export in Unreal`
+- `ONE STEP: Prepare debug IDs and source ...` — one per target, because each
+  target gets its own debug ID prefix
+- `ONE STEP: Update the source on Crowdin` — uploads what is already exported
+  locally, so gather and prepare have to have run first
+- `ONE STEP: Build and download the translations from Crowdin`
+- `ONE STEP: Import and compile in Unreal`
+
+## One-offs
+
+Source upload variants you will rarely want. All of them expect gather, export
+and prepare to have run for each target already.
+
+- `ONE OFF: Add new files to Crowdin with the correct export settings` — adds
+  files without touching the ones that already exist, for when a new
+  localization target appears
+- `ONE OFF: Update the source into the word count branch` — uploads to a branch
+  nobody translates, for counting words
+- `ONE OFF: Update the source by hand, without the Crowdin CLI` — prepares the
+  files and waits while you upload them yourself
+
+> [!NOTE]
+>
+> Lists that change the source text on Crowdin are marked in the config with
+> `updates-source`, and the script warns you before running them. Read the
+> warning.
 
 # Typical scenarios
 
