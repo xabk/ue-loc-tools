@@ -23,6 +23,16 @@ import yaml
 from loguru import logger
 from typing_extensions import Annotated as A
 
+from libraries.environment import (
+    CROWDIN_WINGET_ID,
+    crowdin_cli_state,
+    installed_crowdin_cli_version,
+    pinned_crowdin_cli_version,
+    report_crowdin_cli,
+    report_p4_settings,
+    report_unreal_binary,
+    resolved_task_path,
+)
 from libraries.task_runner import (
     DEFAULT_BASE_CONFIG,
     DEFAULT_SECRET_CONFIG,
@@ -35,10 +45,6 @@ TEMPLATE_DIR = Path(__file__).resolve().parent / 'templates'
 # Sections under script-parameters that no registered task owns: standalone
 # scripts with their own parsers, configured here for convenience.
 NON_TASK_SECTIONS = {'targets', 'ue-reimport-assets'}
-
-# winget is the only distribution channel we automate. The CLI ships as a
-# portable exe, so winget puts it on PATH without an installer.
-CROWDIN_WINGET_ID = 'Crowdin.CrowdinCLI'
 
 app = typer.Typer(
     add_completion=False,
@@ -97,35 +103,6 @@ def do_init(base_path: Path, secret_path: Path) -> int:
         'workspace root.'
     )
     return 0
-
-
-def pinned_crowdin_cli_version() -> str | None:
-    pyproject = Path(__file__).resolve().parent / 'pyproject.toml'
-    if not pyproject.is_file():
-        return None
-    with open(pyproject, 'rb') as f:
-        return (
-            tomllib.load(f).get('tool', {}).get('loctools', {})
-        ).get('crowdin_cli_version')
-
-
-def installed_crowdin_cli_version() -> str | None:
-    try:
-        result = subprocess.run(
-            ['crowdin', '--version'],
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=60,
-            stdin=subprocess.DEVNULL,
-            shell=True,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip().splitlines()[0].strip() if result.stdout else None
 
 
 def winget_has_crowdin_cli() -> bool:
@@ -232,33 +209,17 @@ def install_crowdin_cli(version: str) -> bool:
 
 
 def check_crowdin_cli(install_missing: bool = False) -> bool:
-    """A version mismatch warns rather than blocks: the CLI is only used for
-    uploads, and most task lists never touch it. Returns False only when
-    there is no usable CLI at all."""
+    """Warn-only unless there is no CLI at all. Setting up a project can
+    install the missing one; a sync only ever reports."""
     pinned = pinned_crowdin_cli_version()
-    if not pinned:
-        return True
-
     installed = installed_crowdin_cli_version()
-    if installed is None:
-        if install_missing:
-            return install_crowdin_cli(pinned)
-        logger.warning(
-            f'Crowdin CLI not found on PATH. Source uploads need it, pinned at '
-            f'{pinned}. Run update-loc-tools.bat to install it.'
-        )
-        return False
+    state = crowdin_cli_state(installed, pinned)
 
-    if installed != pinned:
-        logger.warning(
-            f'Crowdin CLI is {installed}, this release is tested against '
-            f'{pinned}. Uploads may behave differently. Either install {pinned} '
-            'or bump crowdin_cli_version in pyproject.toml and re-run the tests.'
-        )
-        return True
+    if state == 'missing' and install_missing and pinned:
+        return install_crowdin_cli(pinned)
 
-    logger.success(f'Crowdin CLI {installed} matches the pinned version.')
-    return True
+    report_crowdin_cli(state, installed, pinned, blocking=False)
+    return state != 'missing'
 
 
 def load_for_checking(
@@ -298,56 +259,6 @@ def tasks_in_use(config: dict) -> set[str]:
     return used
 
 
-def check_unreal_binary(path: Path | None) -> int:
-    """Fatal: gather, export, import and compile all shell out to the editor,
-    and it is usually not in source control, so a fresh machine has none
-    until someone builds it."""
-    if path is None:
-        logger.error('Could not work out where the Unreal editor binary is.')
-        return 1
-
-    if not path.exists():
-        logger.error(
-            f'Unreal editor binary not found: {path}. Gather, export, import '
-            'and compile all run through it, so most task lists will fail. '
-            'Build the editor, or fix engine_dir and unreal_binary in your '
-            'config.'
-        )
-        return 1
-
-    logger.success(f'Unreal editor binary found: {path}')
-    return 0
-
-
-def check_p4_settings(path: Path | None) -> None:
-    """Warns: the editor writes this file on first Perforce login and it is
-    not in source control, so a fresh machine will not have it yet."""
-    if path is None:
-        logger.warning('Could not work out where the Perforce settings are.')
-        return
-
-    if not path.exists():
-        logger.warning(
-            f'No Perforce settings at {path}. p4-checkout reads them to check '
-            'out the localization files. The editor writes this file when you '
-            'first connect it to Perforce: do that, then run this again.'
-        )
-        return
-
-    logger.success(f'Perforce settings found: {path}')
-
-
-def resolved_task_path(runner: TaskRunner, script: str, attr: str) -> Path | None:
-    """Lets each task work out its own paths rather than second-guessing the
-    config here."""
-    try:
-        task = runner.create_task_instance(script, {})
-    except Exception as err:
-        logger.error(f'Could not set up {script} to check it: {err}')
-        return None
-    return getattr(task, attr, None)
-
-
 def do_check_env(base_path: Path, secret_path: Path) -> int:
     """Checks what the project needs from the machine, as opposed to what the
     config says. Kept apart from --check so that stays a pure config check
@@ -361,13 +272,15 @@ def do_check_env(base_path: Path, secret_path: Path) -> int:
     problems = 0
 
     if 'ue-loc-gather-cmd' in used:
-        problems += check_unreal_binary(
-            resolved_task_path(runner, 'ue-loc-gather-cmd', '_unreal_binary_path')
+        problems += report_unreal_binary(
+            resolved_task_path(runner, 'ue-loc-gather-cmd', '_unreal_binary_path'),
+            blocking=True,
         )
 
     if 'p4-checkout' in used:
-        check_p4_settings(
-            resolved_task_path(runner, 'p4-checkout', '_config_path')
+        report_p4_settings(
+            resolved_task_path(runner, 'p4-checkout', '_config_path'),
+            blocking=False,
         )
 
     if problems:

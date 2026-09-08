@@ -13,6 +13,7 @@ from typing_extensions import Annotated as A
 from timeit import default_timer as timer
 from loguru import logger
 
+from libraries.environment import check_before_running, warn_on_launch
 from libraries.utilities import init_logging
 from libraries.task_runner import (
     TaskRunner,
@@ -109,6 +110,8 @@ def run(
             logger.info('')
         raise typer.Exit(code=0)
 
+    warn_on_launch(runner)
+
     # Interactive loop: after running a task list, offer to run another
     while True:
         if tasklist:
@@ -127,6 +130,13 @@ def run(
             raise typer.Exit(code=1)
 
         tasks = cast(list[dict[str, Any]], runner.config[runner.task_list_name])
+
+        if check_before_running(runner, tasks):
+            logger.error(
+                'This task list cannot run on this machine yet. See above.'
+            )
+            raise typer.Exit(code=1)
+
         logger.info(f'Executing task list: {runner.task_list_name}')
         total_start = timer()
         results = runner.run_task_list(tasks)
