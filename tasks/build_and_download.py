@@ -188,7 +188,7 @@ class BuildAndDownloadTranslations(LocTask):
 
     def process_loc_targets(self) -> bool:
         if not self.loc_targets:
-            logger.error('No loc targets to modify specified.')
+            logger.info('No loc targets specified, skipping PO targets.')
             return True
 
         logger.info(f'Targets to process ({len(self.loc_targets)}): {self.loc_targets}')
@@ -414,7 +414,7 @@ class BuildAndDownloadTranslations(LocTask):
 
     def process_csv_loc_targets(self) -> bool:
         if not self.csv_loc_targets:
-            logger.error('No CSV loc targets to modify specified.')
+            logger.info('No CSV loc targets specified, skipping CSV targets.')
             return True
 
         logger.info(
@@ -432,10 +432,6 @@ class BuildAndDownloadTranslations(LocTask):
             )
             return True
 
-        if not self.csv_loc_targets:
-            logger.error('No CSV loc targets specified.')
-            return True
-
         logger.warning(
             f'Only some CSV targets processed: {targets_processed} out of {self.csv_loc_targets}'
         )
@@ -443,6 +439,13 @@ class BuildAndDownloadTranslations(LocTask):
         return False
 
     def run(self) -> bool:
+        if not self.loc_targets and not self.csv_loc_targets:
+            logger.error(
+                'Nothing to download: set loc_targets, csv_loc_targets, or '
+                'both. Leaving one of them empty is fine.'
+            )
+            return False
+
         self.build_and_download()
 
         self.unzip_file()
