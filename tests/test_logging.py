@@ -16,15 +16,21 @@ SNIPPET = (
 )
 
 
-def test_cjk_survives_a_redirected_stdout(repo_root):
+def test_cjk_survives_a_redirected_stdout(repo_root, tmp_path):
     """stdout is a pipe here, so Python picks the locale encoding for it.
     PYTHONIOENCODING pins that to cp1252, which is what a Windows console
-    gives you and what UE output then fails to encode into."""
-    env = dict(os.environ, PYTHONIOENCODING='cp1252')
+    gives you and what UE output then fails to encode into.
+
+    Runs from tmp_path because init_logging() opens its file sink relative
+    to the working directory: from the repo root this test wrote a real
+    logs/locsync.log into the checkout on every run."""
+    env = dict(
+        os.environ, PYTHONIOENCODING='cp1252', PYTHONPATH=str(repo_root)
+    )
 
     result = subprocess.run(
         [sys.executable, '-c', SNIPPET],
-        cwd=repo_root,
+        cwd=tmp_path,
         env=env,
         capture_output=True,
     )
