@@ -44,6 +44,11 @@ tasks:
     module: 'tasks.build_and_download'
     class: 'BuildAndDownloadTranslations'
 
+  # UE5 only: the commandlet ships with the studio's Unreal loc plugin.
+  ue-gather-references:
+    module: 'tasks.ue_gather_references'
+    class: 'GatherStringTableReferences'
+
   ue-loc-gather-cmd:
     module: 'tasks.ue_loc_gather_cmd'
     class: 'UnrealLocGatherCommandlet'
