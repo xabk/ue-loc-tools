@@ -287,6 +287,7 @@ script-parameters:
     # Check out Localization directory and any other assets from p4 server
 
     # loc_targets: [Game]
+    # csv_loc_targets: []
 
     add_assets_to_checkout: []
 
@@ -373,6 +374,10 @@ script-parameters:
 
     cli_cfg_name: '#Config/#crowdin.upload.yaml' # Will be generated in temp_dir
     cli_source_dir: '#Sources' # Relative to temp_dir
+
+    # Prepare the source files into the temp dir before uploading. Set to No
+    # only when something else has already staged them there.
+    # cli_prep_files: Yes
 
     # One Crowdin folder per loc target. Keep this on when a target is split
     # into many files: the folder is what keeps each target together.
