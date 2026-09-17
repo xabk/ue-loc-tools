@@ -164,3 +164,40 @@ def test_checkout_paths_are_project_relative(config, task_lists):
         assert path.startswith(('Content/', 'Plugins/')), (
             f'{path!r} is content-relative; p4-checkout resolves from the project'
         )
+
+
+def test_check_accepts_scripts_dir_tasks(tmp_path, monkeypatch):
+    """Not every step is a registered task: anything else falls back to
+    scripts/<name>.py, run through the editor when the step says unreal.
+    --check used to report all of those as unknown."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    scripts = {p.stem for p in (root / 'scripts').glob('*.py')}
+    assert 'ue-reimport-assets' in scripts, 'expected a scripts/ task to test with'
+
+    cfg = tmp_path / 'base.config.yaml'
+    template = (root / 'templates' / 'base.config.yaml').read_text(encoding='utf-8')
+    cfg.write_text(
+        template
+        + '\n"ONE STEP: Reimport\nUE: Reimport":\n'
+        '  - description: Reimport\n'
+        '    unreal: Yes\n'
+        '    script: ue-reimport-assets\n',
+        encoding='utf-8',
+    )
+    (tmp_path / 'crowdin.config.yaml').write_text(
+        'crowdin:\n  organization: ""\n  token: x\n  project_id: 1\n',
+        encoding='utf-8',
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(root / 'loc-project.py'), '--check'],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+
+    assert 'unknown task "ue-reimport-assets"' not in result.stdout + result.stderr
