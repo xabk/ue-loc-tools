@@ -386,9 +386,9 @@ class ProcessTestAndHashLocales(LocTask):
         self, files: list[str] | None = None
     ) -> StringContextList:
         """
-        Load string table references from CSV files for all targets
+        Load narrative context from Excel files for all targets
 
-        Return a dict of StrTableName,Key : String with all references, one per line
+        Return a dict of Asset name : context text
         """
 
         narative_context: StringContextList = {}
@@ -398,10 +398,10 @@ class ProcessTestAndHashLocales(LocTask):
 
         for file in files:
             if not narative_context:
-                narative_context = self.load_string_table_refs_from_file(file)
+                narative_context = self.load_narrative_context_from_file(file)
                 continue
 
-            for key, value in self.load_string_table_refs_from_file(file).items():
+            for key, value in self.load_narrative_context_from_file(file).items():
                 if key not in narative_context:
                     narative_context[key] = value
                 else:
