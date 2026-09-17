@@ -19,27 +19,48 @@ class CheckoutAssets(LocTask):
     loc_targets: list | None = None
     csv_loc_targets: list | None = None
 
-    # Relative to Game/Content directory
+    # Relative to the project directory, the one holding the .uproject.
+    # Project-relative rather than content-relative so that a path outside
+    # Content -- a game feature plugin's Localization/StringTables, say -- can
+    # be named like any other. Content paths simply start with Content/.
     add_assets_to_checkout: list | None = None
     add_paths_to_checkout: list | None = None
 
-    # TODO: Do I need this here? Or rather in smth from uetools lib?
-    content_dir: str = '../'
-    config_name: str = '../Saved/Config/WindowsEditor/SourceControlSettings.ini'
+    project_dir: str = '../../../'
+    config_name: str = 'Saved/Config/WindowsEditor/SourceControlSettings.ini'
     p4_config_section: str = 'PerforceSourceControl.PerforceSourceControlSettings'
 
     # Ignore some harmless errors
     errors_to_ignore: list[str] | None = None
 
-    _content_path: Path | None = None
+    _project_path: Path | None = None
     _config_path: Path | None = None
 
     def post_update(self):
         super().post_update()
-        self._content_path = Path(self.content_dir)
-        self._config_path = (self._content_path / self.config_name).resolve()
+        self._project_path = Path(self.project_dir)
+        self._config_path = (self._project_path / self.config_name).resolve()
         if not self.errors_to_ignore:
             self.errors_to_ignore = ERRORS_TO_IGNORE
+
+        self.warn_about_content_relative_paths()
+
+    def warn_about_content_relative_paths(self):
+        """These paths used to resolve against Content/. A config that still
+        assumes that would quietly check out nothing, so say so instead."""
+        configured = [
+            *(self.add_assets_to_checkout or []),
+            *(self.add_paths_to_checkout or []),
+        ]
+        for path in configured:
+            if (self._project_path / path).exists():
+                continue
+            if (self._project_path / 'Content' / path).exists():
+                logger.warning(
+                    f'Checkout path not found: {path}. Content/{path} does '
+                    'exist, though. These paths resolve against the project '
+                    'directory now, not Content/ -- add the Content/ prefix.'
+                )
 
     def checkout_assets(self):
         cfg = ConfigParser()
@@ -95,7 +116,7 @@ class CheckoutAssets(LocTask):
 
         logger.info('Connected to p4.')
 
-        loc_root = self._content_path / 'Localization'
+        loc_root = self._project_path / 'Content/Localization'
         loc_root = loc_root.resolve().absolute()
         logger.info(f'Localization root: {loc_root}')
         files = list(
@@ -106,14 +127,14 @@ class CheckoutAssets(LocTask):
         )
 
         files += [
-            self._content_path / asset for asset in (self.add_assets_to_checkout or [])
+            self._project_path / asset for asset in (self.add_assets_to_checkout or [])
         ]
         if self.add_paths_to_checkout is not None:
             files += list(
                 chain.from_iterable(
                     [
                         str(item).replace('#', '%23')
-                        for item in (self._content_path / path).glob('**/*')
+                        for item in (self._project_path / path).glob('**/*')
                         if item.is_file()
                     ]
                     for path in self.add_paths_to_checkout

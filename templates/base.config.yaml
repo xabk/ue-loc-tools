@@ -294,12 +294,16 @@ script-parameters:
     # loc_targets: [Game]
     # csv_loc_targets: []
 
+    # Relative to the project directory, not to Content/, so that a plugin
+    # folder can be named as easily as anything under Content/.
+    # e.g. Content/Localization/Foo.csv
+    #      Plugins/GameFeatures/Bar/Content/Localization/StringTables
     add_assets_to_checkout: []
 
     add_paths_to_checkout: []
 
-    # config_name: '../Saved/Config/Windows/SourceControlSettings.ini' # UE4
-    config_name: '../Saved/Config/WindowsEditor/SourceControlSettings.ini' # UE5
+    # config_name: 'Saved/Config/Windows/SourceControlSettings.ini' # UE4
+    config_name: 'Saved/Config/WindowsEditor/SourceControlSettings.ini' # UE5
     p4_config_section: 'PerforceSourceControl.PerforceSourceControlSettings'
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###

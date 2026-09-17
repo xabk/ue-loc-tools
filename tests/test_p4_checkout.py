@@ -45,9 +45,9 @@ def checkout_task(config, tmp_path, monkeypatch):
         tmp_path / 'base.config.yaml',
         {
             'tasks': config['tasks'],
-            'parameters': {'loc_targets': ['Game'], 'content_dir': str(content)},
+            'parameters': {'loc_targets': ['Game'], 'project_dir': str(tmp_path)},
             'script-parameters': {
-                'p4-checkout': {'config_name': '../Saved/p4.ini'},
+                'p4-checkout': {'config_name': 'Saved/p4.ini'},
             },
         },
     )
