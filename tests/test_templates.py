@@ -141,3 +141,26 @@ def test_section_lookup_accepts_the_module_name(monkeypatch, repo_root):
 def test_templates_are_valid_yaml(repo_root, name):
     loaded = yaml.safe_load((repo_root / 'templates' / name).read_text(encoding='utf-8'))
     assert isinstance(loaded, dict) and loaded
+
+
+def test_checkout_paths_are_project_relative(config, task_lists):
+    """p4-checkout resolves against the project directory, so every configured
+    path needs its Content/ or Plugins/ prefix -- in the task lists too, not
+    only in the defaults block."""
+    paths = []
+
+    block = (config.get('script-parameters') or {}).get('p4-checkout') or {}
+    paths += block.get('add_paths_to_checkout') or []
+    paths += block.get('add_assets_to_checkout') or []
+
+    for steps in task_lists.values():
+        for step in steps:
+            params = (step or {}).get('script-parameters') or {}
+            paths += params.get('add_paths_to_checkout') or []
+            paths += params.get('add_assets_to_checkout') or []
+
+    assert paths, 'expected the template to configure some checkout paths'
+    for path in paths:
+        assert path.startswith(('Content/', 'Plugins/')), (
+            f'{path!r} is content-relative; p4-checkout resolves from the project'
+        )

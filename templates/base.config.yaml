@@ -592,7 +592,7 @@ script-parameters:
     script-parameters:
       # loc_targets: []
       add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Localization/~Temp/#Sources'] # Add any additional paths to check out
+      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
   - description: 'Gather the text in UE for all targets and export the source/test locale draft'
     script: ue-loc-gather-cmd
@@ -640,7 +640,7 @@ script-parameters:
     script-parameters:
       # loc_targets: []
       add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Localization/~Temp/#Sources'] # Add any additional paths to check out
+      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
   - description: 'Gather the text in UE for all targets and export the source/test locale draft'
     script: ue-loc-gather-cmd
@@ -678,7 +678,7 @@ script-parameters:
     script-parameters:
       # loc_targets: []
       add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Localization/~Temp/#Sources'] # Add any additional paths to check out
+      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
   - description: 'Gather the text in UE for all targets and export the source/test locale draft'
     script: ue-loc-gather-cmd
@@ -714,7 +714,7 @@ script-parameters:
     script-parameters:
       # loc_targets: []
       add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Localization/~Temp/#Sources'] # Add any additional paths to check out
+      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
   - description: 'Build the project on Crowdin and download all targets to Content/Localization'
     script: build-and-download
@@ -738,7 +738,7 @@ script-parameters:
     script-parameters:
       # loc_targets: []
       add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Localization/~Temp/#Sources'] # Add any additional paths to check out
+      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
   - description: 'Gather the text in UE for all targets and export the source/test locale draft'
     script: ue-loc-gather-cmd
@@ -778,7 +778,7 @@ script-parameters:
     script-parameters:
       # loc_targets: []
       add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Localization/~Temp/#Sources'] # Add any additional paths to check out
+      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
 # end of one step check out
 
