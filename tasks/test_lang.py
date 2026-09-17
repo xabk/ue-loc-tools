@@ -227,7 +227,9 @@ class ProcessTestAndHashLocales(LocTask):
         if text:
             id = f'{id}{separator}{text}'
         if variables:
-            id = f'{id}{separator}{" ".join(variables)}'
+            # Each one wrapped, so a placeholder is obvious next to the text
+            wrapped = ' '.join(f'<{var}>' for var in variables)
+            id = f'{id}{separator}{wrapped}'
         return id
 
     @staticmethod

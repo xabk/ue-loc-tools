@@ -153,9 +153,9 @@ def test_the_source_text_is_included_by_default(task, tmp_path):
     assert po[0].msgstr == '?00001:Some text'
 
 
-def test_variables_come_last_either_way(task, tmp_path):
-    """They are appended after the text, not before it -- so switching the text
-    off leaves the ID next to its variables."""
+def test_variables_come_last_wrapped_in_angle_brackets(task, tmp_path):
+    """Appended after the text, not before it, and each one wrapped so a
+    placeholder stands out from the words around it."""
     po_file = write_po(tmp_path / 'Game.po', [(',KEY1', 'Touch {0}', '')])
 
     task.process_debug_ID_locale(po_file, 1)
@@ -166,5 +166,15 @@ def test_variables_come_last_either_way(task, tmp_path):
     task.process_debug_ID_locale(po_file, 1)
     without = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')[0].msgstr
 
-    assert with_text == '?00001:Touch {0}:{0}'
-    assert without == '?00001:{0}'
+    assert with_text == '?00001:Touch {0}:<{0}>'
+    assert without == '?00001:<{0}>'
+
+
+def test_each_variable_is_wrapped_separately(task, tmp_path):
+    """Two placeholders give two bracketed items, not one bracketed pair."""
+    po_file = write_po(tmp_path / 'Game.po', [(',KEY1', 'From {0} to {1}', '')])
+
+    task.process_debug_ID_locale(po_file, 1)
+
+    po = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')
+    assert po[0].msgstr.endswith('<{0}> <{1}>')
