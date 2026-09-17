@@ -526,7 +526,9 @@ script-parameters:
 
     engine_id: 0
 
-    file_format: gettext_unreal # gettext_unreal
+    # auto lets Crowdin pick the parser. Use gettext_unreal only if you want
+    # the Unreal PO parser on Crowdin.
+    file_format: auto
 
     src_locale: io
 

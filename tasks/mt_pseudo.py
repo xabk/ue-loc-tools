@@ -63,9 +63,9 @@ class MTPseudo(LocTask):
 
     engine_id: int | None = 1
 
-    file_format: str = (
-        'gettext_unreal'  # gettext_unreal to use the Unreal PO parser on Crowdin
-    )
+    # 'auto' lets Crowdin pick the parser and suits most projects. Set this to
+    # 'gettext_unreal' only where the Unreal PO parser is actually wanted.
+    file_format: str = 'auto'
 
     src_locale: str = 'en-ZA'
     longest_locale: str = 'en-AE'
