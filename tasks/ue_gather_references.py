@@ -39,7 +39,10 @@ class GatherStringTableReferences(LocTask):
     # The commandlet and the flags it needs. Both are here rather than hard
     # coded so a project with a renamed or extended commandlet can say so.
     commandlet: str = 'GatherStringTableReferences'
-    extra_args: list[str] = field(default_factory=lambda: ['-NullRHI'])
+    # -Unattended so a modal cannot stop a run that is only ever unattended.
+    extra_args: list[str] = field(
+        default_factory=lambda: ['-NullRHI', '-Unattended']
+    )
 
     # Engine start-up chatter that says nothing about the gather. Live
     # coding alone accounted for 96% of the lines on the first real run.

@@ -131,3 +131,11 @@ def test_building_the_task_survives_a_missing_project(tmp_path):
     task.post_update()  # must not raise
 
     assert task.run() is False
+
+
+def test_the_commandlet_runs_unattended_by_default(task):
+    """It only ever runs unattended, and a modal in a commandlet stops the run
+    with nobody watching. Satisfactory's previous script passed this; the task
+    did not."""
+    assert '-Unattended' in task.extra_args
+    assert '-NullRHI' in task.extra_args
