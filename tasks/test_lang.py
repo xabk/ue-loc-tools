@@ -935,18 +935,13 @@ class ProcessTestAndHashLocales(LocTask):
                 entry.msgstr = self.id_gen(
                     number=current_id, text=entry.msgid, variables=variables
                 )
+                debug_ID = 'Debug ID:\t' + self.id_gen(
+                    number=current_id, variables=variables, separator=' '
+                )
 
                 current_id += 1
-
-            own_id = re.match(
-                re.escape(self.debug_prefix) + r'\d{' + str(self.id_length) + '}',
-                entry.msgstr,
-            )
-            debug_ID = 'Debug ID:\t' + (
-                own_id.group(0) if own_id else entry.msgstr
-            )
-            if variables:
-                debug_ID += ' ' + ' '.join(variables)
+            else:
+                debug_ID = 'Debug ID:\t' + entry.msgstr
 
             asset_name = ''
 

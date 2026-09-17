@@ -110,3 +110,23 @@ def test_an_untranslated_entry_still_gets_a_minted_id(task, tmp_path):
     assert comments[0] == '?00042'
     assert po[1].msgstr.startswith('?00007')
     assert comments[1] == '?00007'
+
+
+def test_an_existing_id_keeps_its_variable_hint(task, tmp_path):
+    """Variables are baked into the msgstr of entries created by earlier runs
+    (`~00124 <{0}>`), and the comment mirrors the whole thing. Taking only the
+    ID off the front drops the hint translators use to spot placeholders."""
+    po_file = write_po(
+        tmp_path / 'InputKeys.po',
+        [(',InputKeys,TouchFormat', 'Touch {0}', '?00124 <{0}>')],
+    )
+
+    task.process_debug_ID_locale(po_file, 1)
+
+    po = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')
+    comment = [
+        ln for ln in po[0].comment.splitlines() if ln.startswith('Debug ID:')
+    ][0]
+
+    assert comment == 'Debug ID:\t?00124 <{0}>'
+    assert po[0].msgstr == '?00124 <{0}>'
