@@ -69,6 +69,10 @@ class ProcessTestAndHashLocales(LocTask):
     clear_translations: bool = False  # Start over? E.g., if ID length changed
     debug_prefix: str = '#'  # Prefix to use for debug ID, start over if changed
     debug_separator: str = ':'
+    # Put the source string into the debug ID translation, so the debug
+    # locale reads as `#0001:Some text`. Off gives a bare `#0001`, which
+    # keeps the locale small and the IDs easy to read on screen.
+    debug_id_include_source: bool = True
     id_length: int = 4  # Num of digits in ID (#0001), start over if changed
     remove_source_loc_prefixes: list[str] | None = None
 
@@ -933,7 +937,9 @@ class ProcessTestAndHashLocales(LocTask):
 
                 # Generate and save the ID
                 entry.msgstr = self.id_gen(
-                    number=current_id, text=entry.msgid, variables=variables
+                    number=current_id,
+                    text=entry.msgid if self.debug_id_include_source else None,
+                    variables=variables,
                 )
                 debug_ID = 'Debug ID:\t' + self.id_gen(
                     number=current_id, variables=variables, separator=' '

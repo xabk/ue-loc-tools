@@ -130,3 +130,41 @@ def test_an_existing_id_keeps_its_variable_hint(task, tmp_path):
 
     assert comment == 'Debug ID:\t?00124 <{0}>'
     assert po[0].msgstr == '?00124 <{0}>'
+
+
+def test_the_source_text_can_be_left_out(task, tmp_path):
+    """A debug locale is easier to read on screen as a bare ID, and the POs stay
+    small. Satisfactory wants that; Rabbithole wants the text."""
+    task.debug_id_include_source = False
+    po_file = write_po(tmp_path / 'Game.po', [(',KEY1', 'Some text', '')])
+
+    task.process_debug_ID_locale(po_file, 1)
+
+    po = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')
+    assert po[0].msgstr == '?00001'
+
+
+def test_the_source_text_is_included_by_default(task, tmp_path):
+    po_file = write_po(tmp_path / 'Game.po', [(',KEY1', 'Some text', '')])
+
+    task.process_debug_ID_locale(po_file, 1)
+
+    po = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')
+    assert po[0].msgstr == '?00001:Some text'
+
+
+def test_variables_come_last_either_way(task, tmp_path):
+    """They are appended after the text, not before it -- so switching the text
+    off leaves the ID next to its variables."""
+    po_file = write_po(tmp_path / 'Game.po', [(',KEY1', 'Touch {0}', '')])
+
+    task.process_debug_ID_locale(po_file, 1)
+    with_text = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')[0].msgstr
+
+    task.debug_id_include_source = False
+    po_file = write_po(tmp_path / 'Game2.po', [(',KEY1', 'Touch {0}', '')])
+    task.process_debug_ID_locale(po_file, 1)
+    without = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')[0].msgstr
+
+    assert with_text == '?00001:Touch {0}:{0}'
+    assert without == '?00001:{0}'

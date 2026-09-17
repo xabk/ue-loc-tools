@@ -179,6 +179,9 @@ script-parameters:
     clear_translations: No
     debug_prefix: '#' # Start over (clear_translations = True) if you change debug prefix
     debug_separator: ':'
+    # Yes puts the source string into the debug ID translation (#0001:Some
+    # text). No leaves a bare #0001.
+    debug_id_include_source: Yes
     id_length: 4 # Start over (clear_translations = True) if you change id length
     encoding: utf-8-sig
     sort_po: No
