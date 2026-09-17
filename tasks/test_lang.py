@@ -115,7 +115,9 @@ class ProcessTestAndHashLocales(LocTask):
     ind_regex: str = r'([\[\(])([^\]\)]+)([\]\)])'  # Anything in () or []
 
     # Regex pattern to match IDs
-    id_regex_pattern: str = r'^{prefix}(\d{{{id_length}}}):'
+    # No separator: what follows the digits depends on debug_separator and on
+    # whether the source text and variables are included at all.
+    id_regex_pattern: str = r'^{prefix}(\d{{{id_length}}})'
 
     # Skip strings with empty namespace in debug locales
     skip_empty_namespace: bool = False

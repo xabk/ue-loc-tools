@@ -178,3 +178,36 @@ def test_each_variable_is_wrapped_separately(task, tmp_path):
 
     po = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')
     assert po[0].msgstr.endswith('<{0}> <{1}>')
+
+
+# ------------------- finding the IDs that already exist ------------------- #
+
+
+@pytest.fixture
+def id_regex(task):
+    return task.id_regex_pattern.format(
+        prefix=re.escape(task.debug_prefix), id_length=task.id_length
+    )
+
+
+@pytest.mark.parametrize(
+    'msgstr',
+    [
+        '?00124',  # bare, which is what debug_id_include_source: No gives
+        '?00124:Some source text',  # with the text
+        '?00124:<{0}>',  # with variables, colon separator
+        '?00124 <{0}>',  # with variables, space separator
+        '?00124:Some text:<{0}>',  # both
+    ],
+)
+def test_an_id_is_recognised_whatever_follows_it(id_regex, msgstr):
+    """What comes after the digits depends on debug_separator and on whether the
+    source and variables are included. Requiring a colon made 6058 of
+    Satisfactory's 6450 entries invisible, so the next run would have handed out
+    IDs that were already taken."""
+    assert re.search(id_regex, msgstr).group(1) == '00124'
+
+
+def test_something_that_is_not_an_id_is_not_matched(id_regex):
+    for msgstr in ('Just a translation', '?abc', '?0012', ''):
+        assert not re.search(id_regex, msgstr)
