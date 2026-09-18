@@ -30,6 +30,13 @@ PACKAGES_TO_LOAD = r'Preparing to load (\d+) packages'
 PACKAGES_LOADED = r'Loaded (\d+) packages in ([\d.]+) seconds\. (\d+) failed'
 PROGRESS = r'\[\s*([\d.]+)%\]'
 NO_ASSETS = r'No assets matched the specified criteria'
+# A reference to a string table entry that does not exist. The commandlet
+# prints these between two banner lines at the end of its run.
+MISSING_REFERENCE = (
+    r'<MissingStringTableReference> StringTable: \[([^]]+)\], '
+    r'Key: \[([^]]+)\] Context: (.*)'
+)
+MISSING_BANNER = r'Missing String Table References|={6,}'
 
 
 @dataclass
@@ -53,6 +60,10 @@ class GatherStringTableReferences(LocTask):
     # Progress is one line per package, and a real project has tens of
     # thousands. Report every this-many percent instead of every line.
     progress_step: int = 10
+
+    # One missing entry is often referenced from many places; list this many
+    # before summarising the rest.
+    missing_contexts_to_show: int = 3
 
     # Same shape as ue-loc-gather-cmd, so a project configures paths once.
     project_dir: str | None = None  # Absolute or relative to cwd
@@ -111,6 +122,8 @@ class GatherStringTableReferences(LocTask):
         expected = None
         loaded = failed = None
         no_assets = 0
+        # (string table, key) -> the contexts that reference it
+        missing: dict[tuple[str, str], list[str]] = {}
         next_report = 0
         start = timer()
 
@@ -152,6 +165,15 @@ class GatherStringTableReferences(LocTask):
                         )
                         continue
 
+                    match = re.search(MISSING_REFERENCE, line)
+                    if match:
+                        table, key, context = match.groups()
+                        missing.setdefault((table, key), []).append(context.strip())
+                        continue
+
+                    if re.search(MISSING_BANNER, line):
+                        continue
+
                     if re.search(NO_ASSETS, line):
                         no_assets += 1
                         continue
@@ -172,8 +194,15 @@ class GatherStringTableReferences(LocTask):
             logger.error(f'Could not run the commandlet: {err}')
             return False
 
-        return self.verdict(process.returncode, expected, loaded, failed, no_assets,
-                            timer() - start)
+        return self.verdict(
+            process.returncode,
+            expected,
+            loaded,
+            failed,
+            no_assets,
+            timer() - start,
+            missing,
+        )
 
     def verdict(
         self,
@@ -183,6 +212,7 @@ class GatherStringTableReferences(LocTask):
         failed: int | None,
         no_assets: int,
         duration: float,
+        missing: dict[tuple[str, str], list[str]] | None = None,
     ) -> bool:
         """The commandlet states its own failure count, so this leans on that
         rather than inferring success from the absence of errors."""
@@ -209,6 +239,8 @@ class GatherStringTableReferences(LocTask):
                 f'Planned to load {expected} packages but loaded {loaded}.'
             )
 
+        self.report_missing_references(missing)
+
         # The source pass finds nothing on projects that keep their strings in
         # assets only, which is normal rather than a problem.
         if no_assets:
@@ -221,3 +253,25 @@ class GatherStringTableReferences(LocTask):
             f'{self.commandlet} gathered {loaded} packages in {duration:.0f}s.'
         )
         return True
+
+    def report_missing_references(
+        self, missing: dict[tuple[str, str], list[str]] | None
+    ) -> None:
+        """A reference to a string table entry that is not there. The text
+        will fall back to its key in game, so this is worth surfacing, but it
+        is a content problem rather than a failed run."""
+        if not missing:
+            return
+
+        total = sum(len(contexts) for contexts in missing.values())
+        logger.warning(
+            f'{len(missing)} string table entr(ies) are referenced but do not '
+            f'exist, from {total} place(s):'
+        )
+        for (table, key), contexts in sorted(missing.items()):
+            logger.warning(f'| REF | {table},{key} - {len(contexts)} reference(s)')
+            for context in contexts[: self.missing_contexts_to_show]:
+                logger.warning(f'| REF |     {context}')
+            if len(contexts) > self.missing_contexts_to_show:
+                extra = len(contexts) - self.missing_contexts_to_show
+                logger.warning(f'| REF |     ... and {extra} more')

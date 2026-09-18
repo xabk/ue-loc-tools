@@ -8,6 +8,8 @@ Marker shapes here are taken from a real Rabbithole run: 22967 packages,
 import pytest
 
 from tasks.ue_gather_references import (
+    MISSING_BANNER,
+    MISSING_REFERENCE,
     NO_ASSETS,
     PACKAGES_LOADED,
     PACKAGES_TO_LOAD,
@@ -21,6 +23,17 @@ import re
 @pytest.fixture
 def task():
     return GatherStringTableReferences()
+
+
+@pytest.fixture
+def capture_logs():
+    """loguru does not go through pytest's caplog."""
+    from loguru import logger
+
+    messages: list[str] = []
+    sink = logger.add(lambda m: messages.append(str(m)), level='WARNING')
+    yield messages
+    logger.remove(sink)
 
 
 # --------------------------- marker parsing --------------------------- #
@@ -139,3 +152,71 @@ def test_the_commandlet_runs_unattended_by_default(task):
     did not."""
     assert '-Unattended' in task.extra_args
     assert '-NullRHI' in task.extra_args
+
+
+# --------------------- missing string table references --------------------- #
+
+MISSING_LINE = (
+    'LogGatherStringTableReferencesCommandlet: Warning: '
+    '<MissingStringTableReference> StringTable: [FICSMAS_UI], '
+    'Key: [Calendar/2020] Context: /Game/FactoryGame/Buildable/Foo.Foo_C'
+)
+
+
+def test_a_missing_reference_line_is_parsed():
+    table, key, context = re.search(MISSING_REFERENCE, MISSING_LINE).groups()
+
+    assert table == 'FICSMAS_UI'
+    assert key == 'Calendar/2020'
+    assert context == '/Game/FactoryGame/Buildable/Foo.Foo_C'
+
+
+def test_the_banner_around_them_is_not_mistaken_for_one():
+    """The commandlet wraps the list in two rules; neither is a reference."""
+    for line in (
+        'LogGatherStringTableReferencesCommandlet: Warning: '
+        '============= Missing String Table References ==================',
+        'LogGatherStringTableReferencesCommandlet: Warning: '
+        '===============================================================',
+    ):
+        assert not re.search(MISSING_REFERENCE, line)
+        assert re.search(MISSING_BANNER, line)
+
+
+def test_an_ordinary_warning_is_neither(task):
+    line = 'LogStringTable: Warning: Failed to find string table entry for X'
+
+    assert not re.search(MISSING_REFERENCE, line)
+    assert not re.search(MISSING_BANNER, line)
+
+
+def test_missing_references_warn_but_do_not_fail_the_task(task):
+    """The text falls back to its key in game, which is worth knowing about,
+    but the gather itself did its job."""
+    missing = {('FICSMAS_UI', 'Calendar/2020'): ['/Game/A', '/Game/B']}
+
+    assert task.verdict(0, 100, 100, 0, 0, 1.0, missing) is True
+
+
+def test_the_report_groups_by_entry(task, capture_logs):
+    """One missing entry referenced from five places is one problem, not five:
+    the previous tooling printed the raw line each time."""
+    missing = {
+        ('FICSMAS_UI', 'Calendar/2020'): ['/Game/A', '/Game/B', '/Game/C', '/Game/D'],
+        ('Menus_UI', 'Sessions/Header'): ['/Game/E'],
+    }
+
+    task.report_missing_references(missing)
+    logged = '\n'.join(capture_logs)
+
+    assert '2 string table entr(ies) are referenced but do not exist, from 5 place(s)' in logged
+    assert 'FICSMAS_UI,Calendar/2020 - 4 reference(s)' in logged
+    assert 'Menus_UI,Sessions/Header - 1 reference(s)' in logged
+    assert '... and 1 more' in logged  # only 3 of the 4 contexts listed
+
+
+def test_nothing_is_reported_when_nothing_is_missing(task, capture_logs):
+    task.report_missing_references({})
+    task.report_missing_references(None)
+
+    assert not capture_logs
