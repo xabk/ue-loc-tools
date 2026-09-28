@@ -268,10 +268,13 @@ class UpdateSourceFile(LocTask):
                 # TODO: Assign MaxLength and Labels based on regex criteria / metadata
                 labels = ''
                 maxlength = ''
+                src = entry.msgid
+                if self.delete_unsafe_whitespace:
+                    src = src.strip()
                 csv_data[po_path.stem].append(
                     [
                         entry.msgctxt,
-                        entry.msgid,
+                        src,
                         entry.msgstr,
                         maxlength,
                         labels,

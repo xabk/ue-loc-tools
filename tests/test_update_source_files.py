@@ -195,3 +195,35 @@ def test_a_fixed_output_name_needs_no_capture_group(tmp_path):
 
     written = {p.name for p in (tmp_path / 'out').glob('*.csv')}
     assert written == {'Alien-MAM.csv', 'Alien.csv'}
+
+
+def test_whitespace_is_stripped_in_both_branches(tmp_path):
+    """delete_unsafe_whitespace was honoured only for entries that matched a
+    split rule; the ones that fell through to {target}.csv kept their leading
+    space, so the same setting gave two different answers in one file."""
+    from libraries import polib
+    from tasks.update_source_files import UpdateSourceFile
+
+    po_path = tmp_path / 'Narrative.po'
+    po = polib.POFile(wrapwidth=0)
+    po.append(polib.POEntry(msgctxt='Narrative/Alien,Bar', msgid=' matched ', msgstr='=1'))
+    po.append(polib.POEntry(msgctxt=',NoNamespace', msgid=' fell through ', msgstr='=2'))
+    po.save(str(po_path))
+
+    task = UpdateSourceFile()
+    task.csv_dir = ''
+    task.delete_unsafe_whitespace = True
+    task.split_csv_rules = [['msgctxt', '^[^/,]*/(.*?),.*?$', '']]
+
+    task.write_bilingual_csv(str(po_path), dir=tmp_path / 'out')
+
+    import csv as _csv
+    import io as _io
+
+    rows = {}
+    for p in (tmp_path / 'out').glob('*.csv'):
+        for r in _csv.DictReader(_io.open(p, encoding='utf-8-sig', newline='')):
+            rows[r['Key']] = r['SourceString']
+
+    assert rows['Narrative/Alien,Bar'] == 'matched'
+    assert rows[',NoNamespace'] == 'fell through'
