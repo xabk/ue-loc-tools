@@ -77,6 +77,12 @@ tasks:
     module: 'tasks.po_csv_converter'
     class: 'UE_PO_CSV_Converter'
 
+  # For a game with separate professional and community Crowdin projects:
+  # source lands in the pro project, then syncs across on release.
+  sync-projects:
+    module: 'tasks.sync_projects'
+    class: 'SyncProjects'
+
 #
 # -------------------------------------------------------------
 # ----------------- LOCSYNC SETTINGS SECTION ------------------
