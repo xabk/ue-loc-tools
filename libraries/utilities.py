@@ -1,6 +1,7 @@
 # Holds utility functions used across scripts:
 # read and update configs, etc.
 
+import stat
 import sys
 from pathlib import Path
 import yaml
@@ -22,6 +23,13 @@ DEF_PROJECT_PATH = Path('../../../')
 DEF_ENGINE_ROOT = Path('../../../../../')
 DEF_ENGINE_CMD = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/UnrealEditor-Cmd.exe'  # UE5
 DEF_ENGINE_DIR = DEF_ENGINE_ROOT / 'Engine/Binaries/Win64/'
+
+
+def remove_read_only(func, path, _exc):
+    """onexc handler for shutil.rmtree: a Perforce file that is not checked
+    out is read-only, and rmtree cannot delete it until the flag is off."""
+    Path(path).chmod(stat.S_IWRITE)
+    func(path)
 
 
 def init_logging(verbose: bool = False) -> None:

@@ -128,3 +128,44 @@ def test_csv_translations_also_keep_the_target_folder():
     entry = task.cli_files_for_csv_loc_target('Tables')
 
     assert entry['translation'] == '/Tables/%locale%/%original_file_name%'
+
+
+# --------- wiping a staging directory that Perforce has left read-only --------
+
+
+def test_staging_clears_read_only_files_in_subdirectories(tmp_path):
+    """The staging directory is inside the Perforce workspace, so anything not
+    checked out is read-only. The wipe cleared the flag on files at the top
+    level but called rmtree on subdirectories, which then failed on the CSVs
+    inside -- and the CSVs are always in a subdirectory."""
+    import shutil
+    import stat
+
+    from libraries.utilities import remove_read_only
+
+    nested = tmp_path / 'CSVs' / 'AllStringTables'
+    nested.mkdir(parents=True)
+    csv = nested / 'Architecture_Data.csv'
+    csv.write_text('Key,SourceString\n', encoding='utf-8')
+    csv.chmod(stat.S_IREAD)
+
+    shutil.rmtree(tmp_path / 'CSVs', onexc=remove_read_only)
+
+    assert not (tmp_path / 'CSVs').exists()
+
+
+def test_a_read_only_file_is_still_removed(tmp_path):
+    import shutil
+    import stat
+
+    from libraries.utilities import remove_read_only
+
+    d = tmp_path / 'dir'
+    d.mkdir()
+    f = d / 'locked.csv'
+    f.write_text('x', encoding='utf-8')
+    f.chmod(stat.S_IREAD)
+
+    shutil.rmtree(d, onexc=remove_read_only)
+
+    assert not d.exists()

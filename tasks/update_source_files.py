@@ -10,7 +10,7 @@ import subprocess as subp
 import json
 
 from libraries.crowdin import UECrowdinClient
-from libraries.utilities import LocTask, init_logging
+from libraries.utilities import LocTask, init_logging, remove_read_only
 from libraries import polib
 
 CROWDIN_CELL_BYTE_LIMIT = 65535
@@ -407,7 +407,7 @@ class UpdateSourceFile(LocTask):
                 file.chmod(stat.S_IWRITE)
                 file.unlink()
             else:
-                shutil.rmtree(file)
+                shutil.rmtree(file, onexc=remove_read_only)
 
         logger.info(
             f'Prepping files for upload. Content path: {self._content_path}\n'
