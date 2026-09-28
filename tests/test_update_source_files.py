@@ -169,3 +169,29 @@ def test_a_read_only_file_is_still_removed(tmp_path):
     shutil.rmtree(d, onexc=remove_read_only)
 
     assert not d.exists()
+
+
+def test_a_fixed_output_name_needs_no_capture_group(tmp_path):
+    """A rule can name its file outright -- ['msgctxt', '^Narrative/MAM,', 'Alien-MAM'].
+    The $1 substitution reached for group 1 regardless, so such a rule raised
+    IndexError against a pattern that has no group."""
+    from libraries import polib
+    from tasks.update_source_files import UpdateSourceFile
+
+    po_path = tmp_path / 'Narrative.po'
+    po = polib.POFile(wrapwidth=0)
+    po.append(polib.POEntry(msgctxt='Narrative/MAM,AlienTech/Foo', msgid='A', msgstr='=1'))
+    po.append(polib.POEntry(msgctxt='Narrative/Alien,Bar', msgid='B', msgstr='=2'))
+    po.save(str(po_path))
+
+    task = UpdateSourceFile()
+    task.csv_dir = ''
+    task.split_csv_rules = [
+        ['msgctxt', '^Narrative/MAM,AlienTech/', 'Alien-MAM'],
+        ['msgctxt', '^[^/,]*/(.*?),.*?$', ''],
+    ]
+
+    task.write_bilingual_csv(str(po_path), dir=tmp_path / 'out')
+
+    written = {p.name for p in (tmp_path / 'out').glob('*.csv')}
+    assert written == {'Alien-MAM.csv', 'Alien.csv'}

@@ -238,7 +238,7 @@ class UpdateSourceFile(LocTask):
                         if match:
                             if not cat:
                                 cat = match.group(1)
-                            else:
+                            elif '$1' in cat:
                                 cat = cat.replace('$1', match.group(1))
 
                         # TODO: Assign MaxLength and Labels based on regex criteria / metadata
