@@ -15,6 +15,10 @@ from libraries.crowdin import UECrowdinClient
 # Parameters - These can be edited
 
 
+# The section of `crowdin status` output carrying the word counts.
+WORDS_SECTION = 'Translated words:'
+
+
 @dataclass
 class UpdateLanguageCompletionRates(LocTask):
     # Declare Crowdin parameters to load them from config
@@ -66,26 +70,49 @@ class UpdateLanguageCompletionRates(LocTask):
         def add_stats(
             result: list[str], stats: dict[str, dict[str, int]]
         ) -> dict[str, dict[str, int]]:
-            current_lang = ''
+            """Read the `Translated words` section of `crowdin status`.
+
+            The output is one section per metric, each a flat list of
+            `<language> <translated>/<total>`:
+
+                Translated:
+                de 100
+                Translated words:
+                de 37163/37163
+                Translated phrases:
+                de 6415/6415
+
+            Only the word counts are summed, because folders differ in size and
+            averaging their percentages would weight a small one like a large
+            one.
+            """
+            in_words_section = False
             for line in result:
-                if line.strip() == '':
+                line = line.strip()
+                if not line:
                     continue
-                if re.match(r'^.+?\):$', line):
-                    current_lang = re.search(r'\(([^()]+)\):$', line).group(1)
+
+                if line.endswith(':'):
+                    in_words_section = line == WORDS_SECTION
                     continue
-                if 'Translated: ' in line:
-                    match = re.search(r'Words: (\d+)/(\d+)', line)
-                    if match:
-                        translated = int(match.group(1))
-                        total = int(match.group(2))
-                        if current_lang in stats:
-                            stats[current_lang]['translated'] += translated
-                            stats[current_lang]['total'] += total
-                        else:
-                            stats[current_lang] = {
-                                'translated': translated,
-                                'total': total,
-                            }
+
+                if not in_words_section:
+                    continue
+
+                match = re.match(r'^(\S+)\s+(\d+)/(\d+)$', line)
+                if not match:
+                    continue
+
+                lang, translated, total = (
+                    match.group(1),
+                    int(match.group(2)),
+                    int(match.group(3)),
+                )
+                if lang in stats:
+                    stats[lang]['translated'] += translated
+                    stats[lang]['total'] += total
+                else:
+                    stats[lang] = {'translated': translated, 'total': total}
             return stats
 
         stats = {}
@@ -103,20 +130,21 @@ class UpdateLanguageCompletionRates(LocTask):
             f'--project-id={self.project_id}',
             '-v',
             '--no-progress',
-            '--plain',
+            '--output',
+            'plain',
         ]
 
         if self.cli_branch:
-            command.append(f'--branch="{self.cli_branch}"')
+            command += ['--branch', self.cli_branch]
 
         for folder in self.cli_folders:
             logger.info(
                 f'Getting completion rates for {folder}:\n'
-                f'{" ".join(command)} -d="{folder}"'
+                f'{" ".join(command)} -d {folder}'
             )
 
             result = subprocess.run(
-                [*command, f'-d={folder}', f'--token={self.token}'],
+                [*command, '-d', folder, '--token', self.token],
                 capture_output=True,
                 text=True,
                 shell=True,
@@ -133,7 +161,7 @@ class UpdateLanguageCompletionRates(LocTask):
 
         for file in self.cli_files:
             result = subprocess.run(
-                [*command, f'-f={file}', f'--token={self.token}'],
+                [*command, '-f', file, '--token', self.token],
                 capture_output=True,
                 text=True,
                 shell=True,
