@@ -23,6 +23,8 @@ from libraries.utilities import LocTask
 TASKS_MODULE = 'tasks'
 
 SCRIPT_DIR = 'scripts'
+# scripts/ ships inside the package, next to libraries/ and tasks/.
+SCRIPT_PATH = Path(__file__).resolve().parent.parent / SCRIPT_DIR
 
 LOG_TO_SKIP = ['LogLinker: ']
 
@@ -270,7 +272,7 @@ class TaskRunner:
     ) -> tuple[bool, float, str]:
         import subprocess as subp
 
-        script_name = f'{SCRIPT_DIR}/{task_config["script"]}.py'
+        script_name = str(SCRIPT_PATH / f'{task_config["script"]}.py')
         if task_config.get('unreal'):
             return self._execute_ue_task(task_config, start_time)
 
@@ -303,8 +305,6 @@ class TaskRunner:
 
             project_path = Path(ue_params.get('project_dir')).resolve().absolute()
 
-            script_path = Path().absolute()
-
             uprojects = project_path.glob('*.uproject')
             if uprojects:
                 project_path = next(uprojects)
@@ -325,8 +325,7 @@ class TaskRunner:
                     f"Project path does not exist or isn't a file: {project_path}"
                 )
 
-            ue_script = script_path / f'{SCRIPT_DIR}/{task_config["script"]}.py'
-            ue_script = ue_script.as_posix()
+            ue_script = (SCRIPT_PATH / f'{task_config["script"]}.py').as_posix()
 
             cmd = [
                 ue_executable,

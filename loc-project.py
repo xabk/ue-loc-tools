@@ -35,6 +35,7 @@ from libraries.environment import (
 )
 from libraries.task_runner import (
     SCRIPT_DIR,
+    SCRIPT_PATH,
     DEFAULT_BASE_CONFIG,
     DEFAULT_SECRET_CONFIG,
     TaskRunner,
@@ -314,7 +315,7 @@ def do_check(base_path: Path, secret_path: Path) -> int:
             logger.error(f'{name}: "{key}" matches no field and is ignored{hint}')
             problems += 1
 
-    script_dir = Path(__file__).resolve().parent / SCRIPT_DIR
+    script_dir = SCRIPT_PATH
 
     for list_name, tasks in config.items():
         if not isinstance(tasks, list):

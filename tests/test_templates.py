@@ -201,3 +201,39 @@ def test_check_accepts_scripts_dir_tasks(tmp_path, monkeypatch):
     )
 
     assert 'unknown task "ue-reimport-assets"' not in result.stdout + result.stderr
+
+
+def test_the_scripts_path_is_resolved_from_the_package():
+    """scripts/ ships inside the package. Resolving it from the working
+    directory found nothing on the nested layout, where the runner is started
+    from the project repo root and the package sits one level down -- so every
+    scripts/ task failed with "Could not load Python file"."""
+    from pathlib import Path
+
+    from libraries.task_runner import SCRIPT_PATH
+
+    package_root = Path(__file__).resolve().parent.parent
+    assert SCRIPT_PATH == package_root / 'scripts'
+    assert SCRIPT_PATH.is_dir()
+    assert (SCRIPT_PATH / 'ue-reimport-assets.py').is_file()
+
+
+def test_check_and_the_runner_look_in_the_same_place():
+    """--check used its own path to decide a scripts/ task exists. It agreed
+    with the filesystem and disagreed with the runner, so a task list could
+    validate and then fail to run."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    probe = (
+        'import sys; sys.path.insert(0, r"%s");'
+        'from libraries.task_runner import SCRIPT_PATH;'
+        'import runpy, pathlib;'
+        'src = pathlib.Path(r"%s", "loc-project.py").read_text(encoding="utf-8");'
+        'assert "script_dir = SCRIPT_PATH" in src, "loc-project builds its own path";'
+        'print(SCRIPT_PATH)' % (root, root)
+    )
+    result = subprocess.run([sys.executable, '-c', probe], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
