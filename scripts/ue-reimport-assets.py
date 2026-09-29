@@ -91,11 +91,8 @@ def main():
         task.factory = factory
 
         logw(
-            'Reimporting asset: '
-            + task.destination_path
-            + task.destination_name
-            + ' from '
-            + task.filename
+            f'Reimporting asset: {task.destination_path}/'
+            f'{task.destination_name} from {task.filename}'
         )
 
         asset_tools = unreal.AssetToolsHelpers.get_asset_tools()
