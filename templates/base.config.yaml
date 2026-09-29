@@ -517,6 +517,11 @@ script-parameters:
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
   mt-pseudo:
+    # Build the longest locale from the POs already in Content/Localization and
+    # skip Crowdin entirely. Set this if you only want a locale to stress the UI
+    # and have no use for the machine translation half of the task.
+    offline: No
+
     # Project ID override, it's recommended not to use the main project for AI/MT
     project_id: -1
     loc_targets: [] # Reset here to avoid updating with defaults
@@ -555,6 +560,9 @@ script-parameters:
     suffix: '›'
 
     filler: '~'
+
+    # Sits between the source text and the filler that pads it out.
+    separator: '| '
 
     var_regex: '{[^}]*}'
     tags_regex: '<[^>]*>'

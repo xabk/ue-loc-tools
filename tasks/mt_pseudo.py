@@ -24,6 +24,12 @@ class MTPseudo(LocTask):
     organization: str | None = None
     project_id: int | None = None
 
+    # Build the longest locale from the POs already in Content/Localization and
+    # skip the Crowdin round trip entirely. A project that wants a locale to
+    # stress its UI, rather than machine translation, needs nothing else: the
+    # translations it measures are the ones the last download left on disk.
+    offline: bool = False
+
     # TODO: Process all loc targets if none are specified
     # TODO: Change lambda to empty list to process all loc targets when implemented
 
@@ -79,6 +85,9 @@ class MTPseudo(LocTask):
 
     filler: str = '~'
 
+    # Sits between the source text and the filler that pads it out.
+    separator: str = '| '
+
     var_regex: str = r'{[^}]*}'
     tags_regex: str = r'<[^>]*>'
 
@@ -99,7 +108,12 @@ class MTPseudo(LocTask):
     def post_update(self):
         super().post_update()
         self._content_path = Path(self.content_dir).resolve()
-        self._temp_path = (self._content_path / self.temp_dir).resolve()
+        if self.offline:
+            # Read the locales where the download left them, not from the
+            # staging directory the Crowdin round trip writes into.
+            self._temp_path = self._content_path / 'Localization'
+        else:
+            self._temp_path = (self._content_path / self.temp_dir).resolve()
         self._languages = {}
         for crowd_l, ue_l in self.languages.items():
             self._languages[crowd_l] = ue_l if ue_l else crowd_l
@@ -519,9 +533,9 @@ class MTPseudo(LocTask):
         result, _ = re.subn(self.var_regex, '*', target)
         result, _ = re.subn(self.tags_regex, '=', result)
 
-        length = length - len(result) - 2
+        length = length - len(result) - len(self.separator)
 
-        result = base + '| ' + result[len(base) - length :].strip()
+        result = base + self.separator + result[len(base) - length :].strip()
         if not result.startswith(self.prefix):
             result = self.prefix + result
         if not result.endswith(self.suffix):
@@ -696,7 +710,11 @@ class MTPseudo(LocTask):
 
         return task.process_loc_targets()
 
-    def run(self):
+    def run(self) -> bool:
+        """The task runner reads the return value as the verdict."""
+        if self.offline:
+            return self.create_longest_locale_for_targets()
+
         files = self.add_or_update_files()
 
         logger.info(files)
@@ -713,11 +731,13 @@ class MTPseudo(LocTask):
 
         # self.copy_downloaded_files_to_content()
 
-        self.create_longest_locale_for_targets()
+        longest = self.create_longest_locale_for_targets()
 
         self.create_longest_locale_pack()
 
-        self.copy_longest_to_content()
+        copied = self.copy_longest_to_content()
+
+        return bool(longest and copied)
 
 
 def main():
