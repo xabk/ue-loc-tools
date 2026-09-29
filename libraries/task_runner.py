@@ -402,6 +402,44 @@ class TaskRunner:
             return False
         return False
 
+    def resolve_task_list_name(self, name: str) -> str:
+        """Find the task list a name refers to.
+
+        Task list names are written over two lines: a title, then the steps it
+        runs. Both show up in the menu, but only the title is worth typing, and
+        a newline cannot be passed on a command line at all -- which left every
+        two-line list unreachable with -u. An exact key still wins; failing
+        that, the title alone is enough as long as it picks out one list.
+        """
+        if name in self.config and name not in CONFIG_NON_TASK_SECTIONS:
+            return name
+
+        wanted = name.strip()
+        matches = [
+            key
+            for key in self.config
+            if key not in CONFIG_NON_TASK_SECTIONS
+            and key.splitlines()
+            and key.splitlines()[0].strip() == wanted
+        ]
+
+        if len(matches) == 1:
+            return matches[0]
+
+        if not matches:
+            raise ValueError(f"Task list '{name}' not found in configuration")
+
+        # Listing the titles would show the same line several times, so show
+        # what actually tells them apart.
+        listed = '\n'.join(
+            '  ' + key.replace('\n', ' / ') for key in matches
+        )
+        raise ValueError(
+            f"Task list title '{wanted}' matches {len(matches)} lists:\n"
+            f'{listed}\n'
+            'Pass the whole name to pick one.'
+        )
+
     def get_task_list_from_user(self) -> str:
         task_lists = [t for t in self.config if t not in CONFIG_NON_TASK_SECTIONS]
         if not task_lists:

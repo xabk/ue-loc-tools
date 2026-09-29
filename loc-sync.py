@@ -123,10 +123,12 @@ def run(
                 logger.error(str(e))
                 raise typer.Exit(code=1)
 
-        if runner.task_list_name not in runner.config:
-            logger.error(
-                f"Task list '{runner.task_list_name}' not found in configuration"
+        try:
+            runner.task_list_name = runner.resolve_task_list_name(
+                runner.task_list_name
             )
+        except ValueError as e:
+            logger.error(str(e))
             raise typer.Exit(code=1)
 
         tasks = cast(list[dict[str, Any]], runner.config[runner.task_list_name])
