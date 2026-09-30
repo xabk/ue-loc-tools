@@ -1,3 +1,4 @@
+import json
 import re
 from pathlib import Path
 from loguru import logger
@@ -580,6 +581,16 @@ class UEProject:
     _default_editor_ini_name: str = 'DefaultEditor.ini'
     _loc_target_regex: str = r'^\+GameTargetsSettings=\(Name="([^"]+)",Guid=.*$'
 
+    # How far above the project to look for an engine. Room for a project that
+    # sits inside the engine tree, like UE4/Games/<project>.
+    # A project that builds its own editor target keeps it here.
+    _project_binary_glob: str = 'Binaries/Win64/*Editor-Cmd.exe'
+
+    _engine_search_depth: int = 8
+    # How far into the workspace directory to look for an engine kept in a
+    # folder of its own, like Engine/Code/.
+    _engine_nesting_depth: int = 2
+
     _p4_config: dict[int, str] = {
         4: 'Saved/Config/Windows/SourceControlSettings.ini',
         5: 'Saved/Config/WindowsEditor/SourceControlSettings.ini',
@@ -783,25 +794,49 @@ class UEProject:
         if unreal_binary:
             self.cmd_binary_path = self.engine_path / unreal_binary
             if ue_major_version is None:
-                ue_major_version = 4 if 'UE4Editor' in unreal_binary else 5
-                logger.info(
-                    f'Version assumed to be {ue_major_version} from the binary name. '
-                    'Pass ue_major_version if that is wrong.'
-                )
+                ue_major_version = self._version_from_build_file()
+                if ue_major_version is not None:
+                    logger.info(
+                        f'Version {ue_major_version} read from Build.version.'
+                    )
+                else:
+                    ue_major_version = 4 if 'UE4Editor' in unreal_binary else 5
+                    logger.info(
+                        f'Version assumed to be {ue_major_version} from the binary '
+                        'name, with no Build.version to read. It decides where '
+                        'Perforce settings are read from, so pass '
+                        'ue_major_version if that is wrong.'
+                    )
         else:
             versions = (
                 [ue_major_version] if ue_major_version else self._supported_versions
             )
-            for version in versions:
-                for name in self._cmd_binary_candidates(version):
-                    candidate = self.engine_path / name
-                    if candidate.is_file():
-                        self.cmd_binary_path = candidate
-                        ue_major_version = version
-                        logger.info(f'Version detected as {ue_major_version}')
+            # A project that builds its own editor target names it after
+            # itself and keeps it in its own Binaries. That one wins: it is
+            # the editor built to open this project, whatever the engine
+            # happens to carry, and neither the standard names nor the engine
+            # root would lead to it.
+            own = sorted(self.project_path.glob(self._project_binary_glob))
+            if own:
+                self.cmd_binary_path = own[0]
+                if ue_major_version is None:
+                    ue_major_version = self._version_from_build_file()
+                logger.info(
+                    f'Editor binary {own[0].name} found in the project. '
+                    f'Version {ue_major_version or "unknown"}.'
+                )
+
+            if self.cmd_binary_path is None:
+                for version in versions:
+                    for name in self._cmd_binary_candidates(version):
+                        candidate = self.engine_path / name
+                        if candidate.is_file():
+                            self.cmd_binary_path = candidate
+                            ue_major_version = version
+                            logger.info(f'Version detected as {ue_major_version}')
+                            break
+                    if self.cmd_binary_path is not None:
                         break
-                if self.cmd_binary_path is not None:
-                    break
 
         if self.cmd_binary_path is None or not self.cmd_binary_path.is_file():
             logger.error(
@@ -833,11 +868,59 @@ class UEProject:
         logger.info('Not implemented: Defaulting project path to <cwd>/../../')
         return Path.cwd() / '../../'
 
-    def _find_engine(self):
-        logger.info(
-            'Not implemented: Defaulting engine path to ../Engine/ relative to project path.'
+    def _holds_an_engine(self, path: Path) -> bool:
+        return (path / 'Engine' / 'Binaries' / 'Win64').is_dir() or (
+            path / 'Engine' / 'Build' / 'Build.version'
+        ).is_file()
+
+    def _find_engine(self) -> Path:
+        """Look for the engine above the project.
+
+        It is usually an ancestor, either directly above the project or several
+        levels up when the project sits inside the engine tree. One workspace
+        here keeps it in a folder of its own beside the project instead, so the
+        workspace directory is also searched a couple of levels deep.
+
+        That wider search covers the workspace directory only. A machine holds
+        several workspaces side by side, and reaching further finds a
+        neighbour's engine and quietly configures the project against it.
+        """
+        ancestor = self.project_path
+        for step in range(self._engine_search_depth):
+            ancestor = ancestor.parent
+            if ancestor == ancestor.parent:  # the drive root
+                break
+
+            if self._holds_an_engine(ancestor):
+                logger.info(f'Engine root found at: {ancestor}')
+                return ancestor
+
+            if step == 0:
+                for depth in range(1, self._engine_nesting_depth + 1):
+                    for nested in sorted(ancestor.glob('/'.join(['*'] * depth))):
+                        if nested.is_dir() and self._holds_an_engine(nested):
+                            logger.info(f'Engine root found at: {nested}')
+                            return nested
+
+        logger.warning(
+            'No engine found above the project. Defaulting to ../Engine/, '
+            'which is very likely wrong: set engine_dir in the config.'
         )
         return self.project_path / '../Engine/'
+
+    def _version_from_build_file(self) -> int | None:
+        """Engine/Build/Build.version carries the major version outright.
+
+        Worth asking before the binary's name, because a project that builds
+        its own editor target names it after itself and the name then says
+        nothing. Reading 5 out of 'not UE4Editor' is how a UE4 project ends up
+        looking for its Perforce settings in the UE5 location.
+        """
+        path = self.engine_path / 'Engine' / 'Build' / 'Build.version'
+        try:
+            return int(json.loads(path.read_text(encoding='utf-8'))['MajorVersion'])
+        except Exception:
+            return None
 
     def _load_p4_settings(self, p4_config_path: Path):
         cfg = ConfigParser()
