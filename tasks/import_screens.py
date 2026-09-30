@@ -327,7 +327,13 @@ class ImportScreenshots(LocTask):
 
     def tag_string(self, screen_id: int, string_id: int) -> bool:
         logger.info(f'Tagging string {string_id} on screenshot {screen_id}...')
-        tags = self._crowdin.screenshots.list_tags(self.project_id, screen_id)
+        # Both calls take screenshotId first and projectId second, and every
+        # other call in this file names them. Fetch all the tags: a screenshot
+        # can carry more than one page of them, and a tag on a later page would
+        # read as missing and be added again.
+        tags = self._crowdin.screenshots.with_fetch_all().list_tags(
+            projectId=self.project_id, screenshotId=screen_id
+        )
         if 'data' not in tags:
             logger.error(f'No data in response for screenshot {screen_id}')
             return False
@@ -337,7 +343,9 @@ class ImportScreenshots(LocTask):
             return True
 
         response = self._crowdin.screenshots.add_tag(
-            self.project_id, screen_id, [{'stringId': string_id}]
+            projectId=self.project_id,
+            screenshotId=screen_id,
+            data=[{'stringId': string_id}],
         )
         if 'data' in response:
             return True
