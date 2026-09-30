@@ -38,6 +38,8 @@ from libraries.task_runner import (
     SCRIPT_PATH,
     DEFAULT_BASE_CONFIG,
     DEFAULT_SECRET_CONFIG,
+    RUNNER_PARAMETERS,
+    UNIMPLEMENTED_PARAMETERS,
     TaskRunner,
 )
 from libraries.utilities import init_logging
@@ -292,6 +294,50 @@ def do_check_env(base_path: Path, secret_path: Path) -> int:
     return 0
 
 
+def check_parameters(runner, config: dict) -> int:
+    """Check the top-level `parameters:` section.
+
+    Everything there that the runner does not read itself is a default handed
+    to the tasks, so it has to name a field on at least one of them. A key that
+    names nothing is inert, and inert settings have been expensive here: the
+    config says one thing and the run does another, with nothing said either
+    way.
+
+    Keys starting with an underscore are skipped. They hold YAML anchors, which
+    is how a project declares a list of targets once and refers to it from
+    several task lists.
+    """
+    parameters = config.get('parameters') or {}
+    known = set()
+    for task_class in runner._task_registry.values():
+        known |= {f.name for f in fields(task_class())}
+
+    problems = 0
+    inert = []
+
+    for key in parameters:
+        if key.startswith('_') or key in RUNNER_PARAMETERS or key in known:
+            continue
+        if key in UNIMPLEMENTED_PARAMETERS:
+            inert.append(key)
+            continue
+        suggestion = difflib.get_close_matches(key, known | RUNNER_PARAMETERS, n=1)
+        hint = f' (did you mean "{suggestion[0]}"?)' if suggestion else ''
+        logger.error(
+            f'parameters: "{key}" matches no task field and is ignored{hint}'
+        )
+        problems += 1
+
+    if inert:
+        logger.warning(
+            f'parameters: {", ".join(sorted(inert))} '
+            f'{"are" if len(inert) > 1 else "is"} accepted but not implemented, '
+            'so setting them changes nothing.'
+        )
+
+    return problems
+
+
 def do_check(base_path: Path, secret_path: Path) -> int:
     loaded = load_for_checking(base_path, secret_path)
     if loaded is None:
@@ -299,6 +345,7 @@ def do_check(base_path: Path, secret_path: Path) -> int:
     runner, config = loaded
 
     problems = 0
+    problems += check_parameters(runner, config)
 
     for name, params in (config.get('script-parameters') or {}).items():
         if name in NON_TASK_SECTIONS:

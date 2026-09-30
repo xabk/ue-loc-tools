@@ -35,6 +35,16 @@ CONFIG_NON_TASK_SECTIONS = {'crowdin', 'parameters', 'script-parameters', 'tasks
 CONFIG_KEY_STOP_ON_ERRORS = 'stop-on-errors'
 CONFIG_KEY_USE_UNREAL = 'use-unreal'
 
+# Keys under `parameters:` that the runner reads itself. Everything else there
+# is a default for the tasks and has to name a field on one of them.
+RUNNER_PARAMETERS = {CONFIG_KEY_STOP_ON_ERRORS, CONFIG_KEY_USE_UNREAL}
+
+# Accepted, and nothing acts on them. They are in every project's config and in
+# the template, two of them carrying a TODO, so they are not typos to be fixed
+# by deleting -- but a reader is entitled to know that setting p4-checkout to
+# False skips nothing.
+UNIMPLEMENTED_PARAMETERS = {'p4-checkout', 'p4-checkin', 'p4-cl-desc'}
+
 # User interaction
 EXIT_COMMANDS = {'q', 'Q', 'quit', 'Quit', 'Exit', 'exit'}
 
@@ -541,4 +551,6 @@ __all__ = [
     'DEFAULT_SECRET_CONFIG',
     'CONFIG_KEY_STOP_ON_ERRORS',
     'CONFIG_KEY_USE_UNREAL',
+    'RUNNER_PARAMETERS',
+    'UNIMPLEMENTED_PARAMETERS',
 ]

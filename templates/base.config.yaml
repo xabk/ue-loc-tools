@@ -101,7 +101,7 @@ parameters:
   # By default, it checks out the whole Localization folder.
   # You can also specify additional files for checkout in script settings below.
   # UE editor P4 settings are used (Saved/Config/Windows/SourceControlSettings.ini)
-  p4-checkout: True
+  p4-checkout: True # TODO: implement this -- setting it False skips nothing
 
   # Should we check in the files back to p4?
   p4-checkin: False # TODO: implement this
