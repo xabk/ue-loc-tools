@@ -45,6 +45,9 @@ class FakeTask:
     loc_targets: list = field(default_factory=list)
     content_dir: str = '../'
     encoding: str = 'utf-8-sig'
+    # Worked out in post_update. read_config refuses to set one of these from
+    # the config, in all four places it merges from.
+    _content_path: str = None
 
 
 class FakeRunner:
@@ -114,3 +117,28 @@ def test_the_unimplemented_keys_are_still_reported(gc, logged):
 
 def test_a_real_problem_is_still_found_alongside_them(gc):
     assert check(gc, {'p4-checkout': True, 'not_a_field': 1}) == 1
+
+
+# --- fields the task works out for itself
+
+
+def test_setting_a_computed_field_is_reported(gc, logged):
+    """read_config skips any key starting with an underscore, so writing one
+    does nothing and nothing used to say so."""
+    check(gc, {'_content_path': '/somewhere'})
+
+    reported = messages(logged)
+    assert '_content_path' in reported and 'cannot be set' in reported
+
+
+def test_setting_a_computed_field_is_not_a_failure(gc):
+    """It is a misunderstanding, not a broken config."""
+    assert check(gc, {'_content_path': '/somewhere'}) == 0
+
+
+def test_an_anchor_holder_is_still_silent(gc, logged):
+    """An underscore key that is not a field at all is a project parking a YAML
+    anchor where the runner will not read it. That is the intended use."""
+    check(gc, {'_base_targets': ['A', 'B']})
+
+    assert messages(logged) == ''

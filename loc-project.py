@@ -294,6 +294,21 @@ def do_check_env(base_path: Path, secret_path: Path) -> int:
     return 0
 
 
+def report_computed_field(where: str, key: str) -> None:
+    """A field whose name starts with an underscore is worked out in
+    post_update from the others, and read_config refuses to set one from the
+    config -- in all four places it merges from. Writing one is therefore
+    silently dropped, which is worth saying out loud.
+
+    An underscore key that is not a field at all is left alone: that is a
+    project parking a YAML anchor somewhere the runner will not read it.
+    """
+    logger.warning(
+        f'{where}: "{key}" is worked out while the task runs and cannot be set '
+        'from the config, so this value is ignored.'
+    )
+
+
 def check_parameters(runner, config: dict) -> int:
     """Check the top-level `parameters:` section.
 
@@ -302,26 +317,29 @@ def check_parameters(runner, config: dict) -> int:
     names nothing is inert, and inert settings have been expensive here: the
     config says one thing and the run does another, with nothing said either
     way.
-
-    Keys starting with an underscore are skipped. They hold YAML anchors, which
-    is how a project declares a list of targets once and refers to it from
-    several task lists.
     """
     parameters = config.get('parameters') or {}
     known = set()
     for task_class in runner._task_registry.values():
         known |= {f.name for f in fields(task_class())}
 
+    public = {f for f in known if not f.startswith('_')}
+
     problems = 0
     inert = []
 
     for key in parameters:
-        if key.startswith('_') or key in RUNNER_PARAMETERS or key in known:
+        if key in RUNNER_PARAMETERS or key in public:
+            continue
+        if key.startswith('_'):
+            if key in known:
+                report_computed_field('parameters', key)
+            # Otherwise it is an anchor holder, which is the point of the name.
             continue
         if key in UNIMPLEMENTED_PARAMETERS:
             inert.append(key)
             continue
-        suggestion = difflib.get_close_matches(key, known | RUNNER_PARAMETERS, n=1)
+        suggestion = difflib.get_close_matches(key, public | RUNNER_PARAMETERS, n=1)
         hint = f' (did you mean "{suggestion[0]}"?)' if suggestion else ''
         logger.error(
             f'parameters: "{key}" matches no task field and is ignored{hint}'
@@ -356,8 +374,13 @@ def do_check(base_path: Path, secret_path: Path) -> int:
             problems += 1
             continue
         known = {f.name for f in fields(task_class())}
-        for key in sorted(k for k in (params or {}) if k not in known):
-            suggestion = difflib.get_close_matches(key, known, n=1)
+        public = {f for f in known if not f.startswith('_')}
+        for key in sorted(k for k in (params or {}) if k not in public):
+            if key.startswith('_'):
+                if key in known:
+                    report_computed_field(name, key)
+                continue
+            suggestion = difflib.get_close_matches(key, public, n=1)
             hint = f' (did you mean "{suggestion[0]}"?)' if suggestion else ''
             logger.error(f'{name}: "{key}" matches no field and is ignored{hint}')
             problems += 1
