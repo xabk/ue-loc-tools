@@ -5,6 +5,39 @@ import json
 import re
 from pathlib import Path
 
+# The most rows Crowdin returns for one request.
+PAGE_LIMIT = 500
+
+
+def fetch_all_pages(fetch):
+    """Collect every row of a paginated Crowdin listing.
+
+    The client resolves `limit = limit or self.page_size` and its page_size is
+    25, so a listing called without a limit quietly returns the first 25 rows
+    and nothing says the rest exist. Projects here hold dozens to hundreds of
+    files, so the tail was being dropped: a file past the 25th could not be
+    found by name, and a directory past the 25th was created a second time
+    instead of being reused.
+
+    `fetch` takes `offset` and `limit` and returns the raw response. A response
+    with no `data` field is handed straight back, so callers can report it the
+    way they already do.
+    """
+    rows = []
+    while True:
+        response = fetch(offset=len(rows), limit=PAGE_LIMIT)
+
+        if not isinstance(response, dict) or 'data' not in response:
+            return response
+
+        page = response['data']
+        rows += page
+
+        # A short page is the last one. An empty page ends it too, which also
+        # stops a server that keeps answering a past-the-end offset.
+        if len(page) < PAGE_LIMIT:
+            return rows
+
 
 class UECrowdinClient(CrowdinClient):
     def __init__(
@@ -68,18 +101,25 @@ class UECrowdinClient(CrowdinClient):
         return None
 
     def update_file_list_and_project_data(self):
-        self.file_list = self.source_files.list_files(projectId=self.project_id).get(
-            'data', None
+        files = fetch_all_pages(
+            lambda offset, limit: self.source_files.list_files(
+                projectId=self.project_id, offset=offset, limit=limit
+            )
         )
+        self.file_list = files if isinstance(files, list) else None
 
         self.data['project_data'] = self.projects.get_project(
             projectId=self.project_id
         ).get('data', None)
 
-        # TODO: make sure we get all languages via pagination
-        self.data['supported_languages'] = self.languages.list_supported_languages(
-            limit=500
-        ).get('data', None)
+        languages = fetch_all_pages(
+            lambda offset, limit: self.languages.list_supported_languages(
+                offset=offset, limit=limit
+            )
+        )
+        self.data['supported_languages'] = (
+            languages if isinstance(languages, list) else None
+        )
 
         if (
             self.file_list
@@ -112,12 +152,16 @@ class UECrowdinClient(CrowdinClient):
     def get_or_create_directory(self, dir, create: bool = True):
         if not dir:
             return None
-        r = self.source_files.list_directories(projectId=self.project_id)
-        if 'data' not in r:
+        r = fetch_all_pages(
+            lambda offset, limit: self.source_files.list_directories(
+                projectId=self.project_id, offset=offset, limit=limit
+            )
+        )
+        if not isinstance(r, list):
             self.error(f'No data in list directories response. Response: {r}')
             return r
 
-        directories = {d['data']['name']: d['data']['id'] for d in r['data']}
+        directories = {d['data']['name']: d['data']['id'] for d in r}
 
         if directories and dir in directories:
             return directories[dir]
