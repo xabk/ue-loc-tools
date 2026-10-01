@@ -984,7 +984,8 @@ class ProcessTestAndHashLocales(LocTask):
                         self.remove_source_loc_prefixes is not None
                         and len(self.remove_source_loc_prefixes) > 0
                     ):
-                        pattern += '(' + '|'.join(self.remove_source_loc_prefixes) + ')'
+                        # Optional: a path without a listed prefix is still renamed
+                        pattern += '(' + '|'.join(self.remove_source_loc_prefixes) + ')?'
                     comment = re.sub(pattern, 'Loc:\t', comment)
                 if comment.startswith('Debug ID:'):
                     continue
