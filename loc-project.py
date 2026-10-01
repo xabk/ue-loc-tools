@@ -24,6 +24,7 @@ from loguru import logger
 from typing_extensions import Annotated as A
 
 from libraries.environment import (
+    shadowed_by_other_major,
     CROWDIN_WINGET_ID,
     crowdin_cli_state,
     installed_crowdin_cli_version,
@@ -213,17 +214,28 @@ def install_crowdin_cli(version: str) -> bool:
 
 
 def check_crowdin_cli(install_missing: bool = False) -> bool:
-    """Warn-only unless there is no CLI at all. Setting up a project can
-    install the missing one; a sync only ever reports."""
+    """Warn-only during a sync. Setting up a project installs what is needed.
+
+    A major difference is installed over, not just reported: it stops an upload
+    task list, so leaving it alone leaves the project stuck -- and the advice
+    was to run the script that is calling this.
+
+    The one case installing cannot fix is the pinned version already being
+    there while an older major answers on PATH first. That is reported.
+    """
     pinned = pinned_crowdin_cli_version()
     installed = installed_crowdin_cli_version()
     state = crowdin_cli_state(installed, pinned)
 
-    if state == 'missing' and install_missing and pinned:
+    shadowed = (
+        shadowed_by_other_major(installed, pinned) if state == 'major' else None
+    )
+
+    if install_missing and pinned and state in ('missing', 'major') and not shadowed:
         return install_crowdin_cli(pinned)
 
-    report_crowdin_cli(state, installed, pinned, blocking=False)
-    return state != 'missing'
+    report_crowdin_cli(state, installed, pinned, blocking=False, shadowed=shadowed)
+    return state not in ('missing', 'major')
 
 
 def load_for_checking(

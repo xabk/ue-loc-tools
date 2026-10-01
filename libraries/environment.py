@@ -72,6 +72,70 @@ def _major_minor(version: str) -> tuple[int, int] | None:
     return int(match.group(1)), int(match.group(2) or 0)
 
 
+def crowdin_cli_path() -> str | None:
+    """Which crowdin the shell would run. Worth naming when it is the wrong
+    one: two installs can coexist and only PATH order decides."""
+    return shutil.which('crowdin')
+
+
+def winget_crowdin_versions() -> list[str]:
+    """Versions winget reports as installed, newest listing order preserved.
+
+    `winget list` prints a table whose Version column is the installed one:
+
+        Name        Id                 Version Available Source
+        Crowdin CLI Crowdin.CrowdinCLI 5.0.1   5.3.0     winget
+
+    Empty when winget is missing, knows nothing about it, or the CLI arrived
+    some other way -- the Crowdin docs also offer a plain installer.
+    """
+    if not shutil.which('winget'):
+        return []
+    try:
+        result = subprocess.run(
+            ['winget', 'list', '--id', CROWDIN_WINGET_ID, '--exact'],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=120,
+            stdin=subprocess.DEVNULL,
+            shell=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if result.returncode != 0:
+        return []
+
+    versions = []
+    for line in (result.stdout or '').splitlines():
+        if CROWDIN_WINGET_ID not in line:
+            continue
+        after = line.split(CROWDIN_WINGET_ID, 1)[1].split()
+        if after and _major_minor(after[0]) is not None:
+            versions.append(after[0])
+    return versions
+
+
+def shadowed_by_other_major(installed: str | None, pinned: str | None) -> str | None:
+    """The pinned major sitting installed while another major answers on PATH.
+
+    Installing again would not help: the one that was wanted is already there,
+    and PATH reaches the other one first. Returns the version to get rid of.
+    """
+    if not installed or not pinned:
+        return None
+    got, want = _major_minor(installed), _major_minor(pinned)
+    if got is None or want is None or got[0] == want[0]:
+        return None
+
+    for version in winget_crowdin_versions():
+        known = _major_minor(version)
+        if known is not None and known[0] == want[0]:
+            return installed
+    return None
+
+
 def crowdin_cli_state(installed: str | None, pinned: str | None) -> str:
     """One of: no_pin, missing, match, patch, minor, major, unknown.
 
@@ -142,9 +206,14 @@ def resolved_task_path(runner, script: str, attr: str) -> Path | None:
 
 
 def report_crowdin_cli(state: str, installed: str | None, pinned: str | None,
-                       blocking: bool) -> int:
+                       blocking: bool, shadowed: str | None = None) -> int:
     """Returns the number of problems. Only a missing CLI or a major version
-    difference blocks; anything else is worth saying once and moving on."""
+    difference blocks; anything else is worth saying once and moving on.
+
+    `shadowed` is the version to get rid of when the pinned one is installed
+    but an older major answers on PATH first. Worked out by the caller, since
+    finding it costs a winget call and reporting should not shell out.
+    """
     if state in ('no_pin', 'match'):
         if state == 'match':
             logger.success(f'Crowdin CLI {installed} matches the pinned version.')
@@ -154,19 +223,37 @@ def report_crowdin_cli(state: str, installed: str | None, pinned: str | None,
     say = logger.error if fatal else logger.warning
 
     if state == 'missing':
-        say(
-            f'Crowdin CLI not found on PATH. This task list uploads to Crowdin '
-            f'and needs {pinned}. Run {UPDATE_SCRIPT} to install it.'
+        where = (
+            'This task list uploads to Crowdin and needs'
             if blocking
-            else f'Crowdin CLI not found on PATH. Uploads need {pinned}. '
-            f'Run {UPDATE_SCRIPT} to install it.'
+            else 'Uploads need'
+        )
+        say(
+            f'Crowdin CLI not found on PATH. {where} {pinned}. '
+            f'Run {UPDATE_SCRIPT} to install it, or:\n'
+            f'    winget install --id {CROWDIN_WINGET_ID} -e --version {pinned}'
         )
     elif state == 'major':
-        say(
-            f'Crowdin CLI is {installed}, but these tools are tested against '
-            f'{pinned}: that is a different major version and the upload '
-            f'commands may have changed. Run {UPDATE_SCRIPT}.'
-        )
+        if shadowed:
+            say(
+                f'Crowdin CLI {pinned} is installed, but {installed} is what '
+                f'PATH finds first ({crowdin_cli_path()}), and that is a '
+                'different major version. Installing again will not help. '
+                'Remove the old one:\n'
+                f'    winget uninstall --id {CROWDIN_WINGET_ID} -e '
+                f'--version {shadowed}\n'
+                'If winget says there is nothing to uninstall, it was '
+                'installed some other way: remove it through Apps & features, '
+                'or take it off PATH.'
+            )
+        else:
+            say(
+                f'Crowdin CLI is {installed}, but these tools are tested '
+                f'against {pinned}: that is a different major version and the '
+                f'upload commands may have changed. Run {UPDATE_SCRIPT}, or:\n'
+                f'    winget install --id {CROWDIN_WINGET_ID} -e '
+                f'--version {pinned}'
+            )
     elif state == 'unknown':
         say(
             f'Cannot compare Crowdin CLI {installed} with the pinned {pinned}. '
@@ -257,7 +344,11 @@ def check_before_running(runner, tasks: list[dict]) -> int:
         pinned = pinned_crowdin_cli_version()
         installed = installed_crowdin_cli_version()
         problems += report_crowdin_cli(
-            crowdin_cli_state(installed, pinned), installed, pinned, blocking=True
+            crowdin_cli_state(installed, pinned),
+            installed,
+            pinned,
+            blocking=True,
+            shadowed=shadowed_by_other_major(installed, pinned),
         )
 
     if 'ue' in needs:
