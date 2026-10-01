@@ -16,11 +16,11 @@ from loguru import logger
 
 from libraries import environment as env
 
-PINNED = '5.0.1'
+PINNED = '5.3.0'
 
 WINGET_TABLE = """Name        Id                 Version Available Source
 -------------------------------------------------------
-Crowdin CLI Crowdin.CrowdinCLI 5.0.1   5.3.0     winget
+Crowdin CLI Crowdin.CrowdinCLI 5.3.0   5.3.0     winget
 """
 
 
@@ -85,23 +85,28 @@ def test_a_winget_that_fails_is_not_an_answer(monkeypatch):
 # --- the pinned version installed, an older one answering
 
 
-def test_an_older_major_on_path_over_the_pinned_one_is_spotted(monkeypatch):
+@pytest.mark.parametrize('on_path', ['4.15.1', '5.0.1'])
+def test_another_version_answering_over_the_pinned_one_is_spotted(
+    monkeypatch, on_path
+):
+    """A major apart or a minor apart: either way the pinned one is already
+    there and PATH reaches the other first."""
     monkeypatch.setattr(env, 'winget_crowdin_versions', lambda: [PINNED])
 
-    assert env.shadowed_by_other_major('4.15.1', PINNED) == '4.15.1'
+    assert env.shadowed_install(on_path, PINNED) == on_path
 
 
-def test_nothing_is_shadowed_when_the_pinned_major_is_not_installed(monkeypatch):
+def test_nothing_is_shadowed_when_the_pin_is_not_installed(monkeypatch):
     """Then installing is exactly the right move."""
     monkeypatch.setattr(env, 'winget_crowdin_versions', lambda: ['4.15.1'])
 
-    assert env.shadowed_by_other_major('4.15.1', PINNED) is None
+    assert env.shadowed_install('4.15.1', PINNED) is None
 
 
-def test_the_matching_major_is_not_a_shadow(monkeypatch):
+def test_the_pinned_version_itself_is_not_a_shadow(monkeypatch):
     monkeypatch.setattr(env, 'winget_crowdin_versions', lambda: [PINNED])
 
-    assert env.shadowed_by_other_major('5.3.0', PINNED) is None
+    assert env.shadowed_install(PINNED, PINNED) is None
 
 
 # --- what the messages actually say
@@ -149,7 +154,7 @@ def install_calls(monkeypatch, gc, installed, shadowed=None):
     calls = []
     monkeypatch.setattr(gc, 'pinned_crowdin_cli_version', lambda: PINNED)
     monkeypatch.setattr(gc, 'installed_crowdin_cli_version', lambda: installed)
-    monkeypatch.setattr(gc, 'shadowed_by_other_major', lambda i, p: shadowed)
+    monkeypatch.setattr(gc, 'shadowed_install', lambda i, p: shadowed)
     monkeypatch.setattr(
         gc, 'install_crowdin_cli', lambda v: calls.append(v) or True
     )
@@ -177,8 +182,18 @@ def test_a_shadowed_install_is_reported_rather_than_repeated(monkeypatch, gc):
     assert calls == []
 
 
-def test_a_minor_difference_is_left_alone(monkeypatch, gc):
-    calls = install_calls(monkeypatch, gc, installed='5.3.0')
+def test_a_minor_difference_is_installed_over_too(monkeypatch, gc):
+    """Pinning is the point. Left alone, the machine never catches up and the
+    advice is to run the script that just declined."""
+    calls = install_calls(monkeypatch, gc, installed='5.0.1')
+
+    gc.check_crowdin_cli(install_missing=True)
+
+    assert calls == [PINNED]
+
+
+def test_the_pinned_version_is_left_alone(monkeypatch, gc):
+    calls = install_calls(monkeypatch, gc, installed=PINNED)
 
     assert gc.check_crowdin_cli(install_missing=True) is True
     assert calls == []

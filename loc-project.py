@@ -24,7 +24,7 @@ from loguru import logger
 from typing_extensions import Annotated as A
 
 from libraries.environment import (
-    shadowed_by_other_major,
+    shadowed_install,
     CROWDIN_WINGET_ID,
     crowdin_cli_state,
     installed_crowdin_cli_version,
@@ -227,15 +227,18 @@ def check_crowdin_cli(install_missing: bool = False) -> bool:
     installed = installed_crowdin_cli_version()
     state = crowdin_cli_state(installed, pinned)
 
-    shadowed = (
-        shadowed_by_other_major(installed, pinned) if state == 'major' else None
-    )
+    # Anything that is not the pinned version is installed over. Pinning is
+    # the point: a minor difference left in place is a machine that never
+    # catches up, and the advice was to run the script asking the question.
+    mismatched = state not in ('match', 'no_pin')
+    shadowed = shadowed_install(installed, pinned) if mismatched else None
 
-    if install_missing and pinned and state in ('missing', 'major') and not shadowed:
+    if install_missing and pinned and mismatched and not shadowed:
         return install_crowdin_cli(pinned)
 
     report_crowdin_cli(state, installed, pinned, blocking=False, shadowed=shadowed)
     return state not in ('missing', 'major')
+
 
 
 def load_for_checking(

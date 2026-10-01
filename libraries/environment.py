@@ -117,23 +117,15 @@ def winget_crowdin_versions() -> list[str]:
     return versions
 
 
-def shadowed_by_other_major(installed: str | None, pinned: str | None) -> str | None:
-    """The pinned major sitting installed while another major answers on PATH.
+def shadowed_install(installed: str | None, pinned: str | None) -> str | None:
+    """The pinned version sitting installed while another answers on PATH.
 
     Installing again would not help: the one that was wanted is already there,
     and PATH reaches the other one first. Returns the version to get rid of.
     """
-    if not installed or not pinned:
+    if not installed or not pinned or installed == pinned:
         return None
-    got, want = _major_minor(installed), _major_minor(pinned)
-    if got is None or want is None or got[0] == want[0]:
-        return None
-
-    for version in winget_crowdin_versions():
-        known = _major_minor(version)
-        if known is not None and known[0] == want[0]:
-            return installed
-    return None
+    return installed if pinned in winget_crowdin_versions() else None
 
 
 def crowdin_cli_state(installed: str | None, pinned: str | None) -> str:
@@ -233,27 +225,24 @@ def report_crowdin_cli(state: str, installed: str | None, pinned: str | None,
             f'Run {UPDATE_SCRIPT} to install it, or:\n'
             f'    winget install --id {CROWDIN_WINGET_ID} -e --version {pinned}'
         )
+    elif shadowed:
+        say(
+            f'Crowdin CLI {pinned} is installed, but {installed} is what PATH '
+            f'finds first ({crowdin_cli_path()}). Installing again will not '
+            'help. Remove the one in the way:\n'
+            f'    winget uninstall --id {CROWDIN_WINGET_ID} -e '
+            f'--version {shadowed}\n'
+            'If winget says there is nothing to uninstall, it was installed '
+            'some other way: remove it through Apps & features, or take it '
+            'off PATH.'
+        )
     elif state == 'major':
-        if shadowed:
-            say(
-                f'Crowdin CLI {pinned} is installed, but {installed} is what '
-                f'PATH finds first ({crowdin_cli_path()}), and that is a '
-                'different major version. Installing again will not help. '
-                'Remove the old one:\n'
-                f'    winget uninstall --id {CROWDIN_WINGET_ID} -e '
-                f'--version {shadowed}\n'
-                'If winget says there is nothing to uninstall, it was '
-                'installed some other way: remove it through Apps & features, '
-                'or take it off PATH.'
-            )
-        else:
-            say(
-                f'Crowdin CLI is {installed}, but these tools are tested '
-                f'against {pinned}: that is a different major version and the '
-                f'upload commands may have changed. Run {UPDATE_SCRIPT}, or:\n'
-                f'    winget install --id {CROWDIN_WINGET_ID} -e '
-                f'--version {pinned}'
-            )
+        say(
+            f'Crowdin CLI is {installed}, but these tools are tested against '
+            f'{pinned}: that is a different major version and the upload '
+            f'commands may have changed. Run {UPDATE_SCRIPT}, or:\n'
+            f'    winget install --id {CROWDIN_WINGET_ID} -e --version {pinned}'
+        )
     elif state == 'unknown':
         say(
             f'Cannot compare Crowdin CLI {installed} with the pinned {pinned}. '
@@ -262,7 +251,8 @@ def report_crowdin_cli(state: str, installed: str | None, pinned: str | None,
     else:
         say(
             f'Crowdin CLI is {installed}, these tools are tested against '
-            f'{pinned}. Run {UPDATE_SCRIPT} to line them up.'
+            f'{pinned}. Run {UPDATE_SCRIPT} to line them up, or:\n'
+            f'    winget install --id {CROWDIN_WINGET_ID} -e --version {pinned}'
         )
 
     return 1 if fatal else 0
@@ -348,7 +338,7 @@ def check_before_running(runner, tasks: list[dict]) -> int:
             installed,
             pinned,
             blocking=True,
-            shadowed=shadowed_by_other_major(installed, pinned),
+            shadowed=shadowed_install(installed, pinned),
         )
 
     if 'ue' in needs:
