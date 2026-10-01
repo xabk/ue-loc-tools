@@ -406,6 +406,16 @@ script-parameters:
     # folder per target, since that is the layout the download expects.
     subfolder_per_target: Yes
 
+    # An upload only adds and updates files, so Crowdin keeps a file after its
+    # content moves or is deleted in UE. After the upload, report the files in
+    # each target's own folder on Crowdin that this run did not produce.
+    # Nothing outside those folders is looked at, so files that don't come
+    # from UE are safe. Needs subfolder_per_target; skipped for a branch.
+    report_stale_files: Yes
+    # Delete the reported files. Use in a task list of its own with
+    # cli_dry_run: Yes, so you can read the report before anything goes.
+    delete_stale_files: No
+
     cli_csv_first_line_is_header: Yes
     cli_csv_scheme: 'identifier,source_phrase,translation,max_length,labels,context'
 

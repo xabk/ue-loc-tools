@@ -80,6 +80,14 @@ class UpdateSourceFile(LocTask):
 
     branch: str | None = None
 
+    # An upload only adds and updates, so Crowdin keeps a file after its
+    # content moves or is deleted in UE. After the upload, list the files in
+    # each target's folder on Crowdin that this run did not produce. Only
+    # those folders: anything else on Crowdin may not come from UE at all.
+    # Needs subfolder_per_target, since the root is shared with other files.
+    report_stale_files: bool = True
+    delete_stale_files: bool = False  # Delete the files it reports
+
     # TODO: Do I need this here? Or rather in smth from uetools lib?
     content_dir: str = '../'
     temp_dir: str = 'Localization/~Temp/FilesToUpload'
@@ -493,6 +501,95 @@ class UpdateSourceFile(LocTask):
         )
         return False
 
+    def uploaded_file_names(self, target: str) -> set[str]:
+        """Names of the files this run uploads into the target's folder."""
+        if target not in (self.csv_loc_targets or []):
+            return {f'{target}.po'}
+
+        csv_path = self._temp_path / (self.cli_source_dir or '')
+        csv_path = csv_path / (self.csv_dir or '') / target
+        return {p.name for p in csv_path.glob('*.csv')}
+
+    def stale_files(self, crowdin) -> dict[str, list[dict]]:
+        """Files in each target's Crowdin folder that this run did not upload."""
+        directories = crowdin.source_files.with_fetch_all().list_directories(
+            projectId=self.project_id
+        )['data']
+        # Top-level, outside any branch: where the CLI config puts each target
+        folders = {
+            d['data']['name']: d['data']['id']
+            for d in directories
+            if d['data']['directoryId'] is None and d['data']['branchId'] is None
+        }
+
+        stale = {}
+        for target in [*(self.loc_targets or []), *(self.csv_loc_targets or [])]:
+            uploaded = self.uploaded_file_names(target)
+            if not uploaded:
+                logger.warning(
+                    f'Stale files: no local files for {target}, so not checking '
+                    'its folder. Everything in it would look stale.'
+                )
+                continue
+            if target not in folders:
+                continue
+
+            files = crowdin.source_files.with_fetch_all().list_files(
+                projectId=self.project_id, directoryId=folders[target]
+            )['data']
+            stale[target] = [
+                f['data'] for f in files if f['data']['name'] not in uploaded
+            ]
+
+        return stale
+
+    def report_stale_files_on_crowdin(self) -> bool:
+        if self.branch:
+            logger.info('Stale files: not checked for a branch upload.')
+            return True
+        if not self.subfolder_per_target:
+            logger.warning(
+                'Stale files: not checked, because subfolder_per_target is off '
+                'and the targets share the root with files that are not ours.'
+            )
+            return True
+
+        crowdin = UECrowdinClient(
+            self.token, logger, self.organization, self.project_id, silent=True
+        )
+        stale = self.stale_files(crowdin)
+
+        if not any(stale.values()):
+            logger.success('Stale files: none on Crowdin.')
+            return True
+
+        for target, files in stale.items():
+            for f in files:
+                logger.warning(
+                    f'Stale file on Crowdin: {f["path"]} '
+                    f'(last updated {str(f["updatedAt"])[:10]})'
+                )
+
+        if not self.delete_stale_files:
+            logger.info(
+                'Stale files: nothing deleted. Set delete_stale_files to delete them.'
+            )
+            return True
+
+        deleted_all = True
+        for files in stale.values():
+            for f in files:
+                try:
+                    crowdin.source_files.delete_file(
+                        projectId=self.project_id, fileId=f['id']
+                    )
+                    logger.success(f'Deleted stale file: {f["path"]}')
+                except Exception as e:
+                    logger.error(f'Could not delete {f["path"]}: {e}')
+                    deleted_all = False
+
+        return deleted_all
+
     def update_source_files(self):
         # TODO: Rewrite without API
         if self.cli_prep_files:
@@ -635,6 +732,10 @@ class UpdateSourceFile(LocTask):
                 f'Error while running Crowdin CLI command. Return code: {return_code}'
             )
             return False
+
+        if self.report_stale_files or self.delete_stale_files:
+            if not self.report_stale_files_on_crowdin():
+                return False
 
         logger.success(
             f'Targets processed ({len(targets_processed)}): {targets_processed}'
