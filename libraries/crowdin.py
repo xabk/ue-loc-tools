@@ -5,39 +5,6 @@ import json
 import re
 from pathlib import Path
 
-# The most rows Crowdin returns for one request.
-PAGE_LIMIT = 500
-
-
-def fetch_all_pages(fetch):
-    """Collect every row of a paginated Crowdin listing.
-
-    The client resolves `limit = limit or self.page_size` and its page_size is
-    25, so a listing called without a limit quietly returns the first 25 rows
-    and nothing says the rest exist. Projects here hold dozens to hundreds of
-    files, so the tail was being dropped: a file past the 25th could not be
-    found by name, and a directory past the 25th was created a second time
-    instead of being reused.
-
-    `fetch` takes `offset` and `limit` and returns the raw response. A response
-    with no `data` field is handed straight back, so callers can report it the
-    way they already do.
-    """
-    rows = []
-    while True:
-        response = fetch(offset=len(rows), limit=PAGE_LIMIT)
-
-        if not isinstance(response, dict) or 'data' not in response:
-            return response
-
-        page = response['data']
-        rows += page
-
-        # A short page is the last one. An empty page ends it too, which also
-        # stops a server that keeps answering a past-the-end offset.
-        if len(page) < PAGE_LIMIT:
-            return rows
-
 
 class UECrowdinClient(CrowdinClient):
     def __init__(
@@ -101,24 +68,22 @@ class UECrowdinClient(CrowdinClient):
         return None
 
     def update_file_list_and_project_data(self):
-        files = fetch_all_pages(
-            lambda offset, limit: self.source_files.list_files(
-                projectId=self.project_id, offset=offset, limit=limit
-            )
+        # with_fetch_all, or the client fills in its page size of 25 and the
+        # listing comes back with only its first 25 rows.
+        self.file_list = (
+            self.source_files.with_fetch_all()
+            .list_files(projectId=self.project_id)
+            .get('data', None)
         )
-        self.file_list = files if isinstance(files, list) else None
 
         self.data['project_data'] = self.projects.get_project(
             projectId=self.project_id
         ).get('data', None)
 
-        languages = fetch_all_pages(
-            lambda offset, limit: self.languages.list_supported_languages(
-                offset=offset, limit=limit
-            )
-        )
         self.data['supported_languages'] = (
-            languages if isinstance(languages, list) else None
+            self.languages.with_fetch_all()
+            .list_supported_languages()
+            .get('data', None)
         )
 
         if (
@@ -152,16 +117,14 @@ class UECrowdinClient(CrowdinClient):
     def get_or_create_directory(self, dir, create: bool = True):
         if not dir:
             return None
-        r = fetch_all_pages(
-            lambda offset, limit: self.source_files.list_directories(
-                projectId=self.project_id, offset=offset, limit=limit
-            )
+        r = self.source_files.with_fetch_all().list_directories(
+            projectId=self.project_id
         )
-        if not isinstance(r, list):
+        if 'data' not in r:
             self.error(f'No data in list directories response. Response: {r}')
             return r
 
-        directories = {d['data']['name']: d['data']['id'] for d in r}
+        directories = {d['data']['name']: d['data']['id'] for d in r['data']}
 
         if directories and dir in directories:
             return directories[dir]
