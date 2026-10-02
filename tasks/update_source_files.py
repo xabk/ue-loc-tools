@@ -31,7 +31,9 @@ class UpdateSourceFile(LocTask):
     )  # Localization targets, empty = process all targets
 
     delete_criteria: list | None = None
-    delete_unsafe_whitespace: bool = False
+    # Targets to strip leading and trailing whitespace from before upload.
+    # Any other target is uploaded as the gather produced it.
+    delete_whitespace_targets: list[str] = field(default_factory=list)
     # Longest source text logged for an entry delete_criteria removes.
     # A removed EULA otherwise fills the log. 0 = no limit.
     log_text_limit: int = 500
@@ -239,6 +241,8 @@ class UpdateSourceFile(LocTask):
 
         csv_path.mkdir(parents=True, exist_ok=True)
 
+        strip_whitespace = target in self.delete_whitespace_targets
+
         csv_data = {}
 
         if self.split_csv_rules:
@@ -263,7 +267,7 @@ class UpdateSourceFile(LocTask):
                         if cat not in csv_data:
                             csv_data[cat] = []
                         src = entry.msgid
-                        if self.delete_unsafe_whitespace:
+                        if strip_whitespace:
                             src = src.strip()
                         csv_data[cat].append(
                             [
@@ -285,7 +289,7 @@ class UpdateSourceFile(LocTask):
                 labels = ''
                 maxlength = ''
                 src = entry.msgid
-                if self.delete_unsafe_whitespace:
+                if strip_whitespace:
                     src = src.strip()
                 csv_data[po_path.stem].append(
                     [

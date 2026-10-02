@@ -198,7 +198,7 @@ def test_a_fixed_output_name_needs_no_capture_group(tmp_path):
 
 
 def test_whitespace_is_stripped_in_both_branches(tmp_path):
-    """delete_unsafe_whitespace was honoured only for entries that matched a
+    """Stripping was honoured only for entries that matched a
     split rule; the ones that fell through to {target}.csv kept their leading
     space, so the same setting gave two different answers in one file."""
     from libraries import polib
@@ -212,16 +212,16 @@ def test_whitespace_is_stripped_in_both_branches(tmp_path):
 
     task = UpdateSourceFile()
     task.csv_dir = ''
-    task.delete_unsafe_whitespace = True
+    task.delete_whitespace_targets = ['Narrative']
     task.split_csv_rules = [['msgctxt', '^[^/,]*/(.*?),.*?$', '']]
 
-    task.write_bilingual_csv(str(po_path), dir=tmp_path / 'out')
+    task.write_bilingual_csv(str(po_path), 'Narrative', dir=tmp_path / 'out')
 
     import csv as _csv
     import io as _io
 
     rows = {}
-    for p in (tmp_path / 'out').glob('*.csv'):
+    for p in (tmp_path / 'out').rglob('*.csv'):
         for r in _csv.DictReader(_io.open(p, encoding='utf-8-sig', newline='')):
             rows[r['Key']] = r['SourceString']
 

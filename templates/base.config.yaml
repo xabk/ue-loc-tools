@@ -442,7 +442,9 @@ script-parameters:
     split_csv_rules: [
         [msgctxt, '([^,]*),.*', ''], # (string_table),key → {string_table}.csv
       ] # The lines that don't match any of these rules will be saved in {target}.csv
-    delete_unsafe_whitespace: No
+    # Targets to strip leading and trailing whitespace from before upload.
+    # Any other target is uploaded as the gather produced it.
+    delete_whitespace_targets: []
 
     delete_criteria:
       # This will delete any entries that match any of the criteria before uploading
