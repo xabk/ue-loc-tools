@@ -433,6 +433,10 @@ script-parameters:
       #  - - 'field' = PO entry field to search (msgctxt, msgid, msgstr, comment)
       #   - 'RegEx' = regex to use for checking
 
+    # Each removed entry is logged with its source text, cut to this many
+    # characters so a long EULA doesn't fill the log. 0 = all of it.
+    log_text_limit: 500
+
     temp_dir: 'Localization/~Temp'
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###

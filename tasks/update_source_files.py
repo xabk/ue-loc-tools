@@ -32,6 +32,9 @@ class UpdateSourceFile(LocTask):
 
     delete_criteria: list | None = None
     delete_unsafe_whitespace: bool = False
+    # Longest source text logged for an entry delete_criteria removes.
+    # A removed EULA otherwise fills the log. 0 = no limit.
+    log_text_limit: int = 500
 
     csv_loc_targets: list[str] | None = None
     csv_dir: str = 'CSVs'
@@ -165,6 +168,11 @@ class UpdateSourceFile(LocTask):
 
         return config
 
+    def clip_for_log(self, text: str) -> str:
+        if not self.log_text_limit or len(text) <= self.log_text_limit:
+            return text
+        return f'{text[: self.log_text_limit]}… ({len(text)} chars)'
+
     def need_delete_entry(self, entry: polib.POEntry) -> bool:
         for [prop, crit] in self.delete_criteria:
             if re.search(crit, getattr(entry, prop)):
@@ -189,7 +197,7 @@ class UpdateSourceFile(LocTask):
             if self.need_delete_entry(entry):
                 logger.info(
                     f'Removed: {fpath.name} / {entry.msgctxt} @ '
-                    f'{entry.comment}\n{entry.msgid}'
+                    f'{entry.comment}\n{self.clip_for_log(entry.msgid)}'
                 )
                 continue
             new_po.append(entry)

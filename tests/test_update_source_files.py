@@ -227,3 +227,24 @@ def test_whitespace_is_stripped_in_both_branches(tmp_path):
 
     assert rows['Narrative/Alien,Bar'] == 'matched'
     assert rows[',NoNamespace'] == 'fell through'
+
+
+def test_a_long_text_is_cut_for_the_log_and_says_how_long_it_was():
+    task = UpdateSourceFile()
+    task.log_text_limit = 10
+
+    assert task.clip_for_log('a' * 25) == 'aaaaaaaaaa… (25 chars)'
+
+
+def test_a_text_within_the_log_limit_is_logged_whole():
+    task = UpdateSourceFile()
+    task.log_text_limit = 10
+
+    assert task.clip_for_log('a' * 10) == 'a' * 10
+
+
+def test_a_log_limit_of_zero_logs_everything():
+    task = UpdateSourceFile()
+    task.log_text_limit = 0
+
+    assert task.clip_for_log('a' * 70000) == 'a' * 70000
