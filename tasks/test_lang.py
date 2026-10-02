@@ -897,9 +897,9 @@ class ProcessTestAndHashLocales(LocTask):
 
         if self.sort_by_key:
             po.sort(
-                key=lambda x: 'Z' * 100 + x.msgctxt
-                if x.msgctxt.startswith(',')
-                else x.msgctxt
+                key=lambda x: (
+                    'Z' * 100 + x.msgctxt if x.msgctxt.startswith(',') else x.msgctxt
+                )
             )
 
         # --- This is only needed for CSVs?
@@ -918,12 +918,11 @@ class ProcessTestAndHashLocales(LocTask):
 
             if odd_strings:
                 logger.warning(
-                    f'Translated lines with no IDs in them ({len(odd_strings)}):'
+                    f'Translated lines with no IDs in them ({len(odd_strings)}), '
+                    'giving them new IDs:'
                 )
                 for entry in odd_strings:
-                    logger.warning(
-                        '\n'.join([entry.msgctxt, entry.msgid, entry.msgstr])
-                    )
+                    logger.warning(f'{entry.msgctxt}\n{entry.msgid}\n{entry.msgstr}')
 
         logger.info(f'Starting ID: {current_id}')
 
@@ -931,37 +930,40 @@ class ProcessTestAndHashLocales(LocTask):
 
         # Iterate over all entries to generate debug IDs, patch and add comments
         for entry in po:
-            variables = []
+            variables = [str(var) for var in re.findall(self.var_regex, entry.msgid)]
 
-            # If we want to retranslate all entries or if entry is not translated
-            if self.clear_translations or not entry.translated():
-                variables = [
-                    str(var) for var in re.findall(self.var_regex, entry.msgid)
-                ]
+            # Keep an entry's ID only if it has a valid one. Starting over,
+            # untranslated, or a msgstr with no ID in it: mint the next free one
+            existing = None
+            if not self.clear_translations and entry.translated():
+                existing = re.search(self._id_regex, entry.msgstr)
 
-                # Generate and save the ID
+            if existing:
+                number = int(existing.group(1))
+            else:
+                number = current_id
+                current_id += 1
                 entry.msgstr = self.id_gen(
-                    number=current_id,
+                    number=number,
                     text=entry.msgid if self.debug_id_include_source else None,
                     variables=variables,
                 )
-                debug_ID = 'Debug ID:\t' + self.id_gen(
-                    number=current_id, variables=variables, separator=' '
-                )
 
-                current_id += 1
-            else:
-                debug_ID = 'Debug ID:\t' + entry.msgstr
+            # ID and variables only: with debug_id_include_source the msgstr
+            # also carries the source text, which the comment leaves out
+            debug_ID = 'Debug ID:\t' + self.id_gen(
+                number=number, variables=variables, separator=' '
+            )
 
             asset_name = ''
 
             for comment in entry.comment.splitlines(False):
-                if comment.startswith('SourceLocation:') or comment.startswith('Loc:'):
-                    if asset_name := re.search(
-                        r'/([^/]+?\.(cpp|h|csv))(\(\d+\))?$', comment
-                    ):
-                        asset_name = asset_name[1]
-                    elif asset_name := re.search(r'/([^.]+)\.\1', comment):
+                if comment.startswith(('SourceLocation:', 'Loc:')):
+                    if (
+                        asset_name := re.search(
+                            r'/([^/]+?\.(cpp|h|csv))(\(\d+\))?$', comment
+                        )
+                    ) or (asset_name := re.search(r'/([^.]+)\.\1', comment)):
                         asset_name = asset_name[1]
                     break
 
@@ -985,7 +987,9 @@ class ProcessTestAndHashLocales(LocTask):
                         and len(self.remove_source_loc_prefixes) > 0
                     ):
                         # Optional: a path without a listed prefix is still renamed
-                        pattern += '(' + '|'.join(self.remove_source_loc_prefixes) + ')?'
+                        pattern += (
+                            '(' + '|'.join(self.remove_source_loc_prefixes) + ')?'
+                        )
                     comment = re.sub(pattern, 'Loc:\t', comment)
                 if comment.startswith('Debug ID:'):
                     continue

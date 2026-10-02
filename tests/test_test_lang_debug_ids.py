@@ -211,3 +211,66 @@ def test_an_id_is_recognised_whatever_follows_it(id_regex, msgstr):
 def test_something_that_is_not_an_id_is_not_matched(id_regex):
     for msgstr in ('Just a translation', '?abc', '?0012', ''):
         assert not re.search(id_regex, msgstr)
+
+
+def debug_id_comment(po_file):
+    po = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')
+    return next(ln for ln in po[0].comment.splitlines() if ln.startswith('Debug ID:'))
+
+
+def test_an_existing_id_comment_leaves_the_source_text_out(task, tmp_path):
+    """The msgstr carries the text when debug_id_include_source is on, and the
+    comment used to copy it whole: a removed EULA logged pages of it. The
+    comment is the ID and the variables only, same as for a new entry."""
+    po_file = write_po(
+        tmp_path / 'Game.po',
+        [(',KEY1', 'Touch {0}', '?00124:Touch {0}:<{0}>')],
+    )
+
+    task.process_debug_ID_locale(po_file, 1)
+
+    assert debug_id_comment(po_file) == 'Debug ID:\t?00124 <{0}>'
+
+
+def test_a_new_and_an_existing_entry_get_the_same_kind_of_comment(task, tmp_path):
+    po_file = write_po(tmp_path / 'Game.po', [(',KEY1', 'Some text', '')])
+    task.process_debug_ID_locale(po_file, 1)
+    minted = debug_id_comment(po_file)
+
+    # Second pass: now the entry has an ID from the first one
+    task.process_debug_ID_locale(po_file, 1)
+
+    assert debug_id_comment(po_file) == minted == 'Debug ID:\t?00001'
+
+
+@pytest.mark.parametrize(
+    'msgstr', ['Not an ID', 'Some text', '?12:Too short to be an ID']
+)
+def test_a_translation_without_a_valid_id_gets_the_next_free_one(
+    task, tmp_path, msgstr
+):
+    """The debug locale is only ever IDs, so anything else in it is replaced
+    rather than carried along."""
+    po_file = write_po(tmp_path / 'Game.po', [(',KEY1', 'Some text', msgstr)])
+
+    last_used = task.process_debug_ID_locale(po_file, 7)
+
+    po = polib.pofile(po_file, wrapwidth=0, encoding='utf-8-sig')
+    assert po[0].msgstr == '?00007:Some text'
+    assert debug_id_comment(po_file) == 'Debug ID:\t?00007'
+    assert last_used >= 7
+
+
+def test_only_the_entries_without_an_id_take_new_ones(task, tmp_path):
+    po_file = write_po(
+        tmp_path / 'Game.po',
+        [
+            (',KEY1', 'One', '?00003:One'),
+            (',KEY2', 'Two', 'Garbage'),
+            (',KEY3', 'Three', ''),
+        ],
+    )
+
+    task.process_debug_ID_locale(po_file, 10)
+
+    assert debug_ids_in(po_file) == ['?00003', '?00010', '?00011']
