@@ -32,6 +32,13 @@ class UpdateSourceFile(LocTask):
 
     delete_criteria: list | None = None
     delete_unsafe_whitespace: bool = False
+    # Targets whose edge whitespace is meaningful and must reach the CAT tool
+    # as gathered. Whether a leading space is a typo or part of the string is
+    # a per-target convention, and nothing here can infer it: one target's
+    # subtitles carry a space its sources are expected to drop, while another
+    # renders ' / {time}' with it. Stripping the second kind silently changes
+    # what ships; sending the first kind replaces every string on the server.
+    keep_whitespace_targets: list[str] = field(default_factory=list)
     # Longest source text logged for an entry delete_criteria removes.
     # A removed EULA otherwise fills the log. 0 = no limit.
     log_text_limit: int = 500
@@ -239,6 +246,15 @@ class UpdateSourceFile(LocTask):
 
         csv_path.mkdir(parents=True, exist_ok=True)
 
+        strip_whitespace = self.delete_unsafe_whitespace and (
+            target not in self.keep_whitespace_targets
+        )
+        if self.delete_unsafe_whitespace and not strip_whitespace:
+            logger.info(
+                f'{target}: keeping edge whitespace, as keep_whitespace_targets '
+                'says it is meaningful here.'
+            )
+
         csv_data = {}
 
         if self.split_csv_rules:
@@ -263,7 +279,7 @@ class UpdateSourceFile(LocTask):
                         if cat not in csv_data:
                             csv_data[cat] = []
                         src = entry.msgid
-                        if self.delete_unsafe_whitespace:
+                        if strip_whitespace:
                             src = src.strip()
                         csv_data[cat].append(
                             [
@@ -285,7 +301,7 @@ class UpdateSourceFile(LocTask):
                 labels = ''
                 maxlength = ''
                 src = entry.msgid
-                if self.delete_unsafe_whitespace:
+                if strip_whitespace:
                     src = src.strip()
                 csv_data[po_path.stem].append(
                     [
