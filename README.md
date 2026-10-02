@@ -162,7 +162,9 @@ Add `-u` to run unattended, without the confirmation prompt: `!loc-sync.bat "<ta
 
 Other useful flags: `--list-tasks` prints the individual tasks and their
 descriptions, and `--debug` turns on verbose logging. Logs go to
-`logs/locsync.log` next to your config.
+`logs/` next to your config, one file per launch
+(`locsync_<date>_<time>.log`), with the last 20 kept. Each run prints its log path
+at the start and the end.
 
 ## Configuration
 By default, `base.config.yaml` contains several task lists tailored for different scenarios. Take a look at them and adjust to your needs.

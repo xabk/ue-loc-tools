@@ -85,7 +85,8 @@ def run(
     ] = False,
 ):
     """Primary entry point (no subcommand). Future subcommands can be added without changing usage."""
-    init_logging(debug)
+    log_file = init_logging(debug)
+    logger.info(f'Log for this run: {log_file}')
     overrides = {
         'token': token,
         'organization': organization,
@@ -144,6 +145,7 @@ def run(
         results = runner.run_task_list(tasks)
         total_duration = timer() - total_start
         code = runner.summarize(results, total_duration)
+        logger.info(f'Log for this run: {log_file}')
 
         if unattended or tasklist:
             raise typer.Exit(code=code)

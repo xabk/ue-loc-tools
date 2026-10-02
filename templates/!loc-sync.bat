@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 @echo Running the loc-sync script in interactive mode.
 @echo.
-@echo See logs/locsync.log for logs.
+@echo The log for this run goes to the logs folder: its path is printed below.
 @echo.
 @echo ------------------------------------------------------------
 @echo Checking if `uv` is installed...

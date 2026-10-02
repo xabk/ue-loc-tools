@@ -212,7 +212,9 @@ contain a whole bunch of warnings and non-critical errors. Don't be afraid of th
 
 However, if a script crashes with an exception or if it prints that a task has failed, 
 or if you see return code that isn't zero, then something's off. 
-Logs are located in the `logs` folder next to this guide: `logs/locsync.log`.
+Logs are located in the `logs` folder next to this guide, one file per run:
+`logs/locsync_<date>_<time>.log`. Each run prints its log path at the start
+and the end, and the last 20 are kept.
 
 # Adding new localization targets
 If you want to add new localization targets:

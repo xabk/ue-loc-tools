@@ -381,7 +381,7 @@ class UnrealLocGatherCommandlet(LocTask):
 
 
 def main():
-    init_logging()
+    log_file = init_logging()
 
     logger.info('')
     logger.info('--- Unreal gather text commandlet script ---')
@@ -399,7 +399,7 @@ def main():
         logger.info('')
         return 0
 
-    logger.error('Error occured, please see the Content/Python/Logs/locsync.log')
+    logger.error(f'Error occured, please see the log: {log_file}')
     return 1
 
 

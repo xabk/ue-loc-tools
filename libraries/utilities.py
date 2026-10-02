@@ -3,6 +3,7 @@
 
 import stat
 import sys
+from datetime import datetime
 from pathlib import Path
 import yaml
 from dataclasses import asdict, dataclass, fields
@@ -32,7 +33,25 @@ def remove_read_only(func, path, _exc):
     func(path)
 
 
-def init_logging(verbose: bool = False) -> None:
+LOG_DIR = Path('logs')
+LOGS_TO_KEEP = 20
+
+
+def prune_logs(log_dir: Path, keep: int) -> None:
+    """Delete all but the newest `keep` run logs. The names sort by start time.
+    A log another run still has open can't be deleted, and stays."""
+    logs = sorted(log_dir.glob('locsync_*.log'))
+    for old in logs[: max(len(logs) - keep, 0)]:
+        try:
+            old.unlink()
+        except OSError:
+            pass
+
+
+def init_logging(verbose: bool = False) -> Path:
+    """One log file per launch, named by its start time, and the newest
+    LOGS_TO_KEEP kept. A run's log is never renamed while it is open.
+    Returns the path of this launch's log."""
     logger.remove()
     level = 'TRACE' if verbose else 'INFO'
     # Redirected stdout defaults to the locale encoding, and UE logs CJK
@@ -46,15 +65,18 @@ def init_logging(verbose: bool = False) -> None:
         '<level>{message}</level>',
         level=level,
     )
+    LOG_DIR.mkdir(exist_ok=True)
+    # Room for this launch's file among the ones kept
+    prune_logs(LOG_DIR, LOGS_TO_KEEP - 1)
+    log_file = LOG_DIR / f'locsync_{datetime.now().astimezone():%Y-%m-%d_%H-%M-%S}.log'
     logger.add(
-        'logs/locsync.log',
-        rotation='30MB',
-        retention='1 month',
+        str(log_file),
         enqueue=True,
         format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
         level='TRACE',
         encoding='utf-8',
     )
+    return log_file.resolve()
 
 
 @dataclass

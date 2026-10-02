@@ -4,7 +4,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from loguru import logger
 
-from libraries.utilities import LocTask
+from libraries.utilities import LocTask, init_logging
 from libraries.crowdin import UECrowdinClient
 
 
@@ -155,15 +155,7 @@ class UpdateCommunityCredits(LocTask):
 
 
 def main():
-    logger.add(
-        'logs/locsync.log',
-        rotation='10MB',
-        retention='1 month',
-        enqueue=True,
-        format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
-        level='INFO',
-        encoding='utf-8',
-    )
+    init_logging()
 
     logger.info(
         '--- Create and process reports on Crowdin, create CSV for in-game credits ---'
