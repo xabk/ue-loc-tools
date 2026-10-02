@@ -89,8 +89,27 @@ def test_a_clean_run_succeeds(task):
     assert task.verdict(0, 22967, 22967, 0, no_assets=2, duration=204.0) is True
 
 
-def test_a_nonzero_exit_code_fails(task):
+def test_a_nonzero_exit_code_alone_does_not_fail_a_complete_run(task):
+    """Unreal exits non-zero whenever anything logged an error during the run,
+    and a project of any size has broken assets the gather never touches. A
+    run that loaded every package it planned to has done its job."""
+    assert task.verdict(1, 22967, 22967, 0, no_assets=0, duration=1.0) is True
+
+
+def test_a_nonzero_exit_code_fails_when_the_exit_code_is_trusted(task):
+    task.trust_commandlet_exit_code = False
     assert task.verdict(1, 22967, 22967, 0, no_assets=0, duration=1.0) is False
+
+
+def test_a_short_load_with_a_nonzero_exit_fails(task):
+    """Neither signal condemns the run on its own -- a short count can be a
+    stale plan, a non-zero exit can be an unrelated asset -- but together they
+    say the run stopped part way through."""
+    assert task.verdict(1, 22967, 19000, 0, no_assets=0, duration=1.0) is False
+
+
+def test_a_short_load_on_a_clean_exit_still_passes(task):
+    assert task.verdict(0, 22967, 19000, 0, no_assets=0, duration=1.0) is True
 
 
 def test_failed_packages_warn_but_do_not_fail_the_task(task):

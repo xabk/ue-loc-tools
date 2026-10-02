@@ -65,6 +65,11 @@ class GatherStringTableReferences(LocTask):
     # before summarising the rest.
     missing_contexts_to_show: int = 3
 
+    # Unreal exits 1 if anything logged an error, including errors that have
+    # nothing to do with localization, so the commandlet's own accounting is
+    # the better signal. Set this False to fail on any non-zero exit instead.
+    trust_commandlet_exit_code: bool = True
+
     # Same shape as ue-loc-gather-cmd, so a project configures paths once.
     project_dir: str | None = None  # Absolute or relative to cwd
     engine_dir: str | None = None  # Absolute or relative to cwd
@@ -215,8 +220,15 @@ class GatherStringTableReferences(LocTask):
         missing: dict[tuple[str, str], list[str]] | None = None,
     ) -> bool:
         """The commandlet states its own failure count, so this leans on that
-        rather than inferring success from the absence of errors."""
-        if returncode != 0:
+        rather than inferring success from the absence of errors.
+
+        Unreal exits non-zero whenever anything logged an error during the
+        run, and on a project of any size that includes broken assets the
+        gather neither touches nor depends on. A run that loaded every package
+        it planned to has done its job, so the exit code is reported and set
+        aside; it only decides the verdict when the accounting is missing or
+        falls short."""
+        if not self.trust_commandlet_exit_code and returncode != 0:
             logger.error(f'{self.commandlet} exited with code {returncode}.')
             return False
 
@@ -235,6 +247,13 @@ class GatherStringTableReferences(LocTask):
             )
 
         if expected is not None and loaded != expected:
+            if returncode != 0:
+                logger.error(
+                    f'Planned to load {expected} packages but loaded {loaded}, '
+                    f'and Unreal exited {returncode}. The run stopped part way '
+                    'through.'
+                )
+                return False
             logger.warning(
                 f'Planned to load {expected} packages but loaded {loaded}.'
             )
@@ -247,6 +266,15 @@ class GatherStringTableReferences(LocTask):
             logger.info(
                 f'{no_assets} pass(es) matched no assets, which is expected when '
                 'a project has no source-code string references.'
+            )
+
+        if returncode != 0:
+            logger.warning(
+                f'{self.commandlet} loaded every one of its {loaded} packages, '
+                f'but Unreal exited {returncode}. Unreal does that when '
+                'anything logged an error during the run, including errors '
+                'unrelated to localization. Treating the run as successful: '
+                'check the log if the output looks wrong.'
             )
 
         logger.success(
