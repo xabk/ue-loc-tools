@@ -9,6 +9,7 @@ cannot finish. Keeping the resolution here means both agree on what counts as
 import re
 import shutil
 import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -304,10 +305,70 @@ def report_p4_settings(path: Path | None, blocking: bool) -> int:
     return 1 if blocking else 0
 
 
+# --------------------------- Windows path limit --------------------------- #
+
+# Windows refuses paths of 260 characters or more unless long paths are
+# enabled. uv installs past the limit without complaint, and Python then cannot
+# import from there: half the tasks go missing with "No module named
+# 'crowdin_api...'", and nothing points at the path.
+WINDOWS_MAX_PATH = 260
+# The deepest file in the venv relative to the venv folder (119 characters in
+# a crowdin_api __pycache__), plus room. Checked against the real venv in
+# tests/test_environment_paths.py, so a dependency that goes deeper fails there.
+VENV_DEEPEST_PATH = 130
+
+LONG_PATHS_KEY = r'SYSTEM\CurrentControlSet\Control\FileSystem'
+
+
+def current_venv() -> Path | None:
+    """The venv these tools run from, or None outside one."""
+    if sys.prefix == sys.base_prefix:
+        return None
+    return Path(sys.prefix).resolve()
+
+
+def long_paths_enabled() -> bool:
+    if sys.platform != 'win32':
+        return True
+    import winreg
+
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, LONG_PATHS_KEY) as key:
+            return winreg.QueryValueEx(key, 'LongPathsEnabled')[0] == 1
+    except OSError:
+        return False
+
+
+def report_venv_path_length(venv: Path | None, blocking: bool) -> int:
+    """Arithmetic only: the venv's own path plus its deepest file, so it costs
+    nothing and doesn't walk thousands of files on every run."""
+    if venv is None:
+        return 0
+    deepest = len(str(venv)) + 1 + VENV_DEEPEST_PATH
+    if deepest < WINDOWS_MAX_PATH or long_paths_enabled():
+        return 0
+
+    # Shorter by this much, at least, to get the deepest file under the limit
+    too_long_by = deepest - (WINDOWS_MAX_PATH - 1)
+
+    say = logger.error if blocking else logger.warning
+    say(
+        f'The workspace path is too long for Windows: files in {venv} reach '
+        f'about {deepest} characters, past its {WINDOWS_MAX_PATH}-character '
+        'limit. Python cannot load them, so tasks go missing with "No module '
+        'named ...". Move the workspace to a shorter path, at least '
+        f'{too_long_by} characters shorter, ideally close to the drive root '
+        r'(like D:\P4\ProjectName). Unreal works best on short paths too.'
+    )
+    return 1 if blocking else 0
+
+
 def warn_on_launch(runner) -> None:
     """Says once, at startup, whether the machine matches what these tools
     expect. Never blocks: the task list the user picks may not need any of it.
     """
+    report_venv_path_length(current_venv(), blocking=False)
+
     pinned = pinned_crowdin_cli_version()
     state = crowdin_cli_state(installed_crowdin_cli_version(), pinned)
     if state not in ('match', 'no_pin'):

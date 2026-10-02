@@ -27,11 +27,13 @@ from libraries.environment import (
     shadowed_install,
     CROWDIN_WINGET_ID,
     crowdin_cli_state,
+    current_venv,
     installed_crowdin_cli_version,
     pinned_crowdin_cli_version,
     report_crowdin_cli,
     report_p4_settings,
     report_unreal_binary,
+    report_venv_path_length,
     resolved_task_path,
 )
 from libraries.task_runner import (
@@ -288,7 +290,7 @@ def do_check_env(base_path: Path, secret_path: Path) -> int:
     runner, config = loaded
 
     used = tasks_in_use(config)
-    problems = 0
+    problems = report_venv_path_length(current_venv(), blocking=True)
 
     if 'ue-loc-gather-cmd' in used:
         problems += report_unreal_binary(
