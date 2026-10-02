@@ -17,7 +17,10 @@ from typing import Any
 import yaml
 from loguru import logger
 
+from fnmatch import fnmatch
+
 from libraries.utilities import LocTask
+from libraries.uetools import branch_name_from_build_version
 
 # Tasks module (used to import tasks as {TASKS_MODULE}.{task_name})
 TASKS_MODULE = 'tasks'
@@ -34,10 +37,15 @@ CONFIG_NON_TASK_SECTIONS = {'crowdin', 'parameters', 'script-parameters', 'tasks
 # Configuration keys
 CONFIG_KEY_STOP_ON_ERRORS = 'stop-on-errors'
 CONFIG_KEY_USE_UNREAL = 'use-unreal'
+CONFIG_KEY_SOURCE_UPDATE_BRANCHES = 'source-update-branches'
 
 # Keys under `parameters:` that the runner reads itself. Everything else there
 # is a default for the tasks and has to name a field on one of them.
-RUNNER_PARAMETERS = {CONFIG_KEY_STOP_ON_ERRORS, CONFIG_KEY_USE_UNREAL}
+RUNNER_PARAMETERS = {
+    CONFIG_KEY_STOP_ON_ERRORS,
+    CONFIG_KEY_USE_UNREAL,
+    CONFIG_KEY_SOURCE_UPDATE_BRANCHES,
+}
 
 # Accepted, and nothing acts on them. They are in every project's config and in
 # the template, two of them carrying a TODO, so they are not typos to be fixed
@@ -400,6 +408,40 @@ class TaskRunner:
             return False, duration, f'UE task execution failed: {e}'
 
     # -------------------- Helpers -------------------- #
+    def source_update_blocked(self, task_config: dict[str, Any]) -> str | None:
+        """Why this task may not update the source on a CAT tool, or None.
+
+        Keyed off the `updates-source` marker the task lists already carry, so
+        the policy covers every step that writes source rather than one task's
+        parameters, and a task's own settings cannot sidestep it.
+
+        An absent allow-list means no policy. A list that is set but cannot be
+        checked blocks: a guard that gives up when it cannot see is no guard.
+        """
+        if not task_config.get('updates-source'):
+            return None
+
+        params = self.config.get('parameters', {})
+        allowed = params.get(CONFIG_KEY_SOURCE_UPDATE_BRANCHES)
+        if not allowed:
+            return None
+
+        engine_dir = params.get('engine_dir', '.')
+        branch = branch_name_from_build_version(engine_dir)
+        if not branch:
+            return (
+                'no branch could be read from Engine/Build/Build.version under '
+                f'{engine_dir!r}, and {CONFIG_KEY_SOURCE_UPDATE_BRANCHES} is set'
+            )
+
+        if any(fnmatch(branch, pattern) for pattern in allowed):
+            return None
+
+        return (
+            f'this is branch {branch}, and '
+            f'{CONFIG_KEY_SOURCE_UPDATE_BRANCHES} allows only {allowed}'
+        )
+
     def _should_skip_task(self, task_config: dict[str, Any]) -> bool:
         if task_config.get('skip', False):
             return True
@@ -497,6 +539,18 @@ class TaskRunner:
                 print(
                     f'\n{COLOR_YELLOW}Warning: This task list contains tasks that update the source files.{COLOR_RESET}'
                 )
+                blocked = next(
+                    filter(
+                        None,
+                        map(self.source_update_blocked, self.config[task_list]),
+                    ),
+                    None,
+                )
+                if blocked:
+                    print(
+                        f'{COLOR_YELLOW}Those tasks will be refused: '
+                        f'{blocked}.{COLOR_RESET}'
+                    )
             conf = input(
                 f'\nEnter Y to execute task list {task_list.splitlines()[0].strip()}. Anything else to go back to task list selection... '
             )
@@ -517,6 +571,19 @@ class TaskRunner:
             logger.info(f'  Script: {script_name}')
             if self._should_skip_task(task_config):
                 results.append((task_config, 'Skipped', '—'))
+                continue
+            blocked = self.source_update_blocked(task_config)
+            if blocked:
+                logger.error(
+                    f'Task {i} updates the source, but {blocked}. '
+                    'Refusing to run it. Use a task list that does not '
+                    'update the source, or allow this branch in the config.'
+                )
+                results.append((task_config, '—', 'Blocked'))
+                if self.config.get('parameters', {}).get(
+                    CONFIG_KEY_STOP_ON_ERRORS, True
+                ):
+                    break
                 continue
             success, duration, _ = self.execute_task(task_config)
             status = 'Success' if success else 'Failed'
@@ -551,6 +618,7 @@ __all__ = [
     'DEFAULT_SECRET_CONFIG',
     'CONFIG_KEY_STOP_ON_ERRORS',
     'CONFIG_KEY_USE_UNREAL',
+    'CONFIG_KEY_SOURCE_UPDATE_BRANCHES',
     'RUNNER_PARAMETERS',
     'UNIMPLEMENTED_PARAMETERS',
 ]

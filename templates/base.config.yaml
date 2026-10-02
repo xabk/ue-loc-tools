@@ -97,6 +97,23 @@ parameters:
   # Launches scripts via unreal-cmd.exe to leverage the unreal.py
   use-unreal: True
 
+  # Which branches may update the source on Crowdin.
+  #
+  # Any task marked `updates-source: Yes` in a task list is refused unless the
+  # branch matches one of these. Leave it out and there is no policy: every
+  # branch may upload, which is the behaviour this tool has always had.
+  #
+  # The branch is read from Engine/Build/Build.version -- the one place that
+  # knows it without a Perforce connection, editor settings or a network, so
+  # it works on a build machine. That is the *engine's* branch, so this only
+  # discriminates where the engine and the game are synced from one stream;
+  # on a launcher-installed engine every branch reads the same.
+  #
+  # Patterns are globs. If the list is set and the branch cannot be read, the
+  # upload is refused: a guard that gives up when it cannot see is no guard.
+  #
+  # source-update-branches: ['++YourGame+rel-*']
+
   # Should we check out files from p4?
   # By default, it checks out the whole Localization folder.
   # You can also specify additional files for checkout in script settings below.

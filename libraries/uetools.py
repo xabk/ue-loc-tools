@@ -7,6 +7,22 @@ from dataclasses import dataclass
 from libraries.utilities import init_logging
 
 
+def branch_name_from_build_version(engine_path: Path | str) -> str | None:
+    """The branch an engine was synced from, as Engine/Build/Build.version
+    records it: `++Depot+branch`, e.g. `++FactoryGame+rel-main-ficsmas-2026`.
+
+    This is the one piece of branch identity available without a Perforce
+    connection, editor settings or a network, which is what a build machine
+    tends to have. It names the engine's branch, so it is the project's branch
+    only where the two are synced from the same stream.
+    """
+    path = Path(engine_path) / 'Engine' / 'Build' / 'Build.version'
+    try:
+        return json.loads(path.read_text(encoding='utf-8'))['BranchName'] or None
+    except Exception:
+        return None
+
+
 @dataclass
 class UELocTarget:
     """
@@ -921,6 +937,10 @@ class UEProject:
             return int(json.loads(path.read_text(encoding='utf-8'))['MajorVersion'])
         except Exception:
             return None
+
+    def branch_name(self) -> str | None:
+        """The branch this engine was synced from, or None if unreadable."""
+        return branch_name_from_build_version(self.engine_path)
 
     def _load_p4_settings(self, p4_config_path: Path):
         cfg = ConfigParser()
