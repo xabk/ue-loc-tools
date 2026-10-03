@@ -11,6 +11,20 @@ from libraries.utilities import LocTask
 from libraries.crowdin import UECrowdinClient
 from libraries.utilities import init_logging
 from libraries import polib
+from libraries.worddiff import colour_supported, word_diff
+
+
+def _log_both(prefix: str, plain: str, colour: str):
+    """The terminal gets the colours, the log file gets the markers. One
+    finding, two renderings, because a log file read later has no colours
+    and a terminal full of [-markers-] is harder to read than the colours.
+
+    depth=1 so both lines are attributed to the caller rather than to here.
+    """
+    logger.opt(depth=1).bind(log_only=True).warning(f'{prefix}{plain}')
+    logger.opt(depth=1).bind(console_only=True).warning(
+        f'{prefix}{colour if colour_supported() else plain}'
+    )
 
 
 def _truncate_for_logging(text: str, max_bytes: int = 65536, max_length: int = 1000) -> str:
@@ -412,8 +426,11 @@ class BuildAndDownloadTranslations(LocTask):
                     if key in per_locale[loc].source_mismatch
                 )
                 logger.warning(f'  {key}  ({spread(found_in)})')
-                logger.warning(f'      game    {po_src}')
-                logger.warning(f'      crowdin {csv_src}')
+                # crowdin is what the string was, game is what it became, so
+                # each line marks what is unique to it.
+                plain, colour = word_diff(csv_src, po_src)
+                _log_both('      crowdin ', plain[0], colour[0])
+                _log_both('      game    ', plain[1], colour[1])
 
         # Expected in every locale of a run: lines dropped on upload on
         # purpose, and strings the community project has not been given yet.

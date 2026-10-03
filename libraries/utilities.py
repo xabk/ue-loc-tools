@@ -64,6 +64,7 @@ def init_logging(verbose: bool = False) -> Path:
         '<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line:3d}</cyan> '
         '<level>{message}</level>',
         level=level,
+        filter=lambda r: not r['extra'].get('log_only'),
     )
     LOG_DIR.mkdir(exist_ok=True)
     # Room for this launch's file among the ones kept
@@ -75,6 +76,7 @@ def init_logging(verbose: bool = False) -> Path:
         format='{time:YYYY-MM-DD at HH:mm:ss} | {level} | {message}',
         level='TRACE',
         encoding='utf-8',
+        filter=lambda r: not r['extra'].get('console_only'),
     )
     return log_file.resolve()
 
