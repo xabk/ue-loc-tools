@@ -20,6 +20,26 @@ def _truncate_for_logging(text: str, max_bytes: int = 65536, max_length: int = 1
 
 
 @dataclass
+class ImportFindings:
+    """What importing one locale's CSVs into its PO turned up.
+
+    Collected rather than logged: every one of these is a fact about a
+    string, and the same string is usually found in most locales, so they
+    only read well once they are rolled up across the locales of a run.
+    """
+
+    csv_entries: int = 0
+    po_entries: int = 0
+    # key -> (source in the PO, source in the CSV)
+    source_mismatch: dict[str, tuple[str, str]] = field(default_factory=dict)
+    missing_from_crowdin: dict[str, str] = field(default_factory=dict)  # key -> source
+    stale_on_crowdin: dict[str, str] = field(default_factory=dict)  # key -> source
+    whitespace_ignored: set[str] = field(default_factory=set)
+    newlines_normalized: set[str] = field(default_factory=set)
+    mismatch_ignored: set[str] = field(default_factory=set)
+
+
+@dataclass
 class BuildAndDownloadTranslations(LocTask):
     # Declare Crowdin parameters to load them from config
     token: str | None = None
@@ -224,7 +244,7 @@ class BuildAndDownloadTranslations(LocTask):
 
     def load_csv_files_to_po(
         self, csv_files: list[Path], po_file: polib.POFile
-    ) -> bool:
+    ) -> ImportFindings:
         # Load all CSVs into a single dict
         csv_data = {}
         for csv_file in csv_files:
@@ -244,8 +264,7 @@ class BuildAndDownloadTranslations(LocTask):
                     }
 
         csv_length = len(csv_data)
-
-        logger.info(f'Loaded {csv_length} entries from {len(csv_files)} CSV files')
+        findings = ImportFindings(csv_entries=csv_length, po_entries=len(po_file))
 
         # Load CSV data into PO file, if the key exists
         # Delete CSV entry after loading it into PO
@@ -276,7 +295,7 @@ class BuildAndDownloadTranslations(LocTask):
                 self.normalize_newlines_in_translation
                 and '\r\n'.join(translation.splitlines()).strip() != translation.strip()
             ):
-                logger.warning(f'Normalized newlines in translation: {key}')
+                findings.newlines_normalized.add(key)
                 translation = '\r\n'.join(translation.splitlines())
 
             if po_source == csv_source:
@@ -300,7 +319,7 @@ class BuildAndDownloadTranslations(LocTask):
                 continue
 
             if self.ignore_source_mismatch:
-                logger.warning(f'Ignoring source string mismatch for key {key}')
+                findings.mismatch_ignored.add(key)
                 # Update the translation (if source is the same, or if we're ignoring the mismatch)
                 entry.msgstr = translation
                 del csv_data[key]
@@ -316,38 +335,124 @@ class BuildAndDownloadTranslations(LocTask):
             }
             del csv_data[key]
 
-        if skipped_due_to_mismatch:
-            logger.warning(
-                f'--- Skipped / Source mismatch ({len(skipped_due_to_mismatch)}):'
-            )
-            for key, data in skipped_due_to_mismatch.items():
-                logger.warning(
-                    f'{key}:\n{_truncate_for_logging(data["po"])}\n!=\n'
-                    f'{_truncate_for_logging(data["csv"])}'
-                )
-        if missing_in_CSV:
-            logger.warning(
-                f'--- Missing: PO entries not found in CSV ({len(missing_in_CSV)})'
-            )
-            for key, data in missing_in_CSV.items():
-                logger.warning(f'{key}:\n{_truncate_for_logging(data["source"])}')
-        if csv_data:
-            logger.warning(
-                f'--- Missing: CSV entries not found in PO ({len(csv_data)})'
-            )
-            for key, data in csv_data.items():
-                logger.warning(f'{key}:\n{_truncate_for_logging(data["source"])}')
+        findings.source_mismatch = {
+            key: (data['po'], data['csv'])
+            for key, data in skipped_due_to_mismatch.items()
+        }
+        findings.missing_from_crowdin = {
+            key: data['source'] for key, data in missing_in_CSV.items()
+        }
+        findings.stale_on_crowdin = {
+            key: data['source'] for key, data in csv_data.items()
+        }
+        findings.whitespace_ignored = set(ignored_unsafe_whitespace_mismatch)
 
-        logger.info(f'CSV entries loaded {csv_length}')
-        logger.info(f'PO entries loaded {len(po_file)}')
-        logger.info(f'Skipped due to mismatch {len(skipped_due_to_mismatch)}')
+        return findings
+
+    def report_import(self, target: str, per_locale: dict[str, ImportFindings]):
+        """One report per target, rolled up across that target's locales.
+
+        A finding is about a string, and the same string turns up in most of
+        the locales, so reporting per locale says the same thing dozens of
+        times and never says the thing worth knowing: how many locales it
+        affects. The roll-up stays inside one target of one project, because
+        two projects return different locale sets and pooling them invents
+        gaps that are not there.
+        """
+        locales = sorted(per_locale)
+        n = len(locales)
+        if not n:
+            return
+
+        def spread(found_in: set[str]) -> str:
+            if len(found_in) == n:
+                return f'all {n} locales'
+            shown = ', '.join(sorted(found_in)[:5])
+            more = f', +{len(found_in) - 5}' if len(found_in) > 5 else ''
+            return f'{len(found_in)}/{n} locales: {shown}{more}'
+
+        def by_key(attr: str) -> dict[str, set[str]]:
+            out: dict[str, set[str]] = {}
+            for locale, f in per_locale.items():
+                for key in getattr(f, attr):
+                    out.setdefault(key, set()).add(locale)
+            return out
+
+        mismatch = by_key('source_mismatch')
+        missing = by_key('missing_from_crowdin')
+        stale = by_key('stale_on_crowdin')
+        whitespace = by_key('whitespace_ignored')
+        newlines = by_key('newlines_normalized')
+        first = per_locale[locales[0]]
+
+        logger.info(f'--- project {self.project_id} · {target} · {n} locale(s)')
         logger.info(
-            f'Ignored unsafe whitespace mismatch {len(ignored_unsafe_whitespace_mismatch)}'
+            f'    CSV entries {first.csv_entries}    PO entries {first.po_entries}'
         )
-        logger.info(f'Missing in CSV {len(missing_in_CSV)}')
-        logger.info(f'Missing in PO {len(csv_data)}')
+        logger.info(
+            f'    source mismatch {len(mismatch)}    missing from Crowdin '
+            f'{len(missing)}    stale on Crowdin {len(stale)}'
+        )
+        ignored = by_key('mismatch_ignored')
+        logger.info(
+            f'    whitespace ignored {len(whitespace)}    newlines normalized '
+            f'{len(newlines)}    mismatch ignored {len(ignored)}'
+        )
 
-        return True
+        # A translation was thrown away. Always worth a warning, always listed.
+        if mismatch:
+            logger.warning(
+                f'{len(mismatch)} string(s) kept their old translation dropped, '
+                'because the source on Crowdin no longer matches the game:'
+            )
+            for key, found_in in sorted(mismatch.items()):
+                po_src, csv_src = next(
+                    per_locale[loc].source_mismatch[key]
+                    for loc in locales
+                    if key in per_locale[loc].source_mismatch
+                )
+                logger.warning(f'  {key}  ({spread(found_in)})')
+                logger.warning(f'      game    {po_src}')
+                logger.warning(f'      crowdin {csv_src}')
+
+        # Expected in every locale of a run: lines dropped on upload on
+        # purpose, and strings the community project has not been given yet.
+        # In a subset it cannot be explained by either, so it is a warning.
+        if missing:
+            whole = {k: v for k, v in missing.items() if len(v) == n}
+            partial = {k: v for k, v in missing.items() if len(v) != n}
+            if whole:
+                logger.info(
+                    f'{len(whole)} string(s) absent from Crowdin in all {n} '
+                    "locale(s) (filtered out before upload, or the new source "
+                    "hasn't been uploaded yet):"
+                )
+                for key in sorted(whole):
+                    logger.info(f'  {key}')
+            if partial:
+                logger.warning(
+                    f'{len(partial)} string(s) absent from Crowdin in SOME '
+                    'locales but not others. The source is the same for every '
+                    'language, so this should not be possible:'
+                )
+                for key, found_in in sorted(partial.items()):
+                    logger.warning(f'  {key}  ({spread(found_in)})')
+
+        # Crowdin still holds a string the game no longer gathers.
+        if stale:
+            logger.warning(
+                f'{len(stale)} string(s) on Crowdin that the game no longer '
+                'gathers (removed or renamed in the game, the gather missed '
+                "them, or this project's source is out of date). Translators "
+                'may still be working on them:'
+            )
+            for key, found_in in sorted(stale.items()):
+                logger.warning(f'  {key}  ({spread(found_in)})')
+
+        if not mismatch and not stale:
+            logger.success(
+                f'project {self.project_id} · {target}: nothing needs attention.'
+            )
 
     def process_csv_target(self, target: str) -> bool:
         logger.info(f'---\nProcessing CSV localization target: {target}')
@@ -386,6 +491,7 @@ class BuildAndDownloadTranslations(LocTask):
         logger.info('Generating PO files...')
 
         processed = []
+        per_locale: dict[str, ImportFindings] = {}
         directories = [f for f in (self._temp_path / target).glob('*') if f.is_dir()]
         for dir in directories:
             csv_files = [f for f in dir.glob('*.csv')]
@@ -394,10 +500,10 @@ class BuildAndDownloadTranslations(LocTask):
                 locale = self.culture_mappings[locale]
             dst_path = dest_path / locale / f'{target}.po'
             if csv_files and dst_path.exists():
-                logger.info(f'Processing locale {locale} ({len(csv_files)} CSV files)')
                 pofile = polib.pofile(dst_path, wrapwidth=0, encoding=self.po_encoding)
-                if self.load_csv_files_to_po(csv_files, pofile):
-                    logger.info(f'Saving {dst_path}')
+                findings = self.load_csv_files_to_po(csv_files, pofile)
+                if findings is not None:
+                    per_locale[locale] = findings
                     pofile.save()
                     processed += [dir.name]
                 else:
@@ -405,7 +511,8 @@ class BuildAndDownloadTranslations(LocTask):
             else:
                 logger.warning(f'Skip: {str(dir)} → {dst_path} / {dst_path.exists()}')
 
-        logger.info(f'Locales processed ({len(processed)}): {processed}\n')
+        logger.info(f'Locales processed ({len(processed)}): {processed}')
+        self.report_import(target, per_locale)
 
         if len(processed) > 0:
             return True
