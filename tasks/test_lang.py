@@ -48,6 +48,15 @@ class ProcessTestAndHashLocales(LocTask):
     add_context_fields: list[str] | None = None
     skip_other_fields: bool = False
 
+    # Which metadata fields the gather wrote reach the translator, by name:
+    # Key, Loc, and whatever InfoMetaData a project puts on its string tables
+    # -- Tag and Type on one, Description and Mood on another. None keeps
+    # everything, which is what this has always done; [] keeps none.
+    #
+    # The debug ID is prepended before this runs, and Refs, Used in, labels
+    # and the external context are added after it, so none are affected.
+    keep_metadata_fields: list[str] | None = None
+
     # TODO Remove and make part of external context
     # Localization targets from which to load string table references
     string_table_refs_targets: list | None = None
@@ -257,6 +266,29 @@ class ProcessTestAndHashLocales(LocTask):
             if re.match(expr, comment):
                 return True
         return False
+
+    @staticmethod
+    def metadata_field_name(comment: str) -> str | None:
+        """The metadata field a comment line carries, or None if the line is
+        not written as `Field: value`. A continuation line is not a field, so
+        it is never judged on its own: it stands or falls with the field whose
+        value it belongs to."""
+        match = re.match(r'^([^:	]+):', comment)
+        return match[1].strip() if match else None
+
+    @staticmethod
+    def metadata_field_value(comment: str) -> str:
+        """What an unwrapped `Field: value` line carries, stripped."""
+        _, _, value = comment.partition(':')
+        return value.strip()
+
+    def should_keep_metadata_field(self, comment: str) -> bool:
+        if self.keep_metadata_fields is None:
+            return True
+        name = self.metadata_field_name(comment)
+        if name is None:
+            return True
+        return name in self.keep_metadata_fields
 
     def load_string_table_refs_from_file(self, fpath: str) -> StringContextList:
         """
@@ -993,16 +1025,27 @@ class ProcessTestAndHashLocales(LocTask):
                     comment = re.sub(pattern, 'Loc:\t', comment)
                 if comment.startswith('Debug ID:'):
                     continue
-                if self.should_delete_comment(comment):
-                    continue
                 if comment.startswith('Label:\t'):
                     continue
+
                 if comment.startswith('InfoMetaData:\t'):
-                    # Remove prefix, remove quotes around field name and value,
-                    # unescape internal quotes
+                    # Remove prefix, remove quotes around field name and
+                    # value, unescape internal quotes
                     comment = comment.partition('InfoMetaData:\t')[2]
                     comment = re.sub(r'^"(.*?)" : "(.*?)"$', r'\1: \2', comment)
                     comment = comment.replace('\\"', '"')
+                    # A column with no value says nothing, and every
+                    # project carried the same regex to be rid of these.
+                    if not self.metadata_field_value(comment):
+                        continue
+                    if not self.should_keep_metadata_field(comment):
+                        continue
+
+                # Judged last, on the line as it will read in the context:
+                # a criterion names the field the way a translator sees it,
+                # not the way the gather happened to write it.
+                if self.should_delete_comment(comment):
+                    continue
                 if comment not in new_comments:
                     new_comments.append(comment)
 
