@@ -8,7 +8,9 @@ like progress rather than a hang.
 
 import re
 
+from libraries.findings import Findings
 from tasks.ue_loc_gather_cmd import (
+    MISSING_ENTRIES,
     MISSING_ST_ENTRY,
     PROGRESS,
     UnrealLocGatherCommandlet,
@@ -99,16 +101,6 @@ def test_a_fast_run_is_not_padded_by_the_heartbeat():
     assert len(shown(quick)) == 101
 
 
-def test_missing_entries_are_named_once_with_their_reference_count():
-    text = captured(task().report_missing_entries, {('Menus_UI', 'Foo/Bar'): 3})
-    assert 'Menus_UI,Foo/Bar' in text
-    assert '(3 references)' in text
-
-
-def test_nothing_is_logged_when_nothing_is_missing():
-    assert captured(task().report_missing_entries, {}) == ''
-
-
 def test_a_failed_run_says_where_it_stopped():
     """Only the position: the lines themselves are already in the log."""
     text = captured(task().report_where_it_stopped, (73.2, 'Gathering', '/Game/Foo'))
@@ -117,3 +109,62 @@ def test_a_failed_run_says_where_it_stopped():
 
 def test_nothing_is_claimed_when_there_is_nothing_to_claim():
     assert captured(task().report_where_it_stopped, None) == ''
+
+
+
+COLLISION = (
+    "LogGatherTextFromAssetsCommandlet: Warning: Package '/Game/A/Build_Pipe' "
+    "and '/Game/B/Build_Pipeline' have the same localization ID "
+    "(8FC8078C4AE6323D1E17EB8D3FBA8278). Please reset one of these."
+)
+SOURCE_WARNING = (
+    'LogGatherTextFromSourceCommandlet: Warning: Source/Foo/Public/Bar.h'
+)
+ENGINE_NOISE = 'LogEOSSDK: Warning: LogEOSP2P: Leave all connections'
+
+
+def collected(lines, package=None):
+    t = task()
+    t.findings = Findings()
+    for line in lines:
+        t.collect(line, package)
+    return t.findings
+
+
+def test_a_missing_entry_is_keyed_by_what_is_wrong():
+    f = collected([MISSING])
+    assert len(f) == 1
+    assert list(f.by_key)[0][1] == 'Menus_UI,Players/Messages/YouGotKicked'
+
+
+def test_the_asset_is_recorded_when_there_is_one():
+    f = collected([MISSING], package='/Game/FactoryGame/Profiling/Map_UI-Profile')
+    assert 'in /Game/FactoryGame/Profiling/Map_UI-Profile' in str(list(f.by_key.values())[0].detail)
+
+
+def test_the_same_entry_from_two_places_is_one_finding():
+    """Reported once per occurrence, and the first one with an asset keeps it."""
+    f = collected([MISSING])
+    f.add(MISSING_ENTRIES, 'Menus_UI,Players/Messages/YouGotKicked', 'in /Game/Foo')
+    assert len(f) == 1
+    only = list(f.by_key.values())[0]
+    assert only.occurrences == 2 and only.detail == 'in /Game/Foo'
+
+
+def test_a_collision_is_keyed_on_the_pair_either_way_round():
+    f = collected([COLLISION])
+    key = list(f.by_key)[0][1]
+    assert key == '/Game/A/Build_Pipe and /Game/B/Build_Pipeline'
+
+
+def test_a_gather_warning_is_collected():
+    assert len(collected([SOURCE_WARNING])) == 1
+
+
+def test_an_engine_warning_is_not_this_tools_business():
+    """Forty-odd categories log during a gather; only the pipeline's count."""
+    assert len(collected([ENGINE_NOISE])) == 0
+
+
+def test_an_ordinary_line_is_collected_as_nothing():
+    assert len(collected(['LogGatherTextCommandlet: Display: all fine'])) == 0
