@@ -13,6 +13,7 @@
 
 import subprocess as subp
 import re
+from time import monotonic
 from pathlib import Path
 from loguru import logger
 
@@ -24,6 +25,12 @@ COMMANDLET_VERDICT = r'GatherText completed with exit code (-?\d+)'
 CONFIG_STARTED = r"Beginning GatherText Commandlet for '"
 STEP_STARTED = r'Executing GatherTextStep\d+:'
 STEP_COMPLETED = r'Completed GatherTextStep\d+:'
+# One line per package, and a large project has a hundred thousand of them:
+# `[ 12.3%] Gathering package: '/Game/Foo/Bar'...`
+PROGRESS = r"\[\s*([\d.]+)%\]\s*(\w+) package: '([^']*)'"
+# A reference to a string table entry that does not exist. The text falls
+# back to its key on screen, so it is a content bug worth naming.
+MISSING_ST_ENTRY = r"Failed to find string table entry for '([^']*)' '([^']*)'"
 
 
 @dataclass
@@ -67,6 +74,16 @@ class UnrealLocGatherCommandlet(LocTask):
             'LogLinker: ',
         ]
     )
+
+    # The commandlet announces every package it loads and gathers. The
+    # console is told once per this many percent instead.
+    progress_step: int = 1
+
+    # The console shows a progress line every progress_step percent, and at
+    # least this often while the commandlet is working, so a package that
+    # takes a while to load still looks like progress rather than a hang.
+    # The log file keeps every line either way.
+    progress_heartbeat: float = 1.0
 
     _config_pattern: str = 'Config/Localization/{loc_target}_{task}.ini'
     _content_path: Path | None = None
@@ -224,53 +241,101 @@ class UnrealLocGatherCommandlet(LocTask):
         configs_started = 0
         steps_started = 0
         steps_completed = 0
+        # The percentage the console has been told about, and when.
+        next_percent = 0.0
+        last_shown = 0.0
+        last_package = None
+        # (string table, key) -> how many times it was referenced
+        missing_entries: dict[tuple[str, str], int] = {}
 
-        with subp.Popen(
-            commands,
-            stdout=subp.PIPE,
-            stderr=subp.STDOUT,
-            cwd=self._engine_path,
-            universal_newlines=True,
-            encoding='utf-8',
-            errors='replace',
-        ) as process:
-            while True:
-                for line in process.stdout:
-                    skip = False
-                    for item in self.log_to_skip:
-                        if item in line:
-                            skip = True
-                    if skip:
-                        continue
+        try:
+            with subp.Popen(
+                commands,
+                stdout=subp.PIPE,
+                stderr=subp.STDOUT,
+                cwd=self._engine_path,
+                universal_newlines=True,
+                encoding='utf-8',
+                errors='replace',
+            ) as process:
+                while True:
+                    for line in process.stdout:
+                        skip = False
+                        for item in self.log_to_skip:
+                            if item in line:
+                                skip = True
+                        if skip:
+                            continue
 
-                    line = re.sub(r'^\[[^]]+]', '', line.strip())
+                        line = re.sub(r'^\[[^]]+]', '', line.strip())
+                        # Everything, throttled or not, in case this is the run
+                        # that stops without explaining itself.
 
-                    verdict = re.search(COMMANDLET_VERDICT, line)
-                    if verdict:
-                        commandlet_codes.append(int(verdict.group(1)))
-                    elif re.search(CONFIG_STARTED, line):
-                        configs_started += 1
-                    elif re.search(STEP_STARTED, line):
-                        steps_started += 1
-                    elif re.search(STEP_COMPLETED, line):
-                        steps_completed += 1
+                        verdict = re.search(COMMANDLET_VERDICT, line)
+                        if verdict:
+                            commandlet_codes.append(int(verdict.group(1)))
+                        elif re.search(CONFIG_STARTED, line):
+                            configs_started += 1
+                        elif re.search(STEP_STARTED, line):
+                            steps_started += 1
+                        elif re.search(STEP_COMPLETED, line):
+                            steps_completed += 1
 
-                    if 'Error: ' in line:
-                        errors += 1
-                        logger.error(f'| UE | {line.strip()}')
-                    elif 'Warning: ' in line:
-                        logger.warning(f'| UE | {line.strip()}')
-                    else:
-                        logger.info(f'| UE | {line.strip()}')
-                if process.poll() is not None:
-                    break
-            returncode = process.returncode
+                        progress = re.search(PROGRESS, line)
+                        if progress:
+                            percent = float(progress.group(1))
+                            last_package = (percent, progress.group(2),
+                                            progress.group(3))
+                            # The log keeps every one of these: it is the
+                            # record of what the commandlet did. The console
+                            # gets enough of them to show it is alive.
+                            logger.bind(log_only=True).info(f'| UE | {line}')
+                            now = monotonic()
+                            if (
+                                percent >= next_percent
+                                or now - last_shown >= self.progress_heartbeat
+                            ):
+                                logger.bind(console_only=True).info(f'| UE | {line}')
+                                next_percent = (
+                                    int(percent // self.progress_step) + 1
+                                ) * self.progress_step
+                                last_shown = now
+                            continue
 
-            logger.info(
-                f'Unreal loc gather commandlet finished with return code: {returncode}'
-            )
+                        # Counted for the summary and kept in the stream,
+                        # where the commandlet raised it. Logged as a
+                        # warning whichever way Unreal worded it: the
+                        # same missing entry arrives as Display: in some
+                        # contexts and Warning: in others.
+                        missing = re.search(MISSING_ST_ENTRY, line)
+                        if missing:
+                            key = (missing.group(1), missing.group(2))
+                            missing_entries[key] = missing_entries.get(key, 0) + 1
+                            logger.warning(f'| UE | {line.strip()}')
+                            continue
 
-        return self.task_succeeded(
+                        if 'Error: ' in line:
+                            errors += 1
+                            logger.error(f'| UE | {line.strip()}')
+                        elif 'Warning: ' in line:
+                            logger.warning(f'| UE | {line.strip()}')
+                        else:
+                            logger.info(f'| UE | {line.strip()}')
+                    if process.poll() is not None:
+                        break
+                returncode = process.returncode
+
+                logger.info(
+                    f'Unreal loc gather commandlet finished with return code: {returncode}'
+                )
+        except (OSError, subp.SubprocessError) as err:
+            logger.error(f'Reading the commandlet output failed: {err}')
+            self.report_where_it_stopped(last_package)
+            return False
+
+        self.report_missing_entries(missing_entries)
+
+        succeeded = self.task_succeeded(
             returncode,
             commandlet_codes,
             errors,
@@ -278,6 +343,37 @@ class UnrealLocGatherCommandlet(LocTask):
             steps_started,
             steps_completed,
         )
+        if not succeeded:
+            self.report_where_it_stopped(last_package)
+        return succeeded
+
+    def report_where_it_stopped(self, last_package):
+        """Where the commandlet got to, for a run that failed. Only the
+        position: every line it wrote is in the log file already."""
+        if last_package:
+            percent, verb, package = last_package
+            logger.error(
+                f'The last package it reached was {package!r}, '
+                f'{verb.lower()} at {percent:.0f}%.'
+            )
+
+    def report_missing_entries(self, missing: dict[tuple[str, str], int]):
+        """String table entries that are referenced but do not exist.
+
+        One missing entry is usually referenced from several places, and the
+        commandlet says so once per reference, so they are counted and named
+        once each instead."""
+        if not missing:
+            return
+        references = sum(missing.values())
+        logger.warning(
+            f'{len(missing)} string table entr(ies) are referenced but do not '
+            f'exist, from {references} place(s). The text falls back to its '
+            'key on screen:'
+        )
+        for (table, key), count in sorted(missing.items()):
+            times = '' if count == 1 else f'  ({count} references)'
+            logger.warning(f'  {table},{key}{times}')
 
     def incomplete_run(
         self, configs_started: int, steps_started: int, steps_completed: int
