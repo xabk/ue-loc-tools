@@ -599,10 +599,19 @@ class TaskRunner:
         self, results: list[tuple[dict[str, Any], str, str]], total_duration: float
     ) -> int:
         logger.info(f'\nTask execution summary (Total: {total_duration:.2f}s):')
+        # Each line at the level of its own outcome: a summary read at a
+        # glance should not make a failed step look like a finished one.
+        say = {
+            'Success': logger.success,
+            'Failed': logger.error,
+            'Blocked': logger.error,
+        }
         for task_config, duration, status in results:
             script_name = task_config['script']
             task_name, _ = self.get_task_metadata(script_name)
-            logger.info(f'  {task_name} ({script_name}): {duration} - {status}')
+            say.get(status, logger.info)(
+                f'  {task_name} ({script_name}): {duration} - {status}'
+            )
         return 0 if all(r[2] in ['Success', 'Skipped'] for r in results) else 1
 
 
