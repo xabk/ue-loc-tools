@@ -8,7 +8,7 @@ Marker shapes here are taken from a real Rabbithole run: 22967 packages,
 import pytest
 
 from libraries.findings import Findings
-from libraries.ue_findings import MISSING_ENTRIES
+from libraries.ue_findings import MISSING_ENTRIES, collect
 from tasks.ue_gather_references import (
     MISSING_BANNER,
     MISSING_REFERENCE,
@@ -241,3 +241,15 @@ def test_nothing_is_reported_when_nothing_is_missing(task, capture_logs):
     task.findings.report()
 
     assert not capture_logs
+
+
+def test_the_no_assets_line_belongs_to_the_verdict():
+    """The verdict counts these passes and says they are expected, so the
+    run loop consumes the line before collect() can file it as a finding."""
+    line = (
+        'LogGatherStringTableReferencesCommandlet: Warning: '
+        'No assets matched the specified criteria.'
+    )
+
+    assert re.search(NO_ASSETS, line)
+    assert collect(Findings(), line), 'would be a finding if it got this far'

@@ -165,7 +165,10 @@ class GatherStringTableReferences(LocTask):
                         )
 
                     if re.search(NO_ASSETS, line):
+                        # The verdict accounts for these, so they are not findings.
                         no_assets += 1
+                        logger.warning(f'| UE | {line}')
+                        continue
 
                     progress = PROGRESS.search(line)
                     if progress:
