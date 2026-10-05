@@ -9,9 +9,8 @@ like progress rather than a hang.
 import re
 
 from libraries.findings import Findings
+from libraries.ue_findings import MISSING_ENTRIES, MISSING_ST_ENTRY, collect
 from tasks.ue_loc_gather_cmd import (
-    MISSING_ENTRIES,
-    MISSING_ST_ENTRY,
     PROGRESS,
     UnrealLocGatherCommandlet,
 )
@@ -59,7 +58,7 @@ def test_loading_and_gathering_are_both_progress():
 
 
 def test_a_missing_entry_yields_its_table_and_key():
-    assert re.search(MISSING_ST_ENTRY, MISSING).groups() == (
+    assert MISSING_ST_ENTRY.search(MISSING).groups() == (
         'Menus_UI', 'Players/Messages/YouGotKicked')
 
 
@@ -124,11 +123,10 @@ ENGINE_NOISE = 'LogEOSSDK: Warning: LogEOSP2P: Leave all connections'
 
 
 def collected(lines, package=None):
-    t = task()
-    t.findings = Findings()
+    f = Findings()
     for line in lines:
-        t.collect(line, package)
-    return t.findings
+        collect(f, line, package)
+    return f
 
 
 def test_a_missing_entry_is_keyed_by_what_is_wrong():
@@ -139,16 +137,21 @@ def test_a_missing_entry_is_keyed_by_what_is_wrong():
 
 def test_the_asset_is_recorded_when_there_is_one():
     f = collected([MISSING], package='/Game/FactoryGame/Profiling/Map_UI-Profile')
-    assert 'in /Game/FactoryGame/Profiling/Map_UI-Profile' in str(list(f.by_key.values())[0].detail)
+    assert list(f.by_key.values())[0].contexts == {
+        'in /Game/FactoryGame/Profiling/Map_UI-Profile'
+    }
 
 
 def test_the_same_entry_from_two_places_is_one_finding():
-    """Reported once per occurrence, and the first one with an asset keeps it."""
+    """One entry, however many times and wherever it was reported: every
+    place that knew one is kept, and the ones that knew none add nothing."""
     f = collected([MISSING])
     f.add(MISSING_ENTRIES, 'Menus_UI,Players/Messages/YouGotKicked', 'in /Game/Foo')
+    f.add(MISSING_ENTRIES, 'Menus_UI,Players/Messages/YouGotKicked', 'in /Game/Bar')
     assert len(f) == 1
     only = list(f.by_key.values())[0]
-    assert only.occurrences == 2 and only.detail == 'in /Game/Foo'
+    assert only.occurrences == 3
+    assert only.contexts == {'in /Game/Foo', 'in /Game/Bar'}
 
 
 def test_a_collision_is_keyed_on_the_pair_either_way_round():
@@ -168,3 +171,38 @@ def test_an_engine_warning_is_not_this_tools_business():
 
 def test_an_ordinary_line_is_collected_as_nothing():
     assert len(collected(['LogGatherTextCommandlet: Display: all fine'])) == 0
+
+
+REF = ('LogGatherStringTableReferencesCommandlet: Warning: '
+       '<MissingStringTableReference> StringTable: [FICSMAS_UI], '
+       'Key: [Calendar/2020] Context: ')
+
+
+def test_an_asset_and_its_generated_class_are_one_place():
+    """Unreal names the asset, the _C class it compiles to, and the bytecode
+    of the same function. Counting those separately trebles one problem."""
+    f = collected([
+        REF + '/Game/UI/BPW_Cal.BPW_Cal:WidgetTree.mTitleText',
+        REF + '/Game/UI/BPW_Cal.BPW_Cal_C:WidgetTree.mTitleText',
+    ])
+    only = list(f.by_key.values())[0]
+    assert only.occurrences == 2
+    assert only.contexts == {'/Game/UI/BPW_Cal.BPW_Cal:WidgetTree.mTitleText'}
+
+
+def test_the_bytecode_form_is_the_same_function():
+    f = collected([
+        REF + '/Game/UI/BPW_Cal.BPW_Cal_C:UpdateHeader [Script Bytecode]',
+        REF + '/Game/UI/BPW_Cal.BPW_Cal:UpdateHeader',
+    ])
+    assert list(f.by_key.values())[0].contexts == {
+        '/Game/UI/BPW_Cal.BPW_Cal:UpdateHeader'
+    }
+
+
+def test_two_real_places_stay_two():
+    f = collected([
+        REF + '/Game/UI/BC_Cheat.Default__BC_Cheat_C.mDisplayName',
+        REF + '/Game/UI/SC_Cheat.Default__SC_Cheat_C.mDisplayName',
+    ])
+    assert len(list(f.by_key.values())[0].contexts) == 2

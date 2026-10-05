@@ -7,6 +7,8 @@ Marker shapes here are taken from a real Rabbithole run: 22967 packages,
 
 import pytest
 
+from libraries.findings import Findings
+from libraries.ue_findings import MISSING_ENTRIES
 from tasks.ue_gather_references import (
     MISSING_BANNER,
     MISSING_REFERENCE,
@@ -22,7 +24,9 @@ import re
 
 @pytest.fixture
 def task():
-    return GatherStringTableReferences()
+    t = GatherStringTableReferences()
+    t.findings = Findings()
+    return t
 
 
 @pytest.fixture
@@ -210,32 +214,30 @@ def test_an_ordinary_warning_is_neither(task):
 
 
 def test_missing_references_warn_but_do_not_fail_the_task(task):
-    """The text falls back to its key in game, which is worth knowing about,
-    but the gather itself did its job."""
-    missing = {('FICSMAS_UI', 'Calendar/2020'): ['/Game/A', '/Game/B']}
+    """The text falls back to its key in game, which is worth knowing
+    about, but the gather itself did its job."""
+    task.findings.add(MISSING_ENTRIES, 'FICSMAS_UI,Calendar/2020', '/Game/A')
 
-    assert task.verdict(0, 100, 100, 0, 0, 1.0, missing) is True
+    assert task.verdict(0, 100, 100, 0, 0, 1.0) is True
 
 
 def test_the_report_groups_by_entry(task, capture_logs):
-    """One missing entry referenced from five places is one problem, not five:
-    the previous tooling printed the raw line each time."""
-    missing = {
-        ('FICSMAS_UI', 'Calendar/2020'): ['/Game/A', '/Game/B', '/Game/C', '/Game/D'],
-        ('Menus_UI', 'Sessions/Header'): ['/Game/E'],
-    }
+    """One missing entry referenced from five places is one problem, not
+    five: the previous tooling printed the raw line each time."""
+    for context in ('/Game/A', '/Game/B', '/Game/C', '/Game/D'):
+        task.findings.add(MISSING_ENTRIES, 'FICSMAS_UI,Calendar/2020', context)
+    task.findings.add(MISSING_ENTRIES, 'Menus_UI,Sessions/Header', '/Game/E')
 
-    task.report_missing_references(missing)
-    logged = '\n'.join(capture_logs)
+    task.findings.report()
+    logged = chr(10).join(capture_logs)
 
-    assert '2 string table entr(ies) are referenced but do not exist, from 5 place(s)' in logged
-    assert 'FICSMAS_UI,Calendar/2020 - 4 reference(s)' in logged
-    assert 'Menus_UI,Sessions/Header - 1 reference(s)' in logged
-    assert '... and 1 more' in logged  # only 3 of the 4 contexts listed
+    assert '2 string table entr(ies) referenced but missing' in logged
+    assert 'FICSMAS_UI,Calendar/2020  (4 place(s))' in logged
+    assert 'Menus_UI,Sessions/Header' in logged
+    assert logged.count('/Game/') == 5  # every context, none hidden
 
 
 def test_nothing_is_reported_when_nothing_is_missing(task, capture_logs):
-    task.report_missing_references({})
-    task.report_missing_references(None)
+    task.findings.report()
 
     assert not capture_logs

@@ -20,15 +20,14 @@ class Finding:
 
     category: str
     key: str
-    detail: str = ''
+    # Where it was seen. A set: the same problem is reported many times,
+    # with somewhere to point only some of them.
+    contexts: set[str] = field(default_factory=set)
     occurrences: int = 1
 
     def merge(self, other: 'Finding'):
         self.occurrences += other.occurrences
-        # The first run to know where it happened keeps the answer: the same
-        # problem is usually reported with context once and bare after that.
-        if other.detail and not self.detail:
-            self.detail = other.detail
+        self.contexts |= other.contexts
 
 
 @dataclass
@@ -38,12 +37,13 @@ class Findings:
     source: str = ''
     by_key: dict[tuple[str, str], Finding] = field(default_factory=dict)
 
-    def add(self, category: str, key: str, detail: str = ''):
+    def add(self, category: str, key: str, context: str = ''):
+        found = Finding(category, key, {context} if context else set())
         existing = self.by_key.get((category, key))
         if existing:
-            existing.merge(Finding(category, key, detail))
+            existing.merge(found)
         else:
-            self.by_key[(category, key)] = Finding(category, key, detail)
+            self.by_key[(category, key)] = found
 
     def merge(self, other: 'Findings'):
         for finding in other.by_key.values():
@@ -63,24 +63,19 @@ class Findings:
     def __bool__(self) -> bool:
         return bool(self.by_key)
 
-    def report(self, headings: dict[str, str] | None = None):
-        """One block per category, every finding listed.
-
-        Nothing is truncated. A list someone is meant to act on is no use
-        with the end cut off, and there are only ever a handful of these --
-        the volume was in the repetition, which is already gone.
-        """
-        headings = headings or {}
+    def report(self):
+        """One block per category. Nothing is truncated: every finding and
+        every place it was found is something to act on."""
         for category, group in self.categories().items():
-            total = sum(f.occurrences for f in group)
-            heading = headings.get(category, category)
-            said = '' if total == len(group) else f', said {total} time(s)'
-            logger.warning(f'{len(group)} {heading}{said}:')
+            logger.warning(f'{len(group)} {category}:')
             for finding in group:
-                detail = f'   {finding.detail}' if finding.detail else ''
-                times = (
-                    f'  ({finding.occurrences} references)'
-                    if finding.occurrences > 1
-                    else ''
-                )
-                logger.warning(f'  {finding.key}{detail}{times}')
+                # Places where we have them, mentions where we do not.
+                if finding.contexts:
+                    times = f'  ({len(finding.contexts)} place(s))'
+                elif finding.occurrences > 1:
+                    times = f'  ({finding.occurrences} mentions)'
+                else:
+                    times = ''
+                logger.warning(f'  {finding.key}{times}')
+                for context in sorted(finding.contexts):
+                    logger.warning(f'      {context}')

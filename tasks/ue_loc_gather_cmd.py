@@ -20,6 +20,7 @@ from loguru import logger
 from dataclasses import dataclass, field
 
 from libraries.findings import Findings
+from libraries.ue_findings import PACKAGE_PROBLEMS, UE_RECAP, collect
 from libraries.utilities import LocTask, init_logging
 
 COMMANDLET_VERDICT = r'GatherText completed with exit code (-?\d+)'
@@ -29,36 +30,6 @@ STEP_COMPLETED = r'Completed GatherTextStep\d+:'
 # One line per package, and a large project has a hundred thousand of them:
 # `[ 12.3%] Gathering package: '/Game/Foo/Bar'...`
 PROGRESS = r"\[\s*([\d.]+)%\]\s*(\w+) package: '([^']*)'"
-# A reference to a string table entry that does not exist. The text falls
-# back to its key on screen, so it is a content bug worth naming.
-MISSING_ST_ENTRY = r"Failed to find string table entry for '([^']*)' '([^']*)'"
-# Two assets carrying the same localization ID: their text can collide.
-ID_COLLISION = (
-    r"Package '([^']*)' and '([^']*)' have the same localization ID \(([0-9A-F]+)\)"
-)
-# `Package 'X' produced N error(s) and N warning(s) while loading (see
-# below)` heads the lines that follow it, and is the only place the asset
-# a missing string table entry was found in is ever named.
-PACKAGE_PROBLEMS = r"Package '([^']*)' produced \d+ error\(s\) and \d+ warning\(s\)"
-
-MISSING_ENTRIES = 'string table entr(ies) referenced but missing'
-COLLISIONS = 'pair(s) of assets sharing a localization ID'
-GATHER_PROBLEMS = 'other warning(s) from the localization pipeline'
-
-# Unreal logs under fifty categories during a gather and all but these are
-# the editor starting itself up: textures, audio, shaders, the asset
-# registry. A warning from one of those is not this tool's business, so
-# only the localization pipeline's own categories are collected.
-GATHER_LOG_CATEGORIES = (
-    'LogGatherTextCommandlet',
-    'LogGatherTextFromAssetsCommandlet',
-    'LogGatherTextFromSourceCommandlet',
-    'LogGenerateManifestCommandlet',
-    'LogGenerateArchiveCommandlet',
-    'LogGenerateTextLocalizationReportCommandlet',
-    'LogInternationalizationExportCommandlet',
-    'LogStringTable',
-)
 
 
 @dataclass
@@ -103,14 +74,11 @@ class UnrealLocGatherCommandlet(LocTask):
         ]
     )
 
-    # The commandlet announces every package it loads and gathers. The
-    # console is told once per this many percent instead.
+    # The console is told once per this many percent.
     progress_step: int = 1
 
-    # The console shows a progress line every progress_step percent, and at
-    # least this often while the commandlet is working, so a package that
-    # takes a while to load still looks like progress rather than a hang.
-    # The log file keeps every line either way.
+    # ...and at least this often, so a slow package still reads as
+    # progress rather than a hang. The log file keeps every line.
     progress_heartbeat: float = 1.0
 
     _config_pattern: str = 'Config/Localization/{loc_target}_{task}.ini'
@@ -273,11 +241,11 @@ class UnrealLocGatherCommandlet(LocTask):
         next_percent = 0.0
         last_shown = 0.0
         last_package = None
-        # The package being loaded: the only place a missing string table
-        # entry is ever tied to an asset. Cleared when the next package
-        # starts, so nothing is blamed on the one before it.
+        # The package being loaded: the only place the text gather ties a
+        # missing entry to an asset. Cleared when the next one starts.
         package = None
         self.findings = Findings(source=self.__class__.__name__)
+        collecting = True
 
         try:
             with subp.Popen(
@@ -318,9 +286,8 @@ class UnrealLocGatherCommandlet(LocTask):
                             last_package = (percent, progress.group(2),
                                             progress.group(3))
                             package = None
-                            # The log keeps every one of these: it is the
-                            # record of what the commandlet did. The console
-                            # gets enough of them to show it is alive.
+                            # The log keeps every one; the console gets
+                            # enough to show the run is alive.
                             logger.bind(log_only=True).info(f'| UE | {line}')
                             now = monotonic()
                             if (
@@ -334,13 +301,17 @@ class UnrealLocGatherCommandlet(LocTask):
                                 last_shown = now
                             continue
 
-                        header = re.search(PACKAGE_PROBLEMS, line)
+                        header = PACKAGE_PROBLEMS.search(line)
                         if header:
                             package = header.group(1)
 
+                        # The recap repeats what we already collected.
+                        if UE_RECAP.search(line):
+                            collecting = False
+
                         # Collected and listed again at the end, but kept
                         # in the stream where the commandlet raised it.
-                        if self.collect(line, package):
+                        if collecting and collect(self.findings, line, package):
                             logger.warning(f'| UE | {line.strip()}')
                             continue
 
@@ -368,9 +339,7 @@ class UnrealLocGatherCommandlet(LocTask):
             steps_completed,
         )
 
-        # The verdict, on its own line and at its own level, because it is
-        # the one thing every run is read for and it used to sit between the
-        # engine's shutdown warnings and ours.
+        # The verdict, on its own line and at its own level.
         verdict = 'finished' if succeeded else 'FAILED'
         say = logger.success if succeeded else logger.error
         say(f'--- Unreal loc gather commandlet {verdict}, return code {returncode}')
@@ -389,38 +358,6 @@ class UnrealLocGatherCommandlet(LocTask):
                 f'The last package it reached was {package!r}, '
                 f'{verb.lower()} at {percent:.0f}%.'
             )
-
-    def collect(self, line: str, package: str | None) -> bool:
-        """Pick out of one Unreal line anything worth repeating at the
-        end, and say whether this was one of them.
-
-        Unreal reports each occurrence separately and names the asset
-        only where it has one, so a finding is keyed by what is wrong
-        rather than by the line that happened to report it."""
-        missing = re.search(MISSING_ST_ENTRY, line)
-        if missing:
-            self.findings.add(
-                MISSING_ENTRIES,
-                f'{missing.group(1)},{missing.group(2)}',
-                f'in {package}' if package else '',
-            )
-            return True
-
-        collision = re.search(ID_COLLISION, line)
-        if collision:
-            first, second, loc_id = collision.groups()
-            self.findings.add(
-                COLLISIONS, ' and '.join(sorted((first, second))), f'id {loc_id}'
-            )
-            return True
-
-        if ('Warning: ' in line or 'Error: ' in line) and any(
-            category in line for category in GATHER_LOG_CATEGORIES
-        ):
-            self.findings.add(GATHER_PROBLEMS, line.strip())
-            return True
-
-        return False
 
     def incomplete_run(
         self, configs_started: int, steps_started: int, steps_completed: int
