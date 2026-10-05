@@ -24,6 +24,8 @@ class Finding:
     # with somewhere to point only some of them.
     contexts: set[str] = field(default_factory=set)
     occurrences: int = 1
+    # Decides the level the category is reported at.
+    level: str = 'warning'
 
     def merge(self, other: 'Finding'):
         self.occurrences += other.occurrences
@@ -37,8 +39,8 @@ class Findings:
     source: str = ''
     by_key: dict[tuple[str, str], Finding] = field(default_factory=dict)
 
-    def add(self, category: str, key: str, context: str = ''):
-        found = Finding(category, key, {context} if context else set())
+    def add(self, category: str, key: str, context: str = '', level='warning'):
+        found = Finding(category, key, {context} if context else set(), level=level)
         existing = self.by_key.get((category, key))
         if existing:
             existing.merge(found)
@@ -47,7 +49,17 @@ class Findings:
 
     def merge(self, other: 'Findings'):
         for finding in other.by_key.values():
-            self.add(finding.category, finding.key, finding.detail)
+            existing = self.by_key.get((finding.category, finding.key))
+            if existing:
+                existing.merge(finding)
+            else:
+                self.by_key[(finding.category, finding.key)] = Finding(
+                    finding.category,
+                    finding.key,
+                    set(finding.contexts),
+                    finding.occurrences,
+                    finding.level,
+                )
 
     def categories(self) -> dict[str, list[Finding]]:
         out: dict[str, list[Finding]] = {}
@@ -55,7 +67,8 @@ class Findings:
             out.setdefault(finding.category, []).append(finding)
         for group in out.values():
             group.sort(key=lambda f: f.key)
-        return out
+        # Errors first: they are the reason a run failed.
+        return dict(sorted(out.items(), key=lambda kv: kv[1][0].level != 'error'))
 
     def __len__(self) -> int:
         return len(self.by_key)
@@ -64,10 +77,11 @@ class Findings:
         return bool(self.by_key)
 
     def report(self):
-        """One block per category. Nothing is truncated: every finding and
-        every place it was found is something to act on."""
+        """One block per category, errors first. Nothing is truncated:
+        every finding and every place it was found is something to act on."""
         for category, group in self.categories().items():
-            logger.warning(f'{len(group)} {category}:')
+            say = logger.error if group[0].level == 'error' else logger.warning
+            say(f'{len(group)} {category}:')
             for finding in group:
                 # Places where we have them, mentions where we do not.
                 if finding.contexts:
@@ -76,6 +90,6 @@ class Findings:
                     times = f'  ({finding.occurrences} mentions)'
                 else:
                     times = ''
-                logger.warning(f'  {finding.key}{times}')
+                say(f'  {finding.key}{times}')
                 for context in sorted(finding.contexts):
-                    logger.warning(f'      {context}')
+                    say(f'      {context}')

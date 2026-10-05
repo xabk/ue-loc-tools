@@ -34,6 +34,7 @@ UE_RECAP = re.compile(r'Warning/Error Summary \(Unique only\)')
 
 MISSING_ENTRIES = 'string table entr(ies) referenced but missing'
 COLLISIONS = 'pair(s) of assets sharing a localization ID'
+GATHER_ERRORS = 'error(s) from the localization pipeline'
 GATHER_PROBLEMS = 'other warning(s) from the localization pipeline'
 
 # Unreal logs under fifty categories during a gather; the rest are the
@@ -48,6 +49,10 @@ GATHER_LOG_CATEGORIES = (
     'LogGenerateTextLocalizationReportCommandlet',
     'LogInternationalizationExportCommandlet',
     'LogStringTable',
+    # These log when a manifest or archive cannot be read or written, which
+    # is how a gather usually fails outright.
+    'LogInternationalizationManifestSerializer',
+    'LogInternationalizationArchiveSerializer',
 )
 
 
@@ -85,10 +90,12 @@ def collect(findings: Findings, line: str, asset: str | None = None) -> bool:
         findings.add(COLLISIONS, ' and '.join(sorted((first, second))), f'id {loc_id}')
         return True
 
-    if ('Warning: ' in line or 'Error: ' in line) and any(
-        category in line for category in GATHER_LOG_CATEGORIES
-    ):
-        findings.add(GATHER_PROBLEMS, line.strip())
-        return True
+    if any(category in line for category in GATHER_LOG_CATEGORIES):
+        if 'Error: ' in line:
+            findings.add(GATHER_ERRORS, line.strip(), level='error')
+            return True
+        if 'Warning: ' in line:
+            findings.add(GATHER_PROBLEMS, line.strip())
+            return True
 
     return False

@@ -9,7 +9,13 @@ like progress rather than a hang.
 import re
 
 from libraries.findings import Findings
-from libraries.ue_findings import MISSING_ENTRIES, MISSING_ST_ENTRY, collect
+from libraries.ue_findings import (
+    GATHER_ERRORS,
+    GATHER_PROBLEMS,
+    MISSING_ENTRIES,
+    MISSING_ST_ENTRY,
+    collect,
+)
 from tasks.ue_loc_gather_cmd import (
     PROGRESS,
     UnrealLocGatherCommandlet,
@@ -247,3 +253,52 @@ def test_two_real_places_stay_two():
         REF + '/Game/UI/SC_Cheat.Default__SC_Cheat_C.mDisplayName',
     ])
     assert len(list(f.by_key.values())[0].contexts) == 2
+
+
+SAVE_ERROR = (
+    "LogInternationalizationManifestSerializer: Error: Failed to save "
+    "manifest 'F:/sat-main/FactoryGame/Content/Localization/Game/Game.manifest'."
+)
+
+
+def test_the_serializer_is_one_of_ours():
+    """It is the line that says a manifest could not be written, which is
+    how a gather usually fails outright."""
+    assert len(collected([SAVE_ERROR])) == 1
+
+
+def test_an_error_is_not_filed_as_a_warning():
+    f = collected([SAVE_ERROR])
+    only = list(f.by_key.values())[0]
+
+    assert only.category == GATHER_ERRORS
+    assert only.level == 'error'
+
+
+def test_a_warning_stays_a_warning():
+    f = collected([SOURCE_WARNING])
+    only = list(f.by_key.values())[0]
+
+    assert only.category == GATHER_PROBLEMS
+    assert only.level == 'warning'
+
+
+def test_errors_are_reported_before_warnings():
+    f = collected([SOURCE_WARNING, SAVE_ERROR, MISSING])
+
+    assert list(f.categories())[0] == GATHER_ERRORS
+
+
+def test_merging_keeps_every_place_and_the_level():
+    """The task runner will merge one run's findings across its steps."""
+    a, b = Findings(), Findings()
+    a.add(GATHER_ERRORS, 'same', 'in /Game/A', level='error')
+    b.add(GATHER_ERRORS, 'same', 'in /Game/B', level='error')
+    b.add(GATHER_ERRORS, 'other', level='error')
+    a.merge(b)
+
+    assert len(a) == 2
+    merged = a.by_key[(GATHER_ERRORS, 'same')]
+    assert merged.contexts == {'in /Game/A', 'in /Game/B'}
+    assert merged.occurrences == 2
+    assert merged.level == 'error'

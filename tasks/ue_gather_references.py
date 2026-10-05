@@ -209,12 +209,13 @@ class GatherStringTableReferences(LocTask):
                     if UE_RECAP.search(line):
                         collecting = False
 
-                    if collecting and collect(self.findings, line):
-                        with_context()
-                        logger.warning(f'| UE | {line}')
+                    if re.search(MISSING_BANNER, line):
                         continue
 
-                    if re.search(MISSING_BANNER, line):
+                    if collecting and collect(self.findings, line):
+                        with_context()
+                        say = logger.error if 'Error: ' in line else logger.warning
+                        say(f'| UE | {line}')
                         continue
 
                     if 'Error: ' in line:

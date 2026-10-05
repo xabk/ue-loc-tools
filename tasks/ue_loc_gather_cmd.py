@@ -27,6 +27,9 @@ COMMANDLET_VERDICT = r'GatherText completed with exit code (-?\d+)'
 CONFIG_STARTED = r"Beginning GatherText Commandlet for '"
 STEP_STARTED = r'Executing GatherTextStep\d+:'
 STEP_COMPLETED = r'Completed GatherTextStep\d+:'
+# A step that failed. GatherText stops there, so no later step or config runs:
+# `GatherTextStep2-GenerateGatherManifestCommandlet reported an error.`
+STEP_FAILED = r'(GatherTextStep\d+-\w+) reported an error'
 # One line per package, and a large project has a hundred thousand of them:
 # `[ 12.3%] Gathering package: '/Game/Foo/Bar'...`
 PROGRESS = r"\[\s*([\d.]+)%\]\s*(\w+) package: '([^']*)'"
@@ -245,6 +248,10 @@ class UnrealLocGatherCommandlet(LocTask):
         # missing entry to an asset. Cleared when the next one starts.
         package = None
         held = None
+        # Errors logged by the current step, kept so a failed step can say why.
+        step_errors = []
+        failed_step = None
+        failed_step_errors = []
 
         def with_context():
             """Put the held progress line on the console first, so a warning
@@ -287,8 +294,19 @@ class UnrealLocGatherCommandlet(LocTask):
                             configs_started += 1
                         elif re.search(STEP_STARTED, line):
                             steps_started += 1
+                            step_errors = []
                         elif re.search(STEP_COMPLETED, line):
                             steps_completed += 1
+
+                        # The recap repeats the run's errors out of order.
+                        step_failed = re.search(STEP_FAILED, line)
+                        if collecting and step_failed and not failed_step:
+                            failed_step = step_failed.group(1)
+                            failed_step_errors = step_errors
+                        elif collecting and 'Error: ' in line:
+                            step_errors.append(
+                                re.sub(r'^\[\s*\d+\]', '', line.strip())
+                            )
 
                         progress = re.search(PROGRESS, line)
                         if progress:
@@ -324,13 +342,16 @@ class UnrealLocGatherCommandlet(LocTask):
 
                         # Collected and listed again at the end, but kept
                         # in the stream where the commandlet raised it.
+                        if 'Error: ' in line:
+                            errors += 1
+
                         if collecting and collect(self.findings, line, package):
                             with_context()
-                            logger.warning(f'| UE | {line.strip()}')
+                            say = logger.error if 'Error: ' in line else logger.warning
+                            say(f'| UE | {line.strip()}')
                             continue
 
                         if 'Error: ' in line:
-                            errors += 1
                             with_context()
                             logger.error(f'| UE | {line.strip()}')
                         elif 'Warning: ' in line:
@@ -353,6 +374,8 @@ class UnrealLocGatherCommandlet(LocTask):
             configs_started,
             steps_started,
             steps_completed,
+            failed_step,
+            failed_step_errors,
         )
 
         # The verdict, on its own line and at its own level.
@@ -402,6 +425,8 @@ class UnrealLocGatherCommandlet(LocTask):
         configs_started: int = 0,
         steps_started: int = 0,
         steps_completed: int = 0,
+        failed_step: str | None = None,
+        failed_step_errors: list[str] | None = None,
     ) -> bool:
         """Unreal exits non-zero if anything logged an error, including errors
         that have nothing to do with localization, so the commandlet's own
@@ -423,6 +448,18 @@ class UnrealLocGatherCommandlet(LocTask):
                     'trust_commandlet_exit_code is off.'
                 )
             return returncode == 0
+
+        # Named by GatherText itself, so a better reason than any count.
+        if failed_step:
+            logger.error(
+                f'GatherText failed at {failed_step} and stopped there, so no '
+                'later step or config ran.'
+            )
+            for error in failed_step_errors or []:
+                logger.error(f'  {error}')
+            if not failed_step_errors:
+                logger.error('  The step logged no error of its own before failing.')
+            return False
 
         incomplete = self.incomplete_run(
             configs_started, steps_started, steps_completed

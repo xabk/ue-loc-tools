@@ -22,6 +22,7 @@ from tasks.ue_loc_gather_cmd import (
     COMMANDLET_VERDICT,
     CONFIG_STARTED,
     STEP_COMPLETED,
+    STEP_FAILED,
     STEP_STARTED,
     UnrealLocGatherCommandlet,
 )
@@ -147,3 +148,113 @@ def test_opting_out_trusts_the_process_code_again(task):
     task.trust_commandlet_exit_code = False
     assert task.task_succeeded(0, [], 0) is True
     assert task.task_succeeded(1, [0], 11, **FULL_RUN) is False
+
+
+def test_a_failed_step_is_recognised():
+    line = (
+        'LogGatherTextCommandlet: Error: '
+        'GatherTextStep2-GenerateGatherManifestCommandlet reported an error.'
+    )
+    match = re.search(STEP_FAILED, line)
+    assert match.group(1) == 'GatherTextStep2-GenerateGatherManifestCommandlet'
+
+
+def test_a_failed_step_fails_even_when_the_counts_look_complete(task):
+    assert (
+        task.task_succeeded(0, [0], 0, **FULL_RUN, failed_step='GatherTextStep2-Foo')
+        is False
+    )
+
+
+def captured(fn, *args, **kwargs):
+    import loguru
+
+    seen = []
+    handle = loguru.logger.add(lambda m: seen.append(m), level='INFO')
+    result = fn(*args, **kwargs)
+    loguru.logger.remove(handle)
+    return result, ''.join(seen)
+
+
+def test_a_failed_step_names_itself_and_its_errors(task):
+    _, said = captured(
+        task.task_succeeded,
+        -1,
+        [],
+        0,
+        configs_started=1,
+        steps_started=3,
+        steps_completed=2,
+        failed_step='GatherTextStep2-GenerateGatherManifestCommandlet',
+        failed_step_errors=["Error: Failed to save manifest 'Game.manifest'."],
+    )
+    assert 'GatherTextStep2-GenerateGatherManifestCommandlet' in said
+    assert "Failed to save manifest 'Game.manifest'" in said
+    assert 'crash' not in said
+
+
+# Lines from a real run that could not write a read-only manifest.
+READ_ONLY_MANIFEST_RUN = [
+    "[2026.10.05-13.07.42:000][  0]LogGatherTextCommandlet: Display: Beginning "
+    "GatherText Commandlet for '../../../FactoryGame/Config/Localization/Game_Gather.ini'",
+    '[  0]LogGatherTextCommandlet: Display: Executing GatherTextStep0: '
+    'GatherTextFromSourceCommandlet',
+    '[  0]LogGatherTextFromSourceCommandlet: Error: Unrelated error in step 0',
+    '[  0]LogGatherTextCommandlet: Display: Completed GatherTextStep0: '
+    'GatherTextFromSourceCommandlet in 18.86 seconds',
+    '[  0]LogGatherTextCommandlet: Display: Executing GatherTextStep2: '
+    'GenerateGatherManifestCommandlet',
+    "[  0]LogInternationalizationManifestSerializer: Error: Failed to save "
+    "manifest 'F:/sat-main/FactoryGame/Content/Localization/Game/Game.manifest'.",
+    "[  0]LogGenerateManifestCommandlet: Error: Save error: Failed to serialize "
+    "manifest 'F:/sat-main/FactoryGame/Content/Localization/Game/Game.manifest'.",
+    '[  0]LogGatherTextCommandlet: Error: '
+    'GatherTextStep2-GenerateGatherManifestCommandlet reported an error.',
+    '[  0]LogInit: Display: Warning/Error Summary (Unique only)',
+    '[  0]LogInit: Display: LogGatherTextCommandlet: Error: '
+    'GatherTextStep9-SomethingElse reported an error.',
+]
+
+
+class FakeUnreal:
+    def __init__(self, lines, returncode):
+        self.stdout = iter(line + '\n' for line in lines)
+        self.returncode = returncode
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def poll(self):
+        return self.returncode
+
+
+def test_a_run_that_could_not_save_says_so(task, monkeypatch):
+    import tasks.ue_loc_gather_cmd as module
+
+    monkeypatch.setattr(
+        module.subp,
+        'Popen',
+        lambda *a, **k: FakeUnreal(READ_ONLY_MANIFEST_RUN, 4294967295),
+    )
+    task.loc_targets = ['Game']
+    task.try_patch_dependencies = False
+    task._unreal_binary_path = 'UnrealEditor-Cmd.exe'
+    task._uproject_path = 'FactoryGame.uproject'
+
+    succeeded, said = captured(task.run_tasks)
+
+    assert succeeded is False
+    # Up to the closing line: the findings report after it lists every error.
+    verdict = said[
+        said.index('GatherText failed at') : said.index('--- Unreal loc gather')
+    ]
+    assert 'GatherTextStep2-GenerateGatherManifestCommandlet' in verdict
+    assert 'Failed to save manifest' in verdict
+    assert 'Failed to serialize manifest' in verdict
+    # Errors from an earlier step, and the recap, are not the reason.
+    assert 'Unrelated error in step 0' not in verdict
+    assert 'GatherTextStep9' not in verdict
+    assert 'Check the log for a crash' not in said
