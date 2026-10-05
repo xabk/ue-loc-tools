@@ -100,6 +100,47 @@ def test_a_fast_run_is_not_padded_by_the_heartbeat():
     assert len(shown(quick)) == 101
 
 
+def console(stream, step=1, heartbeat=1.0):
+    """The same rule, plus the held line: progress as (percent, clock) and
+    warnings as strings in, what the console is told out."""
+    next_percent, last_shown, held, out = 0.0, 0.0, None, []
+    for item in stream:
+        if isinstance(item, str):
+            if held:
+                out.append(held)
+                held = None
+            out.append(item)
+            continue
+        percent, now = item
+        if percent >= next_percent or now - last_shown >= heartbeat:
+            out.append((percent, now))
+            next_percent = (int(percent // step) + 1) * step
+            last_shown = now
+            held = None
+        else:
+            held = (percent, now)
+    return out
+
+
+def test_a_warning_is_preceded_by_the_package_it_came_from():
+    """The throttle hid the packages in between."""
+    out = console([(0.1, 0.0), (0.11, 0.0), (0.12, 0.0), 'Warning: no entry'])
+
+    assert out == [(0.1, 0.0), (0.12, 0.0), 'Warning: no entry']
+
+
+def test_the_package_is_not_repeated_when_it_was_just_shown():
+    out = console([(0.1, 0.0), 'Warning: no entry'])
+
+    assert out == [(0.1, 0.0), 'Warning: no entry']
+
+
+def test_one_held_package_serves_every_warning_under_it():
+    out = console([(0.1, 0.0), (0.11, 0.0), 'first', 'second'])
+
+    assert out == [(0.1, 0.0), (0.11, 0.0), 'first', 'second']
+
+
 def test_a_failed_run_says_where_it_stopped():
     """Only the position: the lines themselves are already in the log."""
     text = captured(task().report_where_it_stopped, (73.2, 'Gathering', '/Game/Foo'))

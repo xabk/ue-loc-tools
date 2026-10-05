@@ -244,6 +244,16 @@ class UnrealLocGatherCommandlet(LocTask):
         # The package being loaded: the only place the text gather ties a
         # missing entry to an asset. Cleared when the next one starts.
         package = None
+        held = None
+
+        def with_context():
+            """Put the held progress line on the console first, so a warning
+            is read under the package it came from."""
+            nonlocal held
+            if held:
+                logger.bind(console_only=True).info(f'| UE | {held}')
+                held = None
+
         self.findings = Findings(source=self.__class__.__name__)
         collecting = True
 
@@ -299,6 +309,9 @@ class UnrealLocGatherCommandlet(LocTask):
                                     int(percent // self.progress_step) + 1
                                 ) * self.progress_step
                                 last_shown = now
+                                held = None
+                            else:
+                                held = line
                             continue
 
                         header = PACKAGE_PROBLEMS.search(line)
@@ -312,13 +325,16 @@ class UnrealLocGatherCommandlet(LocTask):
                         # Collected and listed again at the end, but kept
                         # in the stream where the commandlet raised it.
                         if collecting and collect(self.findings, line, package):
+                            with_context()
                             logger.warning(f'| UE | {line.strip()}')
                             continue
 
                         if 'Error: ' in line:
                             errors += 1
+                            with_context()
                             logger.error(f'| UE | {line.strip()}')
                         elif 'Warning: ' in line:
+                            with_context()
                             logger.warning(f'| UE | {line.strip()}')
                         else:
                             logger.info(f'| UE | {line.strip()}')

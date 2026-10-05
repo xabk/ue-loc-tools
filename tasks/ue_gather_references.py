@@ -128,6 +128,16 @@ class GatherStringTableReferences(LocTask):
         next_percent = 0.0
         last_shown = 0.0
         last_seen = None
+        held = None
+
+        def with_context():
+            """Put the held progress line on the console first, so a warning
+            is read under the package it came from."""
+            nonlocal held
+            if held:
+                logger.bind(console_only=True).info(f'| UE | {held}')
+                held = None
+
         self.findings = Findings(source=self.__class__.__name__)
         collecting = True
         start = timer()
@@ -167,6 +177,7 @@ class GatherStringTableReferences(LocTask):
                     if re.search(NO_ASSETS, line):
                         # The verdict accounts for these, so they are not findings.
                         no_assets += 1
+                        with_context()
                         logger.warning(f'| UE | {line}')
                         continue
 
@@ -190,12 +201,16 @@ class GatherStringTableReferences(LocTask):
                                 int(percent // self.progress_step) + 1
                             ) * self.progress_step
                             last_shown = now
+                            held = None
+                        else:
+                            held = line
                         continue
 
                     if UE_RECAP.search(line):
                         collecting = False
 
                     if collecting and collect(self.findings, line):
+                        with_context()
                         logger.warning(f'| UE | {line}')
                         continue
 
@@ -203,8 +218,10 @@ class GatherStringTableReferences(LocTask):
                         continue
 
                     if 'Error: ' in line:
+                        with_context()
                         logger.error(f'| UE | {line}')
                     elif 'Warning: ' in line:
+                        with_context()
                         logger.warning(f'| UE | {line}')
                     else:
                         logger.info(f'| UE | {line}')
