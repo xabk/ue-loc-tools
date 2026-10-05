@@ -23,6 +23,68 @@ def branch_name_from_build_version(engine_path: Path | str) -> str | None:
         return None
 
 
+def find_plugin_content_dir(plugin_name: str, plugins_root: Path) -> Path | None:
+    '''
+    Find a plugin's Content directory by name, searching recursively under plugins_root
+    for a matching <plugin_name>.uplugin file (plugins may be nested in subfolders,
+    e.g. Plugins/GameFeatures/ExampleGameFeature/ExampleGameFeature.uplugin).
+
+    Returns None if no matching plugin is found. Used by offline scripts (not running
+    inside Unreal) that can't call unreal.FGEditorBlueprintFunctionLibrary.get_plugin_content_dir().
+    '''
+    uplugin_files = list(plugins_root.glob(f'**/{plugin_name}.uplugin'))
+    if not uplugin_files:
+        return None
+
+    return uplugin_files[0].parent / 'Content'
+
+
+def find_all_plugin_string_table_folders(plugins_root: Path) -> list[Path]:
+    '''
+    Find the Localization/StringTables folder of every plugin under plugins_root
+    that has one.
+    '''
+    folders = []
+    for uplugin_file in plugins_root.glob('**/*.uplugin'):
+        candidate = uplugin_file.parent / 'Content/Localization/StringTables'
+        if candidate.is_dir():
+            folders.append(candidate)
+
+    return folders
+
+
+def resolve_string_table_destination(
+    table_name: str,
+    base_string_tables_path: Path,
+    plugins_root: Path,
+) -> Path | None:
+    '''
+    Determine which Localization/StringTables folder a string table name belongs to.
+
+    Names prefixed with "<PluginName>-" (e.g. "ExampleGameFeature-Items_Data") are routed
+    to that plugin's own content directory. All other names are routed to
+    base_string_tables_path.
+
+    Returns None if the name is prefixed with a plugin name that can't be found (e.g. the
+    plugin isn't available in this branch/checkout): the "-" character is reserved for the
+    plugin-prefix convention, so writing such a table under base_string_tables_path would
+    just get rejected when Unreal loads it. Callers should skip the table in this case.
+    '''
+    if '-' in table_name:
+        plugin_name, _, _ = table_name.partition('-')
+        plugin_content_dir = find_plugin_content_dir(plugin_name, plugins_root)
+        if plugin_content_dir is not None:
+            return plugin_content_dir / 'Localization/StringTables'
+
+        logger.warning(
+            f'String table "{table_name}" targets plugin "{plugin_name}", which could '
+            'not be found. Skipping this string table.'
+        )
+        return None
+
+    return base_string_tables_path
+
+
 @dataclass
 class UELocTarget:
     """
