@@ -12,7 +12,7 @@ import importlib.util
 import importlib
 from pathlib import Path
 from timeit import default_timer as timer
-from dataclasses import asdict, fields
+from dataclasses import asdict, dataclass, fields
 from typing import Any
 import yaml
 from loguru import logger
@@ -33,6 +33,45 @@ LOG_TO_SKIP = ['LogLinker: ']
 
 # Task list filtering
 CONFIG_NON_TASK_SECTIONS = {'crowdin', 'parameters', 'script-parameters', 'tasks'}
+
+
+@dataclass
+class TaskList:
+    """One task list: what it is called, what it says, and what it runs."""
+
+    name: str
+    title: str
+    description: str
+    group: str
+    steps: list
+
+
+def read_task_lists(config: dict) -> dict[str, TaskList]:
+    """Every task list in the config, keyed by the name used to run it.
+
+    A task list is a short, typeable name mapping to the steps it runs and the
+    text that describes them:
+
+        sync.full:
+          group: ALL TARGETS
+          title: Full sync
+          description: P4: Check Out, UE: Gather + Export, ...
+          steps:
+            - script: p4-checkout
+    """
+    lists: dict[str, TaskList] = {}
+    for key, value in config.items():
+        if key in CONFIG_NON_TASK_SECTIONS:
+            continue
+        if isinstance(value, dict) and isinstance(value.get('steps'), list):
+            lists[key] = TaskList(
+                name=key,
+                title=str(value.get('title', key)),
+                description=str(value.get('description', '')),
+                group=str(value.get('group', '')),
+                steps=value['steps'],
+            )
+    return lists
 
 # Configuration keys
 CONFIG_KEY_STOP_ON_ERRORS = 'stop-on-errors'
@@ -455,24 +494,17 @@ class TaskRunner:
         return False
 
     def resolve_task_list_name(self, name: str) -> str:
-        """Find the task list a name refers to.
-
-        Task list names are written over two lines: a title, then the steps it
-        runs. Both show up in the menu, but only the title is worth typing, and
-        a newline cannot be passed on a command line at all -- which left every
-        two-line list unreachable with -u. An exact key still wins; failing
-        that, the title alone is enough as long as it picks out one list.
-        """
-        if name in self.config and name not in CONFIG_NON_TASK_SECTIONS:
+        """Find the task list a name refers to: its name, or its title where
+        that picks out one list."""
+        lists = read_task_lists(self.config)
+        if name in lists:
             return name
 
         wanted = name.strip()
         matches = [
             key
-            for key in self.config
-            if key not in CONFIG_NON_TASK_SECTIONS
-            and key.splitlines()
-            and key.splitlines()[0].strip() == wanted
+            for key, task_list in lists.items()
+            if task_list.title == wanted
         ]
 
         if len(matches) == 1:
@@ -493,7 +525,7 @@ class TaskRunner:
         )
 
     def get_task_list_from_user(self) -> str:
-        task_lists = [t for t in self.config if t not in CONFIG_NON_TASK_SECTIONS]
+        task_lists = list(read_task_lists(self.config))
         if not task_lists:
             raise ValueError('No task lists found in configuration')
         if self.unattended:
@@ -503,11 +535,17 @@ class TaskRunner:
             task_list = ''
             print(f'\nProject directory: {COLOR_YELLOW}{Path.cwd()}{COLOR_RESET}')
             print('\nAvailable task lists from base.config.yaml:\n')
+            lists = read_task_lists(self.config)
+            group = None
             for i, task in enumerate(task_lists, start=1):
-                lines = task.split('\n')
-                print(f'{COLOR_GREEN}{i:>2d}.{COLOR_RESET} {lines[0]}')
-                for line in lines[1:]:
-                    print(f'\t{COLOR_DARK_GRAY}{line}{COLOR_RESET}')
+                entry = lists[task]
+                if entry.group != group:
+                    group = entry.group
+                    if group:
+                        print(f'\n{COLOR_YELLOW}{group}{COLOR_RESET}')
+                print(f'{COLOR_GREEN}{i:>2d}.{COLOR_RESET} {entry.title}')
+                if entry.description:
+                    print(f'\t{COLOR_DARK_GRAY}{entry.description}{COLOR_RESET}')
             while not task_list:
                 choice = ''
                 try:
@@ -529,7 +567,7 @@ class TaskRunner:
 
             print(f'\nSelected task list: {COLOR_GREEN}{task_list}{COLOR_RESET}:')
             update_warning = False
-            for task in self.config[task_list]:
+            for task in read_task_lists(self.config)[task_list].steps:
                 if 'updates-source' in task:
                     print(f'{COLOR_YELLOW}{task}{COLOR_RESET}')
                     update_warning = True
@@ -542,7 +580,10 @@ class TaskRunner:
                 blocked = next(
                     filter(
                         None,
-                        map(self.source_update_blocked, self.config[task_list]),
+                        map(
+                            self.source_update_blocked,
+                            read_task_lists(self.config)[task_list].steps,
+                        ),
                     ),
                     None,
                 )
@@ -552,7 +593,8 @@ class TaskRunner:
                         f'{blocked}.{COLOR_RESET}'
                     )
             conf = input(
-                f'\nEnter Y to execute task list {task_list.splitlines()[0].strip()}. Anything else to go back to task list selection... '
+                f'\nEnter Y to execute task list {lists[task_list].title}. '
+                'Anything else to go back to task list selection... '
             )
             if conf.strip() in ('Y', 'y'):
                 return task_list
@@ -618,6 +660,8 @@ class TaskRunner:
 __all__ = [
     'TaskRunner',
     'CONFIG_NON_TASK_SECTIONS',
+    'read_task_lists',
+    'TaskList',
     'EXIT_COMMANDS',
     'COLOR_GREEN',
     'COLOR_YELLOW',

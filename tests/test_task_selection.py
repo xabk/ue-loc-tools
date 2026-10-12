@@ -6,8 +6,8 @@ import pytest
 
 from libraries.task_runner import TaskRunner
 
-FIRST = 'First list\nP4: Check Out, UE: Gather'
-SECOND = 'Second list\nCrowdin: Update Source'
+FIRST = 'first'
+SECOND = 'second'
 
 
 def make_runner() -> TaskRunner:
@@ -15,10 +15,24 @@ def make_runner() -> TaskRunner:
     runner.unattended = False
     runner.config = {
         'parameters': {'not': 'a task list'},
-        FIRST: [{'description': 'one', 'script': 'test-lang'}],
-        SECOND: [
-            {'description': 'two', 'script': 'update-source-files', 'updates-source': True}
-        ],
+        FIRST: {
+            'group': 'ALL TARGETS',
+            'title': 'First list',
+            'description': 'P4: Check Out, UE: Gather',
+            'steps': [{'description': 'one', 'script': 'test-lang'}],
+        },
+        SECOND: {
+            'group': 'ONE OFF',
+            'title': 'Second list',
+            'description': 'Crowdin: Update Source',
+            'steps': [
+                {
+                    'description': 'two',
+                    'script': 'update-source-files',
+                    'updates-source': True,
+                }
+            ],
+        },
     }
     return runner
 

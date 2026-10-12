@@ -12,6 +12,7 @@ Usage:
 """
 
 import difflib
+import re
 import shutil
 import subprocess
 import tomllib
@@ -38,6 +39,8 @@ from libraries.environment import (
 )
 from libraries.task_runner import (
     SCRIPT_DIR,
+    read_task_lists,
+    CONFIG_NON_TASK_SECTIONS,
     SCRIPT_PATH,
     DEFAULT_BASE_CONFIG,
     DEFAULT_SECRET_CONFIG,
@@ -271,10 +274,8 @@ def tasks_in_use(config: dict) -> set[str]:
     """Scripts named by at least one task list. An environment check only
     applies to a project that actually runs the task that needs it."""
     used = set()
-    for tasks in config.values():
-        if not isinstance(tasks, list):
-            continue
-        for task in tasks:
+    for task_list in read_task_lists(config).values():
+        for task in task_list.steps:
             if isinstance(task, dict) and task.get('script'):
                 used.add(task['script'])
     return used
@@ -373,6 +374,65 @@ def check_parameters(runner, config: dict) -> int:
     return problems
 
 
+# A task list name is typed on a command line, so keep it to what a shell and a
+# tab-completer handle without quoting.
+TASK_LIST_NAME = re.compile(r'^[a-z0-9][a-z0-9._-]*$')
+
+
+def check_task_lists(config: dict, task_lists: dict) -> int:
+    """Whether the task lists are the shape the runner reads.
+
+    A key that is neither a known section nor a readable task list is almost
+    always a list that lost its steps, and it would simply vanish from the menu
+    rather than fail.
+    """
+    problems = 0
+    known = set(CONFIG_NON_TASK_SECTIONS) | NON_TASK_SECTIONS
+
+    for key, value in config.items():
+        if key in known or key in task_lists:
+            continue
+        problems += 1
+        if isinstance(value, dict):
+            logger.error(f'"{key}": a task list needs a steps: list')
+        else:
+            logger.error(
+                f'"{key}": not a task list. Task lists map a name to '
+                'group, title, description and steps.'
+            )
+
+    for name, task_list in task_lists.items():
+        if not TASK_LIST_NAME.match(name):
+            logger.error(
+                f'"{name}": a task list name wants lower case, digits, dot, '
+                'dash and underscore only'
+            )
+            problems += 1
+        if not task_list.title.strip():
+            logger.error(f'"{name}": no title, so the menu would show the name')
+            problems += 1
+        if not task_list.steps:
+            logger.error(f'"{name}": no steps, so it would do nothing')
+            problems += 1
+        if not task_list.group.strip():
+            logger.warning(f'"{name}": no group, so it sits under no heading')
+
+    # The menu prints a heading each time the group changes, so a list filed
+    # away from its own kind shows that group's heading twice.
+    seen = []
+    for task_list in task_lists.values():
+        if not seen or seen[-1] != task_list.group:
+            if task_list.group in seen:
+                logger.error(
+                    f'"{task_list.name}": group "{task_list.group}" is split, '
+                    'so the menu repeats the heading. Keep a group together.'
+                )
+                problems += 1
+            seen.append(task_list.group)
+
+    return problems
+
+
 def do_check(base_path: Path, secret_path: Path) -> int:
     loaded = load_for_checking(base_path, secret_path)
     if loaded is None:
@@ -403,11 +463,11 @@ def do_check(base_path: Path, secret_path: Path) -> int:
             problems += 1
 
     script_dir = SCRIPT_PATH
+    task_lists = read_task_lists(config)
+    problems += check_task_lists(config, task_lists)
 
-    for list_name, tasks in config.items():
-        if not isinstance(tasks, list):
-            continue
-        for task in tasks:
+    for list_name, task_list in task_lists.items():
+        for task in task_list.steps:
             script = task.get('script')
             if script not in runner._task_registry:
                 # Anything not in the registry runs as scripts/<name>.py, either

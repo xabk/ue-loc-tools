@@ -17,6 +17,7 @@ from libraries.environment import check_before_running, warn_on_launch
 from libraries.utilities import init_logging
 from libraries.task_runner import (
     TaskRunner,
+    read_task_lists,
     DEFAULT_BASE_CONFIG,
     DEFAULT_SECRET_CONFIG,
 )
@@ -132,7 +133,10 @@ def run(
             logger.error(str(e))
             raise typer.Exit(code=1)
 
-        tasks = cast(list[dict[str, Any]], runner.config[runner.task_list_name])
+        tasks = cast(
+            list[dict[str, Any]],
+            read_task_lists(runner.config)[runner.task_list_name].steps,
+        )
 
         if check_before_running(runner, tasks):
             logger.error(

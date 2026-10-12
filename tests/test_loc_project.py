@@ -120,8 +120,11 @@ def test_upgrade_never_modifies_the_config(gc, tmp_path):
 def test_tasks_in_use_collects_scripts_from_every_task_list(gc):
     config = {
         'parameters': {'not': 'a list'},
-        'list-one': [{'script': 'ue-loc-gather-cmd'}, {'script': 'p4-checkout'}],
-        'list-two': [{'script': 'test-lang'}],
+        'list.one': {
+            'title': 'One',
+            'steps': [{'script': 'ue-loc-gather-cmd'}, {'script': 'p4-checkout'}],
+        },
+        'list.two': {'title': 'Two', 'steps': [{'script': 'test-lang'}]},
     }
 
     assert gc.tasks_in_use(config) == {
@@ -132,7 +135,12 @@ def test_tasks_in_use_collects_scripts_from_every_task_list(gc):
 
 
 def test_tasks_in_use_ignores_entries_without_a_script(gc):
-    config = {'list': [{'no-script': 1}, 'a string', {'script': 'test-lang'}]}
+    config = {
+        'list': {
+            'title': 'List',
+            'steps': [{'no-script': 1}, 'a string', {'script': 'test-lang'}],
+        }
+    }
 
     assert gc.tasks_in_use(config) == {'test-lang'}
 
@@ -167,3 +175,53 @@ def test_every_template_reaches_the_project(gc, tmp_path):
     )
 
     assert templates - scaffolded == {'p4ignore-snippet.txt'}
+
+
+def a_list(group='ALL TARGETS', title='A list', steps=None):
+    return {
+        'group': group,
+        'title': title,
+        'description': '',
+        'steps': steps if steps is not None else [{'script': 'test-lang'}],
+    }
+
+
+def test_a_list_without_steps_is_reported(gc):
+    """It would vanish from the menu rather than fail, so say so."""
+    config = {'sync.full': {'group': 'ALL TARGETS', 'title': 'Full sync'}}
+
+    assert gc.check_task_lists(config, gc.read_task_lists(config)) == 1
+
+
+def test_a_name_that_needs_quoting_is_reported(gc):
+    config = {'Sync Full': a_list()}
+
+    assert gc.check_task_lists(config, gc.read_task_lists(config)) == 1
+
+
+def test_a_list_without_a_title_is_reported(gc):
+    config = {'sync.full': a_list(title='')}
+
+    assert gc.check_task_lists(config, gc.read_task_lists(config)) == 1
+
+
+def test_a_split_group_is_reported(gc):
+    """The menu prints a heading when the group changes, so a list filed away
+    from its own kind shows that heading twice."""
+    config = {
+        'sync.full': a_list('ALL TARGETS'),
+        'step.gather': a_list('ONE STEP'),
+        'sync.local': a_list('ALL TARGETS'),
+    }
+
+    assert gc.check_task_lists(config, gc.read_task_lists(config)) == 1
+
+
+def test_groups_kept_together_are_accepted(gc):
+    config = {
+        'sync.full': a_list('ALL TARGETS'),
+        'sync.local': a_list('ALL TARGETS'),
+        'step.gather': a_list('ONE STEP'),
+    }
+
+    assert gc.check_task_lists(config, gc.read_task_lists(config)) == 0

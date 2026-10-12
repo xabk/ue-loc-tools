@@ -634,335 +634,403 @@ script-parameters:
 # Name them the way the ones below are named: the first line says what you
 # get, and the line after \n says which steps run. Both show up in the menu.
 
-"ALL TARGETS: Full sync\nP4: Check Out, UE: Gather + Export, Loc: Prepare Debug + Source, Crowdin: Update Source, Crowdin: Build + Download, UE: Import + Compile":
-  - description: 'Checkout Localization folder'
-    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-    script: p4-checkout
-    p4-checkout: True
-    script-parameters:
-      # loc_targets: []
-      add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
+sync.full:
+  group: 'ALL TARGETS'
+  title: 'Full sync'
+  description: 'P4: Check Out, UE: Gather + Export, Loc: Prepare Debug + Source, Crowdin: Update Source, Crowdin: Build + Download, UE: Import + Compile'
+  steps:
+    - description: 'Checkout Localization folder'
+      # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+      script: p4-checkout
+      p4-checkout: True
+      script-parameters:
+        # loc_targets: []
+        add_assets_to_checkout: [] # Add any additional assets to check out
+        add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
-  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Gather, Export]
-      # loc_targets: []
+    - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Gather, Export]
+        # loc_targets: []
 
-  # If your targets need different debug ID prefixes, use one step per target
-  # instead of this one. The single-task lists at the end of this file show how.
-  - description: 'Generate test from draft and source locale with comments and debug IDs'
-    script: test-lang
-    script-parameters:
-      sort_by_key: Yes
-      clear_translations: No
+    # If your targets need different debug ID prefixes, use one step per target
+    # instead of this one. The single-task lists at the end of this file show how.
+    - description: 'Generate test from draft and source locale with comments and debug IDs'
+      script: test-lang
+      script-parameters:
+        sort_by_key: Yes
+        clear_translations: No
 
-  - description: 'Upload the updated source files to Crowdin'
-    script: update-source-files
-    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
-    script-parameters:
-      loc_targets: [InputKeys]
-      csv_loc_targets: [AllStringTables, Narrative]
-      # manual_upload: Yes
-      # wait_for_upload_confirmation: Yes
-      cli_upload: Yes
+    - description: 'Upload the updated source files to Crowdin'
+      script: update-source-files
+      updates-source: Yes # Marker to warn the user that it updates the source file in CAT
+      script-parameters:
+        loc_targets: [InputKeys]
+        csv_loc_targets: [AllStringTables, Narrative]
+        # manual_upload: Yes
+        # wait_for_upload_confirmation: Yes
+        cli_upload: Yes
 
-  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
-    script: build-and-download
-    script-parameters:
-      # loc_targets: []
-      # csv_loc_targets: []
+    - description: 'Build the project on Crowdin and download all targets to Content/Localization'
+      script: build-and-download
+      script-parameters:
+        # loc_targets: []
+        # csv_loc_targets: []
 
-  - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Import, Compile, GenerateReports]
-      # loc_targets: []
+    - description: 'Import and compile all targets in UE'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Import, Compile, GenerateReports]
+        # loc_targets: []
 
-# end of full sync
+  # end of full sync
 
-"ALL TARGETS: Full sync but *without* updating the source on Crowdin\nP4: Check Out, UE: Gather + Export, Loc: Prepare Debug + Source, Crowdin: Build + Download, UE: Import + Compile":
-  - description: 'Checkout Localization folder'
-    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-    script: p4-checkout
-    p4-checkout: True
-    script-parameters:
-      # loc_targets: []
-      add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
+sync.no-upload:
+  group: 'ALL TARGETS'
+  title: 'Full sync but *without* updating the source on Crowdin'
+  description: 'P4: Check Out, UE: Gather + Export, Loc: Prepare Debug + Source, Crowdin: Build + Download, UE: Import + Compile'
+  steps:
+    - description: 'Checkout Localization folder'
+      # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+      script: p4-checkout
+      p4-checkout: True
+      script-parameters:
+        # loc_targets: []
+        add_assets_to_checkout: [] # Add any additional assets to check out
+        add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
-  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Gather, Export]
-      # loc_targets: []
+    - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Gather, Export]
+        # loc_targets: []
 
-  # If your targets need different debug ID prefixes, use one step per target
-  # instead of this one. The single-task lists at the end of this file show how.
-  - description: 'Generate test from draft and source locale with comments and debug IDs'
-    script: test-lang
-    script-parameters:
-      sort_by_key: Yes
-      clear_translations: No
+    # If your targets need different debug ID prefixes, use one step per target
+    # instead of this one. The single-task lists at the end of this file show how.
+    - description: 'Generate test from draft and source locale with comments and debug IDs'
+      script: test-lang
+      script-parameters:
+        sort_by_key: Yes
+        clear_translations: No
 
-  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
-    script: build-and-download
-    script-parameters:
-      # loc_targets: []
-      # csv_loc_targets: []
+    - description: 'Build the project on Crowdin and download all targets to Content/Localization'
+      script: build-and-download
+      script-parameters:
+        # loc_targets: []
+        # csv_loc_targets: []
 
-  - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Import, Compile, GenerateReports]
-      # loc_targets: []
+    - description: 'Import and compile all targets in UE'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Import, Compile, GenerateReports]
+        # loc_targets: []
 
-# end of full sync without source update
+  # end of full sync without source update
 
-"ALL TARGETS: Gather and update the source on Crowdin only\nP4: Check Out, UE: Gather + Export, Loc: Prepare Debug + Source, Crowdin: Update Source":
-  - description: 'Checkout Localization folder'
-    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-    script: p4-checkout
-    p4-checkout: True
-    script-parameters:
-      # loc_targets: []
-      add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
+sync.source:
+  group: 'ALL TARGETS'
+  title: 'Gather and update the source on Crowdin only'
+  description: 'P4: Check Out, UE: Gather + Export, Loc: Prepare Debug + Source, Crowdin: Update Source'
+  steps:
+    - description: 'Checkout Localization folder'
+      # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+      script: p4-checkout
+      p4-checkout: True
+      script-parameters:
+        # loc_targets: []
+        add_assets_to_checkout: [] # Add any additional assets to check out
+        add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
-  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Gather, Export]
-      # loc_targets: []
+    - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Gather, Export]
+        # loc_targets: []
 
-  # If your targets need different debug ID prefixes, use one step per target
-  # instead of this one. The single-task lists at the end of this file show how.
-  - description: 'Generate test from draft and source locale with comments and debug IDs'
-    script: test-lang
-    script-parameters:
-      sort_by_key: Yes
-      clear_translations: No
+    # If your targets need different debug ID prefixes, use one step per target
+    # instead of this one. The single-task lists at the end of this file show how.
+    - description: 'Generate test from draft and source locale with comments and debug IDs'
+      script: test-lang
+      script-parameters:
+        sort_by_key: Yes
+        clear_translations: No
 
-  - description: 'Upload the updated source files to Crowdin'
-    script: update-source-files
-    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
-    script-parameters:
-      loc_targets: [InputKeys]
-      csv_loc_targets: [AllStringTables, Narrative]
-      # manual_upload: Yes
-      # wait_for_upload_confirmation: Yes
-      cli_upload: Yes
+    - description: 'Upload the updated source files to Crowdin'
+      script: update-source-files
+      updates-source: Yes # Marker to warn the user that it updates the source file in CAT
+      script-parameters:
+        loc_targets: [InputKeys]
+        csv_loc_targets: [AllStringTables, Narrative]
+        # manual_upload: Yes
+        # wait_for_upload_confirmation: Yes
+        cli_upload: Yes
 
-# end of gather and update source
+  # end of gather and update source
 
-"ALL TARGETS: Pull the latest translations only\nP4: Check Out, Crowdin: Build + Download, UE: Import + Compile":
-  - description: 'Checkout Localization folder'
-    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-    script: p4-checkout
-    p4-checkout: True
-    script-parameters:
-      # loc_targets: []
-      add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
+sync.pull:
+  group: 'ALL TARGETS'
+  title: 'Pull the latest translations only'
+  description: 'P4: Check Out, Crowdin: Build + Download, UE: Import + Compile'
+  steps:
+    - description: 'Checkout Localization folder'
+      # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+      script: p4-checkout
+      p4-checkout: True
+      script-parameters:
+        # loc_targets: []
+        add_assets_to_checkout: [] # Add any additional assets to check out
+        add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
-  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
-    script: build-and-download
-    script-parameters:
-      # loc_targets: []
-      # csv_loc_targets: []
+    - description: 'Build the project on Crowdin and download all targets to Content/Localization'
+      script: build-and-download
+      script-parameters:
+        # loc_targets: []
+        # csv_loc_targets: []
 
-  - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Import, Compile, GenerateReports]
-      # loc_targets: []
+    - description: 'Import and compile all targets in UE'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Import, Compile, GenerateReports]
+        # loc_targets: []
 
-# end of pull translations
+  # end of pull translations
 
-"ALL TARGETS: *Local* gather, prepare and import\nP4: Check Out, UE: Gather + Export, Loc: Prepare Debug + Source, UE: Import + Compile (nothing leaves the machine)":
-  - description: 'Checkout Localization folder'
-    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-    script: p4-checkout
-    p4-checkout: True
-    script-parameters:
-      # loc_targets: []
-      add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
+sync.local:
+  group: 'ALL TARGETS'
+  title: '*Local* gather, prepare and import'
+  description: 'P4: Check Out, UE: Gather + Export, Loc: Prepare Debug + Source, UE: Import + Compile (nothing leaves the machine)'
+  steps:
+    - description: 'Checkout Localization folder'
+      # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+      script: p4-checkout
+      p4-checkout: True
+      script-parameters:
+        # loc_targets: []
+        add_assets_to_checkout: [] # Add any additional assets to check out
+        add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
-  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Gather, Export]
-      # loc_targets: []
+    - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Gather, Export]
+        # loc_targets: []
 
-  # If your targets need different debug ID prefixes, use one step per target
-  # instead of this one. The single-task lists at the end of this file show how.
-  - description: 'Generate test from draft and source locale with comments and debug IDs'
-    script: test-lang
-    script-parameters:
-      sort_by_key: Yes
-      clear_translations: No
+    # If your targets need different debug ID prefixes, use one step per target
+    # instead of this one. The single-task lists at the end of this file show how.
+    - description: 'Generate test from draft and source locale with comments and debug IDs'
+      script: test-lang
+      script-parameters:
+        sort_by_key: Yes
+        clear_translations: No
 
-  - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Import, Compile, GenerateReports]
-      # loc_targets: []
+    - description: 'Import and compile all targets in UE'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Import, Compile, GenerateReports]
+        # loc_targets: []
 
-# end of local gather and import
+  # end of local gather and import
 
-# -------------------------------------------------------------
-# -------------------- SINGLE-TASK LISTS ----------------------
-# -------------------------------------------------------------
-#
-# One task each, for picking up a full cycle that failed halfway, and for
-# the occasional one-off. Most of these expect the steps before them to have
-# run already.
+  # -------------------------------------------------------------
+  # -------------------- SINGLE-TASK LISTS ----------------------
+  # -------------------------------------------------------------
+  #
+  # One task each, for picking up a full cycle that failed halfway, and for
+  # the occasional one-off. Most of these expect the steps before them to have
+  # run already.
 
-"ONE STEP: Check out the localization files from Perforce\nP4: Check Out":
-  - description: 'Checkout Localization folder'
-    # Enable p4-checkout to let this work or check out Localization folder and other assets manually
-    script: p4-checkout
-    p4-checkout: True
-    script-parameters:
-      # loc_targets: []
-      add_assets_to_checkout: [] # Add any additional assets to check out
-      add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
+step.checkout:
+  group: 'ONE STEP'
+  title: 'Check out the localization files from Perforce'
+  description: 'P4: Check Out'
+  steps:
+    - description: 'Checkout Localization folder'
+      # Enable p4-checkout to let this work or check out Localization folder and other assets manually
+      script: p4-checkout
+      p4-checkout: True
+      script-parameters:
+        # loc_targets: []
+        add_assets_to_checkout: [] # Add any additional assets to check out
+        add_paths_to_checkout: ['Content/Localization/~Temp/#Sources'] # Add any additional paths to check out
 
-# end of one step check out
+  # end of one step check out
 
-"ONE STEP: Gather and export in Unreal\nUE: Gather + Export":
-  - description: 'Gather the text in UE for all targets and export the source/test locale draft'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Gather, Export]
-      # loc_targets: []
+step.gather:
+  group: 'ONE STEP'
+  title: 'Gather and export in Unreal'
+  description: 'UE: Gather + Export'
+  steps:
+    - description: 'Gather the text in UE for all targets and export the source/test locale draft'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Gather, Export]
+        # loc_targets: []
 
-# end of one step gather
+  # end of one step gather
 
-# One list per target, because each target gets its own debug ID prefix.
-# This is the pattern to copy into a full-cycle list if you need it there.
+  # One list per target, because each target gets its own debug ID prefix.
+  # This is the pattern to copy into a full-cycle list if you need it there.
 
-"ONE STEP: Prepare debug IDs and source for the catch-all target\nLoc: Prepare Debug + Source":
-  - description: 'Generate test from draft and source locale with comments and debug IDs'
-    script: test-lang
-    script-parameters:
-      loc_targets: [Game] # Catch-all target, if any
-      hash_prefix: '?'
-      debug_prefix: '?'
-      sort_by_key: Yes
-      clear_translations: No
+step.prepare.catch-all:
+  group: 'ONE STEP'
+  title: 'Prepare debug IDs and source for the catch-all target'
+  description: 'Loc: Prepare Debug + Source'
+  steps:
+    - description: 'Generate test from draft and source locale with comments and debug IDs'
+      script: test-lang
+      script-parameters:
+        loc_targets: [Game] # Catch-all target, if any
+        hash_prefix: '?'
+        debug_prefix: '?'
+        sort_by_key: Yes
+        clear_translations: No
 
-# end of one step prepare catch-all
+  # end of one step prepare catch-all
 
-"ONE STEP: Prepare debug IDs and source for the string tables\nLoc: Prepare Debug + Source":
-  - description: 'AllStringTables: generate test and source locale with comments and debug IDs'
-    script: test-lang
-    script-parameters:
-      loc_targets: [AllStringTables]
-      debug_prefix: '#'
-      hash_prefix: '#'
-      clear_translations: No
+step.prepare.string-tables:
+  group: 'ONE STEP'
+  title: 'Prepare debug IDs and source for the string tables'
+  description: 'Loc: Prepare Debug + Source'
+  steps:
+    - description: 'AllStringTables: generate test and source locale with comments and debug IDs'
+      script: test-lang
+      script-parameters:
+        loc_targets: [AllStringTables]
+        debug_prefix: '#'
+        hash_prefix: '#'
+        clear_translations: No
 
-# end of one step prepare string tables
+  # end of one step prepare string tables
 
-"ONE STEP: Prepare debug IDs and source for the narrative\nLoc: Prepare Debug + Source":
-  - description: 'Narrative: generate test and source locale with comments and debug IDs'
-    script: test-lang
-    script-parameters:
-      loc_targets: [Narrative]
-      debug_prefix: '='
-      hash_prefix: '#'
-      clear_translations: No
+step.prepare.narrative:
+  group: 'ONE STEP'
+  title: 'Prepare debug IDs and source for the narrative'
+  description: 'Loc: Prepare Debug + Source'
+  steps:
+    - description: 'Narrative: generate test and source locale with comments and debug IDs'
+      script: test-lang
+      script-parameters:
+        loc_targets: [Narrative]
+        debug_prefix: '='
+        hash_prefix: '#'
+        clear_translations: No
 
-# end of one step prepare narrative
+  # end of one step prepare narrative
 
-"ONE STEP: Prepare debug IDs and source for the input keys\nLoc: Prepare Debug + Source":
-  - description: 'InputKeys: generate test and source locale with comments and debug IDs'
-    script: test-lang
-    script-parameters:
-      loc_targets: [InputKeys]
-      debug_prefix: '~'
-      hash_prefix: '#'
-      clear_translations: No
+step.prepare.input-keys:
+  group: 'ONE STEP'
+  title: 'Prepare debug IDs and source for the input keys'
+  description: 'Loc: Prepare Debug + Source'
+  steps:
+    - description: 'InputKeys: generate test and source locale with comments and debug IDs'
+      script: test-lang
+      script-parameters:
+        loc_targets: [InputKeys]
+        debug_prefix: '~'
+        hash_prefix: '#'
+        clear_translations: No
 
-# end of one step prepare input keys
+  # end of one step prepare input keys
 
-"ONE STEP: Update the source on Crowdin\nCrowdin: Update Source (needs Gather + Export and Prepare to have run first)":
-  - description: 'Upload the updated source files to Crowdin'
-    script: update-source-files
-    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
-    script-parameters:
-      loc_targets: [InputKeys]
-      csv_loc_targets: [AllStringTables, Narrative]
-      # manual_upload: Yes
-      # wait_for_upload_confirmation: Yes
-      cli_upload: Yes
+step.download:
+  group: 'ONE STEP'
+  title: 'Build and download the translations from Crowdin'
+  description: 'Crowdin: Build + Download'
+  steps:
+    - description: 'Build the project on Crowdin and download all targets to Content/Localization'
+      script: build-and-download
+      script-parameters:
+        # loc_targets: []
+        # csv_loc_targets: []
 
-# end of one step update source
+  # end of one step download
 
-"ONE STEP: Build and download the translations from Crowdin\nCrowdin: Build + Download":
-  - description: 'Build the project on Crowdin and download all targets to Content/Localization'
-    script: build-and-download
-    script-parameters:
-      # loc_targets: []
-      # csv_loc_targets: []
+step.import:
+  group: 'ONE STEP'
+  title: 'Import and compile in Unreal'
+  description: 'UE: Import + Compile'
+  steps:
+    - description: 'Import and compile all targets in UE'
+      script: ue-loc-gather-cmd
+      script-parameters:
+        tasks: [Import, Compile, GenerateReports]
+        # loc_targets: []
 
-# end of one step download
+  # end of one step import
 
-"ONE STEP: Import and compile in Unreal\nUE: Import + Compile":
-  - description: 'Import and compile all targets in UE'
-    script: ue-loc-gather-cmd
-    script-parameters:
-      tasks: [Import, Compile, GenerateReports]
-      # loc_targets: []
+  # -------------------------------------------------------------
+  # ------------------------- ONE-OFFS --------------------------
+  # -------------------------------------------------------------
+  #
+  # Source upload variants you reach for rarely. All of them expect Gather +
+  # Export and Prepare to have run for each target already.
 
-# end of one step import
+source.update:
+  group: 'ONE OFF'
+  title: 'Update the source on Crowdin'
+  description: 'Crowdin: Update Source (needs Gather + Export and Prepare to have run first)'
+  steps:
+    - description: 'Upload the updated source files to Crowdin'
+      script: update-source-files
+      updates-source: Yes # Marker to warn the user that it updates the source file in CAT
+      script-parameters:
+        loc_targets: [InputKeys]
+        csv_loc_targets: [AllStringTables, Narrative]
+        # manual_upload: Yes
+        # wait_for_upload_confirmation: Yes
+        cli_upload: Yes
 
-# -------------------------------------------------------------
-# ------------------------- ONE-OFFS --------------------------
-# -------------------------------------------------------------
-#
-# Source upload variants you reach for rarely. All of them expect Gather +
-# Export and Prepare to have run for each target already.
+  # end of one step update source
 
-"ONE OFF: Add new files to Crowdin with the correct export settings\nCrowdin: Add Files (does not touch files that already exist)":
-  - description: 'Add new source files to Crowdin'
-    script: update-source-files
-    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
-    script-parameters:
-      # Targets that have new files to be added to Crowdin:
-      loc_targets: []
-      csv_loc_targets: []
-      add_files_only: Yes # Won't update existing files
+source.add-files:
+  group: 'ONE OFF'
+  title: 'Add new files to Crowdin with the correct export settings'
+  description: 'Crowdin: Add Files (does not touch files that already exist)'
+  steps:
+    - description: 'Add new source files to Crowdin'
+      script: update-source-files
+      updates-source: Yes # Marker to warn the user that it updates the source file in CAT
+      script-parameters:
+        # Targets that have new files to be added to Crowdin:
+        loc_targets: []
+        csv_loc_targets: []
+        add_files_only: Yes # Won't update existing files
 
-# end of one off add files
+  # end of one off add files
 
-"ONE OFF: Update the source into the word count branch\nCrowdin: Update Source into a branch nobody translates":
-  - description: 'Upload the updated source files to Crowdin'
-    script: update-source-files
-    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
-    script-parameters:
-      loc_targets: [InputKeys]
-      csv_loc_targets: [AllStringTables, Narrative]
-      # manual_upload: Yes
-      # wait_for_upload_confirmation: Yes
-      cli_upload: Yes
-      # cli_dry_run: Yes
-      branch: 'DO-NOT-TRANSLATE-WordCountBranch'
+source.wordcount:
+  group: 'ONE OFF'
+  title: 'Update the source into the word count branch'
+  description: 'Crowdin: Update Source into a branch nobody translates'
+  steps:
+    - description: 'Upload the updated source files to Crowdin'
+      script: update-source-files
+      updates-source: Yes # Marker to warn the user that it updates the source file in CAT
+      script-parameters:
+        loc_targets: [InputKeys]
+        csv_loc_targets: [AllStringTables, Narrative]
+        # manual_upload: Yes
+        # wait_for_upload_confirmation: Yes
+        cli_upload: Yes
+        # cli_dry_run: Yes
+        branch: 'DO-NOT-TRANSLATE-WordCountBranch'
 
-# end of one off word count branch
+  # end of one off word count branch
 
-"ONE OFF: Update the source by hand, without the Crowdin CLI\nCrowdin: Prepare the files, then wait for you to upload them yourself":
-  - description: 'Upload the updated source files to Crowdin'
-    script: update-source-files
-    updates-source: Yes # Marker to warn the user that it updates the source file in CAT
-    script-parameters:
-      loc_targets: [InputKeys]
-      csv_loc_targets: [AllStringTables, Narrative]
-      manual_upload: Yes
-      wait_for_upload_confirmation: Yes
-      cli_upload: No
+source.manual:
+  group: 'ONE OFF'
+  title: 'Update the source by hand, without the Crowdin CLI'
+  description: 'Crowdin: Prepare the files, then wait for you to upload them yourself'
+  steps:
+    - description: 'Upload the updated source files to Crowdin'
+      script: update-source-files
+      updates-source: Yes # Marker to warn the user that it updates the source file in CAT
+      script-parameters:
+        loc_targets: [InputKeys]
+        csv_loc_targets: [AllStringTables, Narrative]
+        manual_upload: Yes
+        wait_for_upload_confirmation: Yes
+        cli_upload: No
 
-# end of one off manual upload
+  # end of one off manual upload

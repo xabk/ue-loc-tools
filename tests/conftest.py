@@ -8,7 +8,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from libraries.task_runner import TaskRunner  # noqa: E402
+from libraries.task_runner import TaskRunner, read_task_lists  # noqa: E402
 
 TEMPLATE_BASE = REPO_ROOT / 'templates' / 'base.config.yaml'
 TEMPLATE_SECRET = REPO_ROOT / 'templates' / 'crowdin.config.yaml'
@@ -38,7 +38,11 @@ def config(runner: TaskRunner) -> dict:
 
 @pytest.fixture(scope='session')
 def task_lists(config: dict) -> dict:
-    return {k: v for k, v in config.items() if isinstance(v, list)}
+    """Name -> steps, which is what the template tests care about."""
+    return {
+        name: task_list.steps
+        for name, task_list in read_task_lists(config).items()
+    }
 
 
 def write_config(path: Path, data: dict) -> Path:
