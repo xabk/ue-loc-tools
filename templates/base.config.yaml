@@ -154,6 +154,20 @@ parameters:
   # unreal_binary: Engine/Binaries/Win64/UE4Editor-Cmd.exe # Standard UE4
   unreal_binary: Engine/Binaries/Win64/UnrealEditor-Cmd.exe # Standard UE5
 
+  # Missing string table references to keep out of the recap.
+  # `entry` is the table and key, `asset` is the path reported under it.
+  # Both are glob patterns (fnmatch), not regular expressions.
+  # An omitted `asset` matches any asset.
+  # `reason` is the rule description.
+  # The recap reports how many findings were ignored.
+  #
+  # List references one by one. A glob also matches references no one has
+  # checked yet.
+  #
+  # ignore_references:
+  #   - entry: 'MyTable,Debug/StartupBanner'
+  #     reason: 'Debug-only string. Confirmed with the devs 2026-10-19.'
+
 # -------------------------------------------------------------
 # ----- SCRIPT PARAMETERS: SET DEFAULTS FOR SCRIPTS HERE ------
 # -------------------------------------------------------------

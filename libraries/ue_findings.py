@@ -5,6 +5,10 @@ other and findings from the two can be merged.
 """
 
 import re
+from dataclasses import dataclass
+from fnmatch import fnmatch
+
+from loguru import logger
 
 from libraries.findings import Findings
 
@@ -56,6 +60,54 @@ GATHER_LOG_CATEGORIES = (
 )
 
 
+@dataclass
+class IgnoreRule:
+    """A missing reference to keep out of the recap.
+
+    Both patterns are globs (fnmatch), not regular expressions, and an
+    omitted one matches anything. The asset is matched as the recap prints
+    it, so a rule can be written by copying a line out of a run.
+    """
+
+    entry: str = '*'
+    asset: str = '*'
+    reason: str = ''
+
+    def matches(self, entry: str, asset: str) -> bool:
+        return fnmatch(entry, self.entry) and fnmatch(asset, self.asset)
+
+
+def read_ignore_rules(configured: list | None) -> list[IgnoreRule]:
+    """Read the `ignore_references` config section. A rule that cannot be
+    honoured is logged and skipped."""
+    rules: list[IgnoreRule] = []
+    for item in configured or []:
+        if not isinstance(item, dict):
+            logger.warning(f'Skipping a malformed ignore_references rule: {item!r}')
+            continue
+        entry = str(item.get('entry', '*'))
+        asset = str(item.get('asset', '*'))
+        if entry == '*' and asset == '*':
+            logger.warning(
+                'Skipping an ignore_references rule that matches every '
+                'reference. Give it an entry or an asset.'
+            )
+            continue
+        rules.append(IgnoreRule(entry, asset, str(item.get('reason', ''))))
+    return rules
+
+
+def _ignored(
+    findings: Findings, rules: list[IgnoreRule] | None, entry: str, asset: str
+) -> bool:
+    """Whether a rule covers this reference. Records the key if one does."""
+    for rule in rules or []:
+        if rule.matches(entry, asset):
+            findings.ignore(entry)
+            return True
+    return False
+
+
 def _one_place(context: str) -> str:
     """Collapse Unreal's three names for one reference: the asset, the _C
     class it compiles to, and the bytecode of the same function."""
@@ -63,7 +115,12 @@ def _one_place(context: str) -> str:
     return re.sub(r'\s*\[Script Bytecode\]$', '', context).strip()
 
 
-def collect(findings: Findings, line: str, asset: str | None = None) -> bool:
+def collect(
+    findings: Findings,
+    line: str,
+    asset: str | None = None,
+    ignore: list[IgnoreRule] | None = None,
+) -> bool:
     """Take out of one line anything worth repeating at the end, and say
     whether this was one of them.
 
@@ -72,16 +129,16 @@ def collect(findings: Findings, line: str, asset: str | None = None) -> bool:
     named = MISSING_REFERENCE.search(line)
     if named:
         table, key, context = named.groups()
-        findings.add(MISSING_ENTRIES, f'{table},{key}', _one_place(context))
+        entry, place = f'{table},{key}', _one_place(context)
+        if not _ignored(findings, ignore, entry, place):
+            findings.add(MISSING_ENTRIES, entry, place)
         return True
 
     missing = MISSING_ST_ENTRY.search(line)
     if missing:
-        findings.add(
-            MISSING_ENTRIES,
-            f'{missing.group(1)},{missing.group(2)}',
-            f'in {asset}' if asset else '',
-        )
+        entry = f'{missing.group(1)},{missing.group(2)}'
+        if not _ignored(findings, ignore, entry, asset or ''):
+            findings.add(MISSING_ENTRIES, entry, f'in {asset}' if asset else '')
         return True
 
     collision = ID_COLLISION.search(line)

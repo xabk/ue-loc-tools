@@ -20,7 +20,12 @@ from loguru import logger
 from dataclasses import dataclass, field
 
 from libraries.findings import Findings
-from libraries.ue_findings import PACKAGE_PROBLEMS, UE_RECAP, collect
+from libraries.ue_findings import (
+    PACKAGE_PROBLEMS,
+    UE_RECAP,
+    collect,
+    read_ignore_rules,
+)
 from libraries.utilities import LocTask, init_logging
 
 COMMANDLET_VERDICT = r'GatherText completed with exit code (-?\d+)'
@@ -76,6 +81,9 @@ class UnrealLocGatherCommandlet(LocTask):
             'LogLinker: ',
         ]
     )
+
+    # Missing references to keep out of the recap. See `read_ignore_rules`.
+    ignore_references: list = field(default_factory=list)
 
     # The console is told once per this many percent.
     progress_step: int = 1
@@ -262,6 +270,7 @@ class UnrealLocGatherCommandlet(LocTask):
                 held = None
 
         self.findings = Findings(source=self.__class__.__name__)
+        ignore = read_ignore_rules(self.ignore_references)
         collecting = True
 
         try:
@@ -345,7 +354,7 @@ class UnrealLocGatherCommandlet(LocTask):
                         if 'Error: ' in line:
                             errors += 1
 
-                        if collecting and collect(self.findings, line, package):
+                        if collecting and collect(self.findings, line, package, ignore):
                             with_context()
                             say = logger.error if 'Error: ' in line else logger.warning
                             say(f'| UE | {line.strip()}')

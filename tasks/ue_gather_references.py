@@ -24,7 +24,7 @@ from timeit import default_timer as timer
 from loguru import logger
 
 from libraries.findings import Findings
-from libraries.ue_findings import UE_RECAP, collect
+from libraries.ue_findings import UE_RECAP, collect, read_ignore_rules
 from libraries.uetools import UEProject
 from libraries.utilities import LocTask
 
@@ -57,6 +57,9 @@ class GatherStringTableReferences(LocTask):
     log_to_skip: list[str] = field(
         default_factory=lambda: ['LogLiveCodingServer: ', 'LogLinker: ']
     )
+
+    # Missing references to keep out of the recap. See `read_ignore_rules`.
+    ignore_references: list = field(default_factory=list)
 
     # The console is told once per this many percent, and at least once
     # per progress_heartbeat. The log file keeps every package.
@@ -139,6 +142,7 @@ class GatherStringTableReferences(LocTask):
                 held = None
 
         self.findings = Findings(source=self.__class__.__name__)
+        ignore = read_ignore_rules(self.ignore_references)
         collecting = True
         start = timer()
 
@@ -212,7 +216,7 @@ class GatherStringTableReferences(LocTask):
                     if re.search(MISSING_BANNER, line):
                         continue
 
-                    if collecting and collect(self.findings, line):
+                    if collecting and collect(self.findings, line, ignore=ignore):
                         with_context()
                         say = logger.error if 'Error: ' in line else logger.warning
                         say(f'| UE | {line}')

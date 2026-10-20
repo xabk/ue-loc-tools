@@ -38,6 +38,11 @@ class Findings:
 
     source: str = ''
     by_key: dict[tuple[str, str], Finding] = field(default_factory=dict)
+    # Keys a config rule covered. Counted at the end of the recap.
+    ignored: set[str] = field(default_factory=set)
+
+    def ignore(self, key: str):
+        self.ignored.add(key)
 
     def add(self, category: str, key: str, context: str = '', level='warning'):
         found = Finding(category, key, {context} if context else set(), level=level)
@@ -48,6 +53,7 @@ class Findings:
             self.by_key[(category, key)] = found
 
     def merge(self, other: 'Findings'):
+        self.ignored |= other.ignored
         for finding in other.by_key.values():
             existing = self.by_key.get((finding.category, finding.key))
             if existing:
@@ -93,3 +99,5 @@ class Findings:
                 say(f'  {finding.key}{times}')
                 for context in sorted(finding.contexts):
                     say(f'      {context}')
+        if self.ignored:
+            logger.info(f'{len(self.ignored)} finding(s) ignored by config.')
