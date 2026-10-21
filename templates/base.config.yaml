@@ -44,6 +44,10 @@ tasks:
     module: 'tasks.build_and_download'
     class: 'BuildAndDownloadTranslations'
 
+  pre-translate:
+    module: 'tasks.pre_translate'
+    class: 'PreTranslate'
+
   # UE5 only: the commandlet ships with the studio's Unreal loc plugin.
   ue-gather-references:
     module: 'tasks.ue_gather_references'
@@ -332,6 +336,31 @@ script-parameters:
     # over AI ones. The project needs Skip Untranslated Strings on, so its
     # untranslated strings come back empty.
     skip_empty_translations: No
+
+  ### ### ### ### ### ### ### ### ### ### ### ### ###
+
+  pre-translate:
+    # Pre-translate every file in a Crowdin project via TM, MT or AI and wait
+    # until Crowdin is done. Meant for a separate project whose translations
+    # fill the gaps until real ones arrive: run it after the source upload,
+    # before the downloads.
+
+    # Set this to the pre-translation project, never the main one
+    project_id: -1
+
+    # tm, mt or ai. mt needs engine_id, ai needs ai_prompt_id (AI → Prompts)
+    method: tm
+    engine_id:
+    ai_prompt_id:
+
+    # Crowdin language IDs. Empty = every target language of the project.
+    languages: []
+    # E.g., a word count language that nobody needs translated
+    exclude_languages: []
+
+    # untranslated, translated or all. Anything but untranslated pays again
+    # for strings that already have a translation.
+    scope: untranslated
 
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 

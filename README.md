@@ -196,6 +196,7 @@ The tasks a project can put in a task list, by the name you use under
 | `mt-pseudo` | create the "longest" locale from TM and MT, where English is extended to the length of the longest translation |
 | `update-source-files` | add or update source files on Crowdin, with the export settings and file type you configure |
 | `build-and-download` | build on Crowdin, download the translations and move them into the UE Localization folders |
+| `pre-translate` | pre-translate a Crowdin project via TM, MT or AI and wait for Crowdin to finish, e.g. to fill gaps until real translations arrive |
 | `completion-rates` | pull language completion rates into a CSV, for a language selection menu |
 | `community-credits` | pull contributor stats into a CSV, for game credits |
 | `po-csv-converter` | convert between the PO files and CSV, including bilingual CSVs |
