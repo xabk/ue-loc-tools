@@ -27,7 +27,9 @@ def _log_both(prefix: str, plain: str, colour: str):
     )
 
 
-def _truncate_for_logging(text: str, max_bytes: int = 65536, max_length: int = 1000) -> str:
+def _truncate_for_logging(
+    text: str, max_bytes: int = 65536, max_length: int = 1000
+) -> str:
     if len(text.encode('utf-8')) > max_bytes:
         return text[:max_length]
     return text
@@ -51,6 +53,7 @@ class ImportFindings:
     whitespace_ignored: set[str] = field(default_factory=set)
     newlines_normalized: set[str] = field(default_factory=set)
     mismatch_ignored: set[str] = field(default_factory=set)
+    empty_skipped: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -73,6 +76,11 @@ class BuildAndDownloadTranslations(LocTask):
     ignore_unsafe_whitespace_mismatch: bool = True
     ignore_new_lines_mismatch: bool = True
     normalize_newlines_in_translation: bool = True
+    # An empty translation in the CSV leaves the PO entry as it is instead of
+    # clearing it. This lets one project be imported over another: the first
+    # project's translations stay wherever the second has none. A project with
+    # Skip Untranslated Strings exports its untranslated strings empty.
+    skip_empty_translations: bool = False
 
     po_encoding: str = 'utf-8-sig'
     csv_fields: list[str] = field(
@@ -286,6 +294,12 @@ class BuildAndDownloadTranslations(LocTask):
         skipped_due_to_mismatch = {}
         ignored_unsafe_whitespace_mismatch = {}
 
+        def set_translation(entry: polib.POEntry, key: str, translation: str):
+            if self.skip_empty_translations and translation == '':
+                findings.empty_skipped.add(key)
+                return
+            entry.msgstr = translation
+
         for entry in po_file:
             key = entry.msgctxt
             if key not in csv_data:
@@ -314,7 +328,7 @@ class BuildAndDownloadTranslations(LocTask):
 
             if po_source == csv_source:
                 # Update the translation (if source is the same, or if we're ignoring the mismatch)
-                entry.msgstr = translation
+                set_translation(entry, key, translation)
                 del csv_data[key]
                 continue
 
@@ -328,14 +342,14 @@ class BuildAndDownloadTranslations(LocTask):
                     'csv': csv_source,
                 }
                 # Update the translation (if source is the same, or if we're ignoring the mismatch)
-                entry.msgstr = translation
+                set_translation(entry, key, translation)
                 del csv_data[key]
                 continue
 
             if self.ignore_source_mismatch:
                 findings.mismatch_ignored.add(key)
                 # Update the translation (if source is the same, or if we're ignoring the mismatch)
-                entry.msgstr = translation
+                set_translation(entry, key, translation)
                 del csv_data[key]
                 continue
 
@@ -412,6 +426,9 @@ class BuildAndDownloadTranslations(LocTask):
             f'    whitespace ignored {len(whitespace)}    newlines normalized '
             f'{len(newlines)}    mismatch ignored {len(ignored)}'
         )
+        if self.skip_empty_translations:
+            empty = by_key('empty_skipped')
+            logger.info(f'    empty on Crowdin, PO kept {len(empty)}')
 
         # A translation was thrown away. Always worth a warning, always listed.
         if mismatch:
@@ -441,7 +458,7 @@ class BuildAndDownloadTranslations(LocTask):
             if whole:
                 logger.info(
                     f'{len(whole)} string(s) absent from Crowdin in all {n} '
-                    "locale(s) (filtered out before upload, or the new source "
+                    'locale(s) (filtered out before upload, or the new source '
                     "hasn't been uploaded yet):"
                 )
                 for key in sorted(whole):

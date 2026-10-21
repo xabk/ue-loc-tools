@@ -326,6 +326,13 @@ script-parameters:
     ignore_new_lines_mismatch: Yes
     normalize_newlines_in_translation: Yes
 
+    # CSV targets only. An empty translation leaves the PO entry as it is
+    # instead of clearing it. Set it in a task list on the second of two
+    # downloads, to import one project over another: e.g., real translations
+    # over AI ones. The project needs Skip Untranslated Strings on, so its
+    # untranslated strings come back empty.
+    skip_empty_translations: No
+
   ### ### ### ### ### ### ### ### ### ### ### ### ###
 
   p4-checkout:
