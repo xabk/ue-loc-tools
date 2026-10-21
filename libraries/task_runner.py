@@ -10,6 +10,7 @@ modes:
 
 import importlib.util
 import importlib
+import shutil
 from pathlib import Path
 from timeit import default_timer as timer
 from dataclasses import asdict, dataclass, fields
@@ -100,6 +101,26 @@ COLOR_GREEN = '\033[92m'
 COLOR_YELLOW = '\033[93m'
 COLOR_DARK_GRAY = '\033[90m'
 COLOR_RESET = '\033[0m'
+
+# Between a task list's title and its description when both fit on one line.
+MENU_SEPARATOR = ' / '
+# Console width to assume when it cannot be read, e.g. when output is piped.
+MENU_FALLBACK_WIDTH = 120
+
+
+def menu_entry_lines(number: int, title: str, description: str, width: int) -> list[str]:
+    """The menu lines for one task list: the description goes after the title
+    when both fit within the console width, and on a line of its own when not.
+    """
+    entry = f'{COLOR_GREEN}{number:>2d}.{COLOR_RESET} {title}'
+    if not description:
+        return [entry]
+    plain = f'{number:>2d}. {title}{MENU_SEPARATOR}{description}'
+    # One short of the edge: a line that fills the console exactly leaves an
+    # empty line under it on consoles that wrap before the newline arrives.
+    if len(plain) < width:
+        return [f'{entry}{COLOR_DARK_GRAY}{MENU_SEPARATOR}{description}{COLOR_RESET}']
+    return [entry, f'\t{COLOR_DARK_GRAY}{description}{COLOR_RESET}']
 
 # Default configuration file names
 DEFAULT_BASE_CONFIG = 'base.config.yaml'
@@ -533,19 +554,20 @@ class TaskRunner:
         # Declining the confirmation comes back here, as the prompt promises.
         while True:
             task_list = ''
-            print(f'\nProject directory: {COLOR_YELLOW}{Path.cwd()}{COLOR_RESET}')
-            print('\nAvailable task lists from base.config.yaml:\n')
+            print(f'Project directory: {COLOR_YELLOW}{Path.cwd()}{COLOR_RESET}')
+            print()
             lists = read_task_lists(self.config)
+            width = shutil.get_terminal_size((MENU_FALLBACK_WIDTH, 0)).columns
             group = None
             for i, task in enumerate(task_lists, start=1):
                 entry = lists[task]
                 if entry.group != group:
                     group = entry.group
                     if group:
-                        print(f'\n{COLOR_YELLOW}{group}{COLOR_RESET}')
-                print(f'{COLOR_GREEN}{i:>2d}.{COLOR_RESET} {entry.title}')
-                if entry.description:
-                    print(f'\t{COLOR_DARK_GRAY}{entry.description}{COLOR_RESET}')
+                        print(f'{COLOR_YELLOW}{group}{COLOR_RESET}')
+                for line in menu_entry_lines(i, entry.title, entry.description, width):
+                    print(line)
+            print()
             while not task_list:
                 choice = ''
                 try:
